@@ -10,3 +10,24 @@ function generateKey() {
 
     document.getElementById('generatedKey').innerHTML = key;
 }
+function savekey() {
+  // Create a Blob with the content
+  const content = key;
+  const blob = new Blob([content], { type: 'text/plain' });
+
+  // Create a link element
+  const link = document.createElement('a');
+
+  // Set link attributes, including the file name
+  link.href = window.URL.createObjectURL(blob);
+  link.download = 'savedkeyfile.txt';
+
+  // Append the link to the document
+  document.body.appendChild(link);
+
+  // Trigger a click on the link to start the download
+  link.click();
+
+  // Remove the link from the document
+  document.body.removeChild(link);
+}
