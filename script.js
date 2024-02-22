@@ -1,7 +1,9 @@
+let key = ''; // Declare key globally
+
 function generateKey() {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+=-[]{};:,<.>/?';
     const keyLength = 50; // Change this to 40
-    let key = '';
+    key = ''; // Reset key before generating a new one
 
     for (let i = 0; i < keyLength; i++) {
         const randomIndex = Math.floor(Math.random() * characters.length);
@@ -10,24 +12,25 @@ function generateKey() {
 
     document.getElementById('generatedKey').innerHTML = key;
 }
+
 function savekey() {
-  // Create a Blob with the content
-  const content = key;
-  const blob = new Blob([content], { type: 'text/plain' });
+    // Create a Blob with the content
+    const content = key;
+    const blob = new Blob([content], { type: 'text/plain' });
 
-  // Create a link element
-  const link = document.createElement('a');
+    // Create a link element
+    const link = document.createElement('a');
 
-  // Set link attributes, including the file name
-  link.href = window.URL.createObjectURL(blob);
-  link.download = 'savedkeyfile.txt';
+    // Set link attributes, including the file name
+    link.href = window.URL.createObjectURL(blob);
+    link.download = 'savedkeyfile.txt';
 
-  // Append the link to the document
-  document.body.appendChild(link);
+    // Append the link to the document
+    document.body.appendChild(link);
 
-  // Trigger a click on the link to start the download
-  link.click();
+    // Trigger a click on the link to start the download
+    link.click();
 
-  // Remove the link from the document
-  document.body.removeChild(link);
+    // Remove the link from the document
+    document.body.removeChild(link);
 }
