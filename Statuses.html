@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatDllsWork</title>
+    <style>
+        body {
+            background: black;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            text-align: center; /* Center the text */
+        }
+
+        .container {
+            width: 80%;
+            max-width: 600px; /* Adjust the max-width based on your preference */
+            padding: 20px;
+            overflow: auto;
+        }
+
+        .status {
+            margin-bottom: 20px;
+            background-color: #333;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer; /* Add cursor pointer for clickable effect */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>What Dlls Work</h1>
+        <p>Welcome to What DLLs Work, a website to show what current mod menus are working.</p>
+
+        <div class="status" onclick="openLink('https://discord.gg/DerYyqW7rK')">
+            <h2>Atom Mod Menu</h2>
+            <p>Very op mod menu and first to be released, current Public version is v0.0.1</p>
+            <p>Status: Currently Offline</p>
+        </div>
+
+        <div class="status" onclick="openLink('https://discord.gg/FeY3dMECp9')">
+            <h2>Hydra Client</h2>
+            <p>A fun to troll menu that's kinda op and second to be released, current Public version is v0.5</p>
+            <p>Status: Currently Offline</p>
+        </div>
+
+        <div class="status" onclick="openLink('#')">
+            <h2>Karma Client</h2>
+            <p>A very long holdable Mod Menu, version is unknown</p>
+            <p>Status: N/A</p>
+        </div>
+    </div>
+
+    <script>
+        function openLink(url) {
+            window.open(url, '_blank');
+        }
+    </script>
+</body>
+</html>
