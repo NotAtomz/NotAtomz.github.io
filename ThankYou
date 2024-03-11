@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atom Client</title>
+    <style>
+        body {
+            background: linear-gradient(45deg, #ff0000, #ff7700, #ffdd00, #aaff00, #00ff77, #0077ff, #3300ff, #7700ff);
+            background-size: 400% 400%;
+            animation: rainbowBackground 15s infinite;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #fff;
+            color: #333;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        @keyframes rainbowBackground {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Thank You For Using Atom Client Holdable Menu Version I Hope You Enjoy And Feel Free To Join The Discord If You Have Not</h1>
+    <button onclick="openURL()">Join Discord</button>
+
+    <script>
+        function openURL() {
+            window.open('https://discord.gg/DerYyqW7rK', '_blank');
+        }
+    </script>
+</body>
+</html>
