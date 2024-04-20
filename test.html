@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Advanced Chatbot with Internet Access</title>
+    <title>Chatbot with Learning and Internet Access</title>
     <style>
         /* General Styles */
         body {
@@ -99,6 +99,17 @@
         const chatbox = document.getElementById('chatbox');
         const input = document.getElementById('input');
 
+        // Data structure to store learned responses
+        const responses = {};
+
+        // Load learned responses from local storage
+        function loadLearnedResponses() {
+            const storedResponses = localStorage.getItem('responses');
+            if (storedResponses) {
+                Object.assign(responses, JSON.parse(storedResponses));
+            }
+        }
+
         // Function to handle the Enter key press
         function handleKeyPress(event) {
             if (event.key === 'Enter') {
@@ -125,30 +136,56 @@
             }
         }
 
-        // Function to get chatbot response
+        // Function to handle chatbot responses
         function getChatbotResponse(userMessage) {
-            // Perform a Google search query
-            const queryURL = `https://www.google.com/search?q=${encodeURIComponent(userMessage)}`;
+            // Check if the response is already learned
+            if (responses[userMessage]) {
+                // Use the learned response
+                const response = responses[userMessage];
+                chatbox.innerHTML += `<p><strong>Chatbot:</strong> ${response}</p>`;
+            } else {
+                // If not learned, prompt the user to teach the chatbot
+                const userResponse = prompt(`I don't know how to respond to "${userMessage}". Can you provide an answer?`);
 
-            fetch(queryURL)
-                .then(response => response.text())
+                if (userResponse) {
+                    // Store the learned response
+                    responses[userMessage] = userResponse;
+
+                    // Save the learned response in local storage
+                    localStorage.setItem('responses', JSON.stringify(responses));
+
+                    // Add the response to the chatbox
+                    chatbox.innerHTML += `<p><strong>Chatbot:</strong> ${userResponse}</p>`;
+                } else {
+                    // If the user doesn't provide a response, fetch from the internet
+                    fetchAnswerFromInternet(userMessage);
+                }
+            }
+        }
+
+        // Function to fetch answers from the internet
+        function fetchAnswerFromInternet(userMessage) {
+            // In this example, we'll use the DuckDuckGo Instant Answer API
+            // for simplicity, but you can use other APIs or services
+            const apiUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(userMessage)}&format=json&no_html=1`;
+
+            fetch(apiUrl)
+                .then(response => response.json())
                 .then(data => {
-                    // Parse the HTML response and extract the desired data
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(data, 'text/html');
+                    // Use the Abstract from the search results as the response
+                    const response = data.Abstract || "I'm sorry, I couldn't find an answer to your question.";
 
-                    // Extract the first search result snippet using a different selector
-                    const snippetElement = doc.querySelector('.BNeawe div, .BNeawe iBenzd, .BNeawe.AP7Wnd');
-                    const snippet = snippetElement ? snippetElement.innerText : "I'm sorry, I couldn't find an answer to your question.";
-
-                    // Add the chatbot's response to the chatbox
-                    chatbox.innerHTML += `<p><strong>Chatbot:</strong> ${snippet}</p>`;
+                    // Add the response to the chatbox
+                    chatbox.innerHTML += `<p><strong>Chatbot:</strong> ${response}</p>`;
                 })
                 .catch(error => {
-                    console.error("Error fetching data:", error);
-                    chatbox.innerHTML += `<p><strong>Chatbot:</strong> I'm sorry, there was an error fetching data.</p>`;
+                    console.error("Error fetching data from the internet:", error);
+                    chatbox.innerHTML += `<p><strong>Chatbot:</strong> I'm sorry, there was an error fetching data from the internet.</p>`;
                 });
         }
+
+        // Load learned responses when the page loads
+        loadLearnedResponses();
     </script>
 </body>
 </html>
