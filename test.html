@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Advanced Chatbot with Internet Access</title>
+    <style>
+        /* General Styles */
+        body {
+            background-color: #1a1a1a;
+            color: #f1f1f1;
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* Flex container for chat output and input area */
+        #chat-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* Chatbox container */
+        #chatbox {
+            width: 400px;
+            height: 400px;
+            overflow-y: scroll;
+            background-color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            margin-right: 20px;
+        }
+
+        /* Chatbox text styles */
+        #chatbox p {
+            margin: 5px 0;
+            line-height: 1.4;
+        }
+
+        /* Chatbox username styling */
+        #chatbox p strong {
+            color: #00aaff;
+        }
+
+        /* Input area styles */
+        #input-area {
+            display: flex;
+            flex-direction: column;
+            width: 400px;
+        }
+
+        /* Input field styles */
+        #input {
+            padding: 10px;
+            border-radius: 20px;
+            border: none;
+            outline: none;
+            background-color: #444;
+            color: #f1f1f1;
+            margin-bottom: 10px;
+        }
+
+        /* Send button styles */
+        #send-btn {
+            padding: 10px 20px;
+            background-color: #00aaff;
+            color: #f1f1f1;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        /* Send button hover effect */
+        #send-btn:hover {
+            background-color: #008ecc;
+        }
+    </style>
+</head>
+<body>
+    <!-- Flex container for chat output and input area -->
+    <div id="chat-container">
+        <!-- Chatbox -->
+        <div id="chatbox"></div>
+
+        <!-- Input area -->
+        <div id="input-area">
+            <!-- Chat input field -->
+            <input type="text" id="input" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+
+            <!-- Send button -->
+            <button id="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <!-- JavaScript code for the chatbot -->
+    <script>
+        const chatbox = document.getElementById('chatbox');
+        const input = document.getElementById('input');
+
+        // Function to handle the Enter key press
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // Function to handle sending a message and getting a response
+        function sendMessage() {
+            const userMessage = input.value.trim();
+
+            if (userMessage) {
+                // Add user message to chatbox
+                chatbox.innerHTML += `<p><strong>User:</strong> ${userMessage}</p>`;
+
+                // Get chatbot response
+                getChatbotResponse(userMessage);
+
+                // Clear the input field
+                input.value = '';
+
+                // Scroll chatbox to the bottom
+                chatbox.scrollTop = chatbox.scrollHeight;
+            }
+        }
+
+        // Function to get chatbot response
+        function getChatbotResponse(userMessage) {
+            // Perform a Google search query
+            const queryURL = `https://www.google.com/search?q=${encodeURIComponent(userMessage)}`;
+
+            fetch(queryURL)
+                .then(response => response.text())
+                .then(data => {
+                    // Parse the HTML response and extract the desired data
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(data, 'text/html');
+
+                    // Extract the first search result snippet using a different selector
+                    const snippetElement = doc.querySelector('.BNeawe div, .BNeawe iBenzd, .BNeawe.AP7Wnd');
+                    const snippet = snippetElement ? snippetElement.innerText : "I'm sorry, I couldn't find an answer to your question.";
+
+                    // Add the chatbot's response to the chatbox
+                    chatbox.innerHTML += `<p><strong>Chatbot:</strong> ${snippet}</p>`;
+                })
+                .catch(error => {
+                    console.error("Error fetching data:", error);
+                    chatbox.innerHTML += `<p><strong>Chatbot:</strong> I'm sorry, there was an error fetching data.</p>`;
+                });
+        }
+    </script>
+</body>
+</html>
