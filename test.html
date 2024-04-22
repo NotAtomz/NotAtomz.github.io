@@ -2,6 +2,9 @@
 <html>
 <head>
     <title>Chatbot with Learning and Internet Access</title>
+        <!-- Add these script tags in your HTML to import axios and cheerio -->
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/cheerio/1.0.0-rc.12/cheerio.min.js"></script>
     <style>
         /* General Styles */
         body {
@@ -164,25 +167,33 @@
         }
 
         // Function to fetch answers from the internet
-        function fetchAnswerFromInternet(userMessage) {
-            // In this example, we'll use the DuckDuckGo Instant Answer API
-            // for simplicity, but you can use other APIs or services
-            const apiUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(userMessage)}&format=json&no_html=1`;
+            // Function to fetch answers from the internet using Google and web scraping
+            function fetchAnswerFromInternet(userMessage) {
+                // Google search URL
+                const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(userMessage)}`;
 
-            fetch(apiUrl)
-                .then(response => response.json())
-                .then(data => {
-                    // Use the Abstract from the search results as the response
-                    const response = data.Abstract || "I'm sorry, I couldn't find an answer to your question.";
+                // Fetch the HTML response from Google search
+                axios.get(searchUrl)
+                    .then(response => {
+                        // Use cheerio to parse the HTML response
+                        const $ = cheerio.load(response.data);
 
-                    // Add the response to the chatbox
-                    chatbox.innerHTML += `<p><strong>Chatbot:</strong> ${response}</p>`;
-                })
-                .catch(error => {
-                    console.error("Error fetching data from the internet:", error);
-                    chatbox.innerHTML += `<p><strong>Chatbot:</strong> I'm sorry, there was an error fetching data from the internet.</p>`;
-                });
-        }
+                        // Find the first snippet in the search results (you can adjust the selector as needed)
+                        const snippet = $('div[data-attrid="wa:/description"]').first().text();
+
+                        if (snippet) {
+                            // Add the snippet as the chatbot response
+                            chatbox.innerHTML += `<p><strong>Chatbot:</strong> ${snippet}</p>`;
+                        } else {
+                            // If no snippet found, add a default response
+                            chatbox.innerHTML += `<p><strong>Chatbot:</strong> I'm sorry, I couldn't find an answer to your question.</p>`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error fetching data from the internet:", error);
+                        chatbox.innerHTML += `<p><strong>Chatbot:</strong> I'm sorry, there was an error fetching data from the internet.</p>`;
+                    });
+            }
 
         // Load learned responses when the page loads
         loadLearnedResponses();
