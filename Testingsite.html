@@ -55,6 +55,7 @@
   let playerBottom = 30;
   let cubeBottom = 30;
   let mouseY = 0;
+  let gravity = 0.5;
   
   document.addEventListener('mousemove', (event) => {
     mouseY = event.clientY;
@@ -72,9 +73,12 @@
     
     cube.style.bottom = cubeBottom + 'px';
     
-    const playerSpeed = 0.1;
-    const direction = (mouseY - playerBottom - 15) / Math.abs(mouseY - playerBottom - 15);
-    playerBottom += direction * playerSpeed;
+    const playerSpeed = (mouseY - playerBottom - 15) / 10;
+    playerBottom += playerSpeed;
+    
+    if (playerBottom > 0) {
+      playerBottom -= gravity;
+    }
     
     player.style.bottom = playerBottom + 'px';
   }
