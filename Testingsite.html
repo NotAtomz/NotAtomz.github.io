@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Getting Over It</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+  }
+  
+  #player {
+    width: 50px;
+    height: 50px;
+    background-color: red;
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  .obstacle {
+    width: 100px;
+    height: 20px;
+    background-color: gray;
+    position: absolute;
+  }
+</style>
+</head>
+<body>
+
+<div id="player"></div>
+<div class="obstacle" style="bottom: 50px; left: 100px;"></div>
+<div class="obstacle" style="bottom: 120px; left: 250px;"></div>
+
+<script>
+  const player = document.getElementById('player');
+  let playerBottom = 0;
+  
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowUp') {
+      playerBottom += 20;
+      player.style.bottom = playerBottom + 'px';
+    } else if (event.key === 'ArrowDown') {
+      playerBottom -= 20;
+      player.style.bottom = playerBottom + 'px';
+    }
+  });
+</script>
+
+</body>
+</html>
