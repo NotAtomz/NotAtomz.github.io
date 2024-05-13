@@ -3,19 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Getting Over It</title>
+<title>Getting Over It Inspired </title>
 <style>
   body {
     margin: 0;
     overflow: hidden;
+    cursor: none;
   }
   
   #player {
-    width: 50px;
-    height: 50px;
+    width: 30px;
+    height: 30px;
     background-color: red;
     position: absolute;
     bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 5px;
+  }
+  
+  #cube {
+    width: 50px;
+    height: 50px;
+    background-color: gray;
+    position: absolute;
+    bottom: 30px;
     left: 50%;
     transform: translateX(-50%);
   }
@@ -30,23 +42,44 @@
 </head>
 <body>
 
+<div id="cube"></div>
 <div id="player"></div>
 <div class="obstacle" style="bottom: 50px; left: 100px;"></div>
 <div class="obstacle" style="bottom: 120px; left: 250px;"></div>
 
 <script>
+  const cube = document.getElementById('cube');
   const player = document.getElementById('player');
-  let playerBottom = 0;
+  const obstacles = document.querySelectorAll('.obstacle');
   
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowUp') {
-      playerBottom += 20;
-      player.style.bottom = playerBottom + 'px';
-    } else if (event.key === 'ArrowDown') {
-      playerBottom -= 20;
-      player.style.bottom = playerBottom + 'px';
-    }
+  let playerBottom = 30;
+  let cubeBottom = 30;
+  let mouseY = 0;
+  
+  document.addEventListener('mousemove', (event) => {
+    mouseY = event.clientY;
   });
+  
+  function moveCube() {
+    const playerRect = player.getBoundingClientRect();
+    const cubeRect = cube.getBoundingClientRect();
+    
+    if (playerRect.bottom > cubeRect.top && playerRect.bottom < cubeRect.bottom && playerRect.left > cubeRect.left && playerRect.right < cubeRect.right) {
+      cubeBottom = playerBottom + 30;
+    } else {
+      cubeBottom = Math.max(playerBottom - 20, 0);
+    }
+    
+    cube.style.bottom = cubeBottom + 'px';
+    
+    const playerSpeed = 0.1;
+    const direction = (mouseY - playerBottom - 15) / Math.abs(mouseY - playerBottom - 15);
+    playerBottom += direction * playerSpeed;
+    
+    player.style.bottom = playerBottom + 'px';
+  }
+  
+  setInterval(moveCube, 20);
 </script>
 
 </body>
