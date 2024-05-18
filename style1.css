@@ -40,7 +40,7 @@ button {
 }
 
 button i {
-    font-size: 7em;  /* Increase icon size */
+    font-size: 4em;  /* Increase icon size */
     margin-bottom: 10px;  /* Increase margin between icon and text */
 }
 
