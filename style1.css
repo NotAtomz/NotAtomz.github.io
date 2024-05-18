@@ -13,13 +13,13 @@ body {
 .container {
     text-align: center;
     width: 90vw;  /* Use viewport width to make it responsive */
-    max-width: 600px; /* Max width for larger screens */
+    max-width: 800px; /* Increase max width for larger screens */
 }
 
 .button-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: 20px;  /* Increase gap between buttons */
     margin-bottom: 20px;
     width: 100%;  /* Make button grid take full width of container */
 }
@@ -30,18 +30,18 @@ button {
     border: none;
     padding: 20px;
     cursor: pointer;
-    font-size: 1.2em;  /* Increase font size for button text */
+    font-size: 1.5em;  /* Increase font size for button text */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 20vh;  /* Use viewport height for responsive sizing */
+    height: 150px;  /* Increase height of buttons */
     text-align: center;
 }
 
 button i {
-    font-size: 2.5em;  /* Increase icon size */
-    margin-bottom: 5px;
+    font-size: 3em;  /* Increase icon size */
+    margin-bottom: 10px;  /* Increase margin between icon and text */
 }
 
 button:hover {
@@ -51,12 +51,12 @@ button:hover {
 .terminal-output {
     background-color: #000;
     color: #adadad;
-    padding: 10px;
+    padding: 20px;  /* Increase padding for better readability */
     border: 2px solid #000000;
-    font-size: 1em;  /* Adjust font size for better readability */
-    height: 20vh;  /* Use viewport height for responsive sizing */
+    font-size: 1.2em;  /* Increase font size for better readability */
+    height: 200px;  /* Increase height of terminal output */
     overflow-y: auto;
     text-align: left;
     width: 100%;
-    max-width: 600px;
+    max-width: 800px;
 }
