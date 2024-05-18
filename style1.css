@@ -40,7 +40,7 @@ button {
 }
 
 button i {
-    font-size: 4em;  /* Increase icon size */
+    font-size: 3em;  /* Increase icon size */
     margin-bottom: 10px;  /* Increase margin between icon and text */
 }
 
@@ -53,7 +53,7 @@ button:hover {
     color: #adadad;
     padding: 20px;  /* Increase padding for better readability */
     border: 2px solid #000000;
-    font-size: 1.2em;  /* Increase font size for better readability */
+    font-size: 6em;  /* Increase font size for better readability */
     height: 200px;  /* Increase height of terminal output */
     overflow-y: auto;
     text-align: left;
