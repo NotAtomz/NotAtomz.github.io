@@ -7,10 +7,13 @@ body {
     align-items: center;
     height: 100vh;
     margin: 0;
+    flex-direction: column;
 }
 
 .container {
     text-align: center;
+    width: 100%;
+    max-width: 600px; /* Adjust as necessary */
 }
 
 .button-grid {
@@ -53,4 +56,6 @@ button:hover {
     height: 150px;
     overflow-y: auto;
     text-align: left;
+    width: 100%;
+    max-width: 600px; /* Adjust as necessary */
 }
