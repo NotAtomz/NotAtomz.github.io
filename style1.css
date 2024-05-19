@@ -60,3 +60,25 @@ button:hover {
     width: 100%;
     max-width: 600px;
 }
+.face-display {
+    display: none;
+    text-align: center;
+    margin-top: 20px;
+}
+
+.face-display img {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    filter: blur(5px);  /* Initial blur for mosaic effect */
+    transition: filter 0.5s ease;  /* Smooth transition for unblurring */
+}
+
+.face-display.active img {
+    filter: none;  /* Remove blur when active */
+}
+
+.face-details {
+    margin-top: 10px;
+    color: #adadad;
+}
