@@ -24,8 +24,6 @@ function getRandomFaceUrl() {
 
 function prepareHack(hackType) {
     const outputDiv = document.getElementById('output');
-    const faceDisplayDiv = document.getElementById('face-display');
-    faceDisplayDiv.style.display = 'none'; // Hide the face display initially
 
     const timestamp = new Date().toLocaleTimeString();
     outputDiv.innerHTML += `[${timestamp}] Preparing to execute ${hackType} hack...<br>`;
@@ -61,13 +59,12 @@ function executeHack(hackType) {
 }
 
 function executeCtOSScan(delay) {
-    const faceDisplayDiv = document.getElementById('face-display');
-    faceDisplayDiv.style.display = 'block';
-    faceDisplayDiv.innerHTML = '<img src="' + getRandomFaceUrl() + '" alt="Random Face">';
-    const faceImg = faceDisplayDiv.querySelector('img');
+    const outputDiv = document.getElementById('output');
+    outputDiv.innerHTML += '<div id="face-mosaic"></div>'; // Add a container for the mosaic
+    const faceMosaicDiv = document.getElementById('face-mosaic');
 
     let mosaicInterval = setInterval(() => {
-        faceImg.src = getRandomFaceUrl();
+        faceMosaicDiv.innerHTML = '<img src="' + getRandomFaceUrl() + '" alt="Random Face">';
     }, 300); // Change face every 300ms for mosaic effect
 
     setTimeout(() => {
@@ -77,10 +74,11 @@ function executeCtOSScan(delay) {
 }
 
 function displayFinalFace() {
-    const faceDisplayDiv = document.getElementById('face-display');
-    const faceImg = faceDisplayDiv.querySelector('img');
+    const outputDiv = document.getElementById('output');
+    const faceMosaicDiv = document.getElementById('face-mosaic');
     const finalFaceUrl = getRandomFaceUrl();
-    faceImg.src = finalFaceUrl;
+
+    faceMosaicDiv.innerHTML = `<img src="${finalFaceUrl}" alt="Final Face" onerror="this.src='fallback-image-url.jpg'">`;
 
     const firstName = getRandomItem(firstNames);
     const lastName = getRandomItem(lastNames);
@@ -90,7 +88,6 @@ function displayFinalFace() {
     const detailsDiv = document.createElement('div');
     detailsDiv.className = 'face-details';
     detailsDiv.innerHTML = `<p>Name: ${firstName} ${lastName}</p><p>Age: ${age}</p><p>Description: ${description}</p>`;
-    faceDisplayDiv.appendChild(detailsDiv);
-
-    faceDisplayDiv.classList.add('active'); // Remove blur
+    outputDiv.appendChild(detailsDiv);
+    outputDiv.scrollTop = outputDiv.scrollHeight; // Auto-scroll to bottom
 }
