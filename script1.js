@@ -17,10 +17,9 @@ function getRandomItem(array) {
     return array[Math.floor(Math.random() * array.length)];
 }
 
-// Function to get a random face image URL (using a placeholder service here)
+// Function to get a random face image URL from This Person Does Not Exist
 function getRandomFaceUrl() {
-    const randomId = Math.floor(Math.random() * 100);
-    return `https://randomuser.me/api/portraits/lego/${randomId}.jpg`;
+    return `https://thispersondoesnotexist.com/image`;
 }
 
 function prepareHack(hackType) {
@@ -69,7 +68,7 @@ function executeCtOSScan(delay) {
 
     let mosaicInterval = setInterval(() => {
         faceImg.src = getRandomFaceUrl();
-    }, 100); // Change face every 100ms for mosaic effect
+    }, 300); // Change face every 300ms for mosaic effect
 
     setTimeout(() => {
         clearInterval(mosaicInterval);
