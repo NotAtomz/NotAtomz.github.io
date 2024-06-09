@@ -83,49 +83,18 @@
             <div class="speed-label" id="speedLabel">0</div>
         </div>
         <button id="hornButton">Honk</button>
+        <!-- Audio Element -->
+        <audio id="hornSound" loop>
+            <source src="horn.mp3" type="audio/mpeg">
+            Your browser does not support the audio element.
+        </audio>
     </div>
     <script>
         const needle = document.getElementById('needle');
         const speedLabel = document.getElementById('speedLabel');
         const hornButton = document.getElementById('hornButton');
+        const hornSound = document.getElementById('hornSound');
         let isHornPlaying = false;
-
-        // Web Audio API setup
-        let audioContext;
-        let hornBuffer;
-
-        // Load horn sound into buffer
-        async function loadHornSound() {
-            try {
-                const response = await fetch('horn.mp3');
-                const arrayBuffer = await response.arrayBuffer();
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                hornBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            } catch (error) {
-                console.error('Error loading horn sound:', error);
-            }
-        }
-
-        loadHornSound();
-
-        function playHorn() {
-            if (audioContext && hornBuffer) {
-                const hornSource = audioContext.createBufferSource();
-                hornSource.buffer = hornBuffer;
-                hornSource.loop = true;
-                hornSource.connect(audioContext.destination);
-                hornSource.start(0);
-                hornButton.hornSource = hornSource; // Attach the source to the button for stopping later
-            }
-        }
-
-        function stopHorn() {
-            if (hornButton.hornSource) {
-                hornButton.hornSource.stop();
-                hornButton.hornSource.disconnect();
-                hornButton.hornSource = null;
-            }
-        }
 
         // Function to update the speedometer
         function updateSpeed(position) {
@@ -156,9 +125,10 @@
         // Toggle horn sound
         hornButton.addEventListener('click', () => {
             if (isHornPlaying) {
-                stopHorn();
+                hornSound.pause();
+                hornSound.currentTime = 0;
             } else {
-                playHorn();
+                hornSound.play();
             }
             isHornPlaying = !isHornPlaying;
             hornButton.textContent = isHornPlaying ? 'Stop' : 'Honk';
