@@ -3,39 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Face Recognition</title>
+    <title>AI Face Recognition</title>
     <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
     <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #000;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            background: #111;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
         #videoElement {
             width: 640px;
             height: 480px;
+            border: 2px solid #fff;
+            border-radius: 10px;
             background-color: #666;
         }
     </style>
 </head>
 <body>
-    <h1>AI Face Recognition</h1>
-    <video id="videoElement" autoplay></video>
+    <div class="container">
+        <h1>AI Face Recognition</h1>
+        <video id="videoElement" autoplay muted></video>
+    </div>
     <script>
-        const video = document.getElementById('videoElement');
-
-        Promise.all([
-            faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-            faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
-            faceapi.nets.faceRecognitionNet.loadFromUri('/models')
-        ]).then(startVideo);
-
-        function startVideo() {
-            navigator.mediaDevices.getUserMedia({ video: {} })
-                .then(stream => {
-                    video.srcObject = stream;
-                })
-                .catch(err => console.error('Error accessing webcam:', err));
+        async function setupCamera() {
+            const video = document.getElementById('videoElement');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+            } catch (err) {
+                console.error('Error accessing webcam:', err);
+            }
         }
 
-        video.addEventListener('play', () => {
+        async function loadModels() {
+            await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models');
+            await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models');
+            await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models');
+        }
+
+        async function startFaceRecognition() {
+            const video = document.getElementById('videoElement');
             const canvas = faceapi.createCanvasFromMedia(video);
-            document.body.append(canvas);
+            document.querySelector('.container').append(canvas);
             const displaySize = { width: video.width, height: video.height };
             faceapi.matchDimensions(canvas, displaySize);
 
@@ -46,7 +68,9 @@
                 faceapi.draw.drawDetections(canvas, resizedDetections);
                 faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
             }, 100);
-        });
+        }
+
+        loadModels().then(setupCamera).then(startFaceRecognition);
     </script>
 </body>
 </html>
