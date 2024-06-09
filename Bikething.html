@@ -50,17 +50,17 @@
             left: 0;
             width: 100%;
             text-align: center;
-            font-size: 1.5em;
+            font-size: 2.5em;
         }
         #hornButton {
-            padding: 20px;
+            padding: 30px;
             cursor: pointer;
             background: radial-gradient(circle, #444, #000);
             border: 2px solid #fff;
             color: #fff;
             border-radius: 50%;
-            width: 100px;
-            height: 100px;
+            width: 120px;
+            height: 120px;
             font-size: 1.2em;
             margin-top: 20px;
             box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
@@ -83,7 +83,7 @@
         <h1>Bike Interface</h1>
         <div id="speedometer">
             <div class="needle" id="needle"></div>
-            <div class="speed-label" id="speedLabel">0 MPH</div>
+            <div class="speed-label" id="speedLabel">0</div>
         </div>
         <button id="hornButton">Honk</button>
         <audio id="hornSound" src="horn.mp3"></audio>
@@ -102,7 +102,7 @@
             const speed = Math.min(speedMph, 100); // cap speed at 100 MPH
             const rotation = speed * 1.8; // 180 degrees max for 100 MPH
             needle.style.transform = `rotate(${rotation}deg)`;
-            speedLabel.textContent = `${speed.toFixed(2)} MPH`;
+            speedLabel.textContent = `${speed.toFixed(0)}`;
         }
 
         // Handle geolocation errors
