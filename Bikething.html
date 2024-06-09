@@ -129,6 +129,7 @@
                 hornSound.currentTime = 0;
             } else {
                 hornSound.play();
+                hornSound.currentTime = 1;
             }
             isHornPlaying = !isHornPlaying;
             hornButton.textContent = isHornPlaying ? 'Stop' : 'Honk';
