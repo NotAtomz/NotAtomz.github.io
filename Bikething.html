@@ -24,14 +24,33 @@
             width: 90%;
             max-width: 400px;
         }
-        #speedDisplay {
-            font-size: 3em;
-            margin: 20px 0;
-            padding: 20px;
-            border: 2px solid #fff;
-            border-radius: 10px;
+        #speedometer {
+            width: 100%;
+            max-width: 300px;
+            height: 300px;
+            border-radius: 50%;
             background: radial-gradient(circle, #444, #000);
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+            position: relative;
+            margin: 20px auto;
+        }
+        .needle {
+            position: absolute;
+            width: 50%;
+            height: 4px;
+            background: red;
+            top: 50%;
+            left: 50%;
+            transform-origin: 0% 50%;
+            transform: rotate(0deg);
+            transition: transform 0.1s ease-out;
+        }
+        .speed-label {
+            position: absolute;
+            top: 45%;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 1.5em;
         }
         #hornButton {
             padding: 20px;
@@ -62,27 +81,34 @@
 <body>
     <div class="container">
         <h1>Bike Interface</h1>
-        <div id="speedDisplay">Speed: 0 MPH</div>
+        <div id="speedometer">
+            <div class="needle" id="needle"></div>
+            <div class="speed-label" id="speedLabel">0 MPH</div>
+        </div>
         <button id="hornButton">Honk</button>
-        <audio id="hornSound" src="horn.mp3" loop></audio>
+        <audio id="hornSound" src="horn.mp3"></audio>
     </div>
     <script>
-        const speedDisplay = document.getElementById('speedDisplay');
+        const needle = document.getElementById('needle');
+        const speedLabel = document.getElementById('speedLabel');
         const hornButton = document.getElementById('hornButton');
         const hornSound = document.getElementById('hornSound');
         let isHornPlaying = false;
 
-        // Function to update the speed display
+        // Function to update the speedometer
         function updateSpeed(position) {
             const speedMps = position.coords.speed || 0; // meters per second
             const speedMph = speedMps * 2.237; // convert to miles per hour
-            speedDisplay.textContent = `Speed: ${speedMph.toFixed(2)} MPH`;
+            const speed = Math.min(speedMph, 100); // cap speed at 100 MPH
+            const rotation = speed * 1.8; // 180 degrees max for 100 MPH
+            needle.style.transform = `rotate(${rotation}deg)`;
+            speedLabel.textContent = `${speed.toFixed(2)} MPH`;
         }
 
         // Handle geolocation errors
         function handleError(error) {
             console.error('Geolocation error:', error);
-            speedDisplay.textContent = 'Speed: N/A';
+            speedLabel.textContent = 'N/A';
         }
 
         // Request location updates with high accuracy
@@ -92,7 +118,7 @@
                 maximumAge: 1000
             });
         } else {
-            speedDisplay.textContent = 'Geolocation not supported';
+            speedLabel.textContent = 'Geolocation not supported';
         }
 
         // Toggle horn sound
@@ -102,6 +128,7 @@
                 hornSound.currentTime = 0; // Reset to start
             } else {
                 hornSound.play();
+                hornSound.loop = true; // Ensure looping with no delay
             }
             isHornPlaying = !isHornPlaying;
             hornButton.textContent = isHornPlaying ? 'Stop' : 'Honk';
