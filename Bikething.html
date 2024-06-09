@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bike Interface</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #000;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            background: #111;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+            width: 80%;
+            max-width: 400px;
+        }
+        #speedDisplay {
+            font-size: 2em;
+            margin: 20px 0;
+        }
+        #hornButton {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #111;
+            border: 1px solid #fff;
+            color: #fff;
+            border-radius: 5px;
+        }
+        audio {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bike Interface</h1>
+        <div id="speedDisplay">Speed: 0 MPH</div>
+        <button id="hornButton">Honk Horn</button>
+        <audio id="hornSound" src="horn.mp3" loop></audio>
+    </div>
+    <script>
+        const speedDisplay = document.getElementById('speedDisplay');
+        const hornButton = document.getElementById('hornButton');
+        const hornSound = document.getElementById('hornSound');
+        let isHornPlaying = false;
+
+        // Request location updates
+        function updateSpeed(position) {
+            const speedMps = position.coords.speed || 0; // meters per second
+            const speedMph = speedMps * 2.237; // convert to miles per hour
+            speedDisplay.textContent = `Speed: ${speedMph.toFixed(2)} MPH`;
+        }
+
+        function handleError(error) {
+            console.error('Geolocation error:', error);
+            speedDisplay.textContent = 'Speed: N/A';
+        }
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(updateSpeed, handleError, {
+                enableHighAccuracy: true,
+                maximumAge: 1000
+            });
+        } else {
+            speedDisplay.textContent = 'Geolocation not supported';
+        }
+
+        // Toggle horn sound
+        hornButton.addEventListener('click', () => {
+            if (isHornPlaying) {
+                hornSound.pause();
+                hornSound.currentTime = 0; // Reset to start
+            } else {
+                hornSound.play();
+            }
+            isHornPlaying = !isHornPlaying;
+            hornButton.textContent = isHornPlaying ? 'Stop Horn' : 'Honk Horn';
+        });
+    </script>
+</body>
+</html>
