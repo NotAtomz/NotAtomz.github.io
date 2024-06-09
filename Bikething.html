@@ -93,35 +93,37 @@
         // Web Audio API setup
         let audioContext;
         let hornBuffer;
-        let hornSource;
 
         // Load horn sound into buffer
-        fetch('horn.mp3')
-            .then(response => response.arrayBuffer())
-            .then(data => {
+        async function loadHornSound() {
+            try {
+                const response = await fetch('horn.mp3');
+                const arrayBuffer = await response.arrayBuffer();
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                return audioContext.decodeAudioData(data);
-            })
-            .then(buffer => {
-                hornBuffer = buffer;
-            })
-            .catch(error => console.error('Error loading horn sound:', error));
+                hornBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            } catch (error) {
+                console.error('Error loading horn sound:', error);
+            }
+        }
+
+        loadHornSound();
 
         function playHorn() {
             if (audioContext && hornBuffer) {
-                hornSource = audioContext.createBufferSource();
+                const hornSource = audioContext.createBufferSource();
                 hornSource.buffer = hornBuffer;
                 hornSource.loop = true;
                 hornSource.connect(audioContext.destination);
                 hornSource.start(0);
+                hornButton.hornSource = hornSource; // Attach the source to the button for stopping later
             }
         }
 
         function stopHorn() {
-            if (hornSource) {
-                hornSource.stop();
-                hornSource.disconnect();
-                hornSource = null;
+            if (hornButton.hornSource) {
+                hornButton.hornSource.stop();
+                hornButton.hornSource.disconnect();
+                hornButton.hornSource = null;
             }
         }
 
