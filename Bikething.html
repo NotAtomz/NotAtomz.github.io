@@ -84,7 +84,7 @@
         </div>
         <button id="hornButton">Honk</button>
         <!-- Audio Element -->
-        <audio id="hornSound" loop>
+        <audio id="hornSound">
             <source src="horn.mp3" type="audio/mpeg">
             Your browser does not support the audio element.
         </audio>
@@ -95,6 +95,7 @@
         const hornButton = document.getElementById('hornButton');
         const hornSound = document.getElementById('hornSound');
         let isHornPlaying = false;
+        let hornStarted = false; // Flag to check if horn has started playing
 
         // Function to update the speedometer
         function updateSpeed(position) {
@@ -127,9 +128,14 @@
             if (isHornPlaying) {
                 hornSound.pause();
                 hornSound.currentTime = 0;
+                hornStarted = false;
             } else {
-                hornSound.play();
-                hornSound.currentTime = 1;
+                if (!hornStarted) {
+                    hornSound.play().then(() => {
+                        hornStarted = true;
+                    });
+                }
+                hornSound.loop = true; // Set loop only after starting to avoid delay
             }
             isHornPlaying = !isHornPlaying;
             hornButton.textContent = isHornPlaying ? 'Stop' : 'Honk';
