@@ -3,12 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ctOS.root</title>
-    <link rel="stylesheet" href="style1.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <title>Ctos Root</title>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-start;
+            background: black;
+            color: white;
+            font-family: monospace;
+            padding: 10px;
+            overflow: hidden;
+        }
+        #terminal {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            white-space: pre;
+        }
+        #login {
+            display: none;
+            flex-direction: column;
+            margin-top: 10px;
+        }
+        input {
+            background: none;
+            border: none;
+            color: white;
+            font-family: monospace;
+            outline: none;
+            caret-color: white;
+            padding: 0;
+        }
+        .container {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #000;
+            color: #adadad;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            flex-direction: column;
+            text-align: center;
+            width: 90vw;
+            max-width: 600px;
+        }
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        button {
+            background-color: #333;
+            color: #ffffff;
+            border: none;
+            padding: 20px;
+            cursor: pointer;
+            font-size: 1.2em;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 20vh;
+            text-align: center;
+        }
+        button i {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+        }
+        button:hover {
+            background-color: #555;
+        }
+        .terminal-output {
+            background-color: #000;
+            color: #adadad;
+            padding: 10px;
+            border: 2px solid #000000;
+            font-size: 1em;
+            height: 20vh;
+            overflow-y: auto;
+            text-align: left;
+            width: 100%;
+            max-width: 600px;
+        }
+        .face-display {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .face-display img {
+            width: 150px;
+            height: 150px;
+            object-fit: cover;
+            filter: blur(5px);
+            transition: filter 0.5s ease;
+        }
+        .face-display.active img {
+            filter: none;
+        }
+        .face-details {
+            margin-top: 10px;
+            color: #adadad;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
+    <div id="terminal"></div>
+    <div id="login">
+        <label>username: <input type="text" id="username" value="jesi" readonly></label><br>
+        <label>password: <input type="password" id="password" onkeydown="if(event.key === 'Enter') checkPassword()"></label>
+    </div>
+
+    <div id="ctOS" class="container" style="display:none;">
         <div class="button-grid">
             <button onclick="prepareHack('Pipes')"><i class="fas fa-water"></i><br>Pipes</button>
             <button onclick="prepareHack('Blackout')"><i class="fas fa-bolt"></i><br>Blackout</button>
@@ -23,6 +134,167 @@
         <div id="output" class="terminal-output"></div>
         <div id="face-display" class="face-display"></div>
     </div>
-    <script src="script1.js"></script>
+
+    <script>
+        const bootMessages = [
+            "Loading, please wait...",
+            "",
+            "12.20160524) ad 010101010ddbu22 (Ded) Assusing drive caches write through Valid path for Logical Volume.",
+            "",
+            "/ubl/playerı olan, 1704684/10121989 Files, 3813438/7532544 blocks Startedi Attempting to mount Dedware fuse sount.",
+            "See system ctl status zunDedware//fuse.nount for details.",
+            "",
+            "[ 0.000000] intt_memory_mappings [mem 0x00100000-OxdeFa4FFF)",
+            "[1.169734] mem 0x00100000-0x001FFFFF]",
+            "[0.310006] NetLabels protocols UNLABELED DEDS0v4",
+            "",
+            "Freeing initrd memory: 18700K (FFFF880035642000 FFFF880036d99000)",
+            "PCI-DHA: Using software bounce buffering for 10 (SFDad)",
+            "",
+            "status: Ok EXT4-Fs (sdal): orphan cleanup on readonly fs",
+            "status: Ok EXT4-Fs (sdal): recovery complete",
+            "status: Ok EXT4-Fs (sdal): mounted Filesysten with ordered data mode.",
+            "status: Ok Found BLUME MP-table mapped at [nen 0x10121989-0x000F9bff]",
+            "",
+            "Scanning 1 areas for low memory corruption Monitoring of Blume mirrors.. ng dneventd or progress polling. init memory mappings [sen 0x00000000-0x000ACK)",
+            "[#—————————]",
+            "[##————————]",
+            "[###———————]",
+            "[####——————]",
+            "[#####—————]",
+            "[######————]",
+            "[#######———]",
+            "[########——]",
+            "[#########—]",
+            "[##########]",
+            "Mounted device Dedvares dedsec00 Logins"
+        ];
+        const terminal = document.getElementById('terminal');
+        const login = document.getElementById('login');
+        const ctOS = document.getElementById('ctOS');
+
+        let index = 0;
+
+        function showBootMessages() {
+            if (index < bootMessages.length) {
+                terminal.innerText += bootMessages[index] + '\n';
+                index++;
+                setTimeout(showBootMessages, 100); // Faster display
+            } else {
+                setTimeout(showLogin, 500);
+            }
+        }
+
+        function showLogin() {
+            terminal.style.display = 'none';
+            login.style.display = 'flex';
+        }
+
+        function checkPassword() {
+            const password = document.getElementById('password').value;
+            if (password === 'admin') {
+                login.style.display = 'none';
+                ctOS.style.display = 'flex';
+            } else {
+                alert('Access denied!');
+            }
+        }
+
+        // Mock data for names and descriptions
+        const firstNames = ["John", "Jane", "Alex", "Emily", "Michael", "Sarah", "David", "Anna"];
+        const lastNames = ["Doe", "Smith", "Johnson", "Brown", "Taylor", "Anderson", "Thomas", "Jackson"];
+        const descriptions = [
+            "Software Engineer",
+            "Graphic Designer",
+            "Data Analyst",
+            "Project Manager",
+            "Marketing Specialist",
+            "Sales Representative",
+            "Customer Support",
+            "Human Resources"
+        ];
+
+        // Function to get a random item from an array
+        function getRandomItem(array) {
+            return array[Math.floor(Math.random() * array.length)];
+        }
+
+        // Function to get a random face image URL from This Person Does Not Exist
+        function getRandomFaceUrl() {
+            return `https://thispersondoesnotexist.com/image`;
+        }
+
+        function prepareHack(hackType) {
+            const outputDiv = document.getElementById('output');
+
+            const timestamp = new Date().toLocaleTimeString();
+            outputDiv.innerHTML += `[${timestamp}] Preparing to execute ${hackType} hack...<br>`;
+            outputDiv.scrollTop = outputDiv.scrollHeight; // Auto-scroll to bottom
+
+            // Random delay between 1 and 6 seconds
+            const delay = Math.floor(Math.random() * 6) + 1;
+
+            if (hackType === 'ctOS Scan') {
+                executeCtOSScan(delay * 1000);
+            } else {
+                setTimeout(() => executeHack(hackType), delay * 1000);
+            }
+        }
+
+        function executeHack(hackType) {
+            const outputDiv = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const messages = {
+                'Pipes': 'Pipe burst activated!',
+                'Blackout': 'City-wide blackout initiated!',
+                'Comms Jam': 'Communications jammed!',
+                'Light': 'Traffic lights changed!',
+                'ctOS Scan': 'ctOS scan completed!',
+                'Train': 'Train systems controlled!',
+                'Blocker': 'Blockers raised!',
+                'Cellphone': 'Cellphone hacked!',
+                'Door': 'Door unlocked!'
+            };
+
+            outputDiv.innerHTML += `[${timestamp}] ${messages[hackType]}<br>`;
+            outputDiv.scrollTop = outputDiv.scrollHeight; // Auto-scroll to bottom
+        }
+
+        function executeCtOSScan(delay) {
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML += '<div id="face-mosaic"></div>'; // Add a container for the mosaic
+            const faceMosaicDiv = document.getElementById('face-mosaic');
+
+            let mosaicInterval = setInterval(() => {
+                faceMosaicDiv.innerHTML = '<img src="' + getRandomFaceUrl() + '" alt="Random Face">';
+            }, 300); // Change face every 300ms for mosaic effect
+
+            setTimeout(() => {
+                clearInterval(mosaicInterval);
+                displayFinalFace();
+            }, delay);
+        }
+
+        function displayFinalFace() {
+            const outputDiv = document.getElementById('output');
+            const faceMosaicDiv = document.getElementById('face-mosaic');
+            const finalFaceUrl = getRandomFaceUrl();
+
+            faceMosaicDiv.innerHTML = `<img src="${finalFaceUrl}" alt="Final Face" onerror="this.src='fallback-image-url.jpg'">`;
+
+            const firstName = getRandomItem(firstNames);
+            const lastName = getRandomItem(lastNames);
+            const description = getRandomItem(descriptions);
+            const age = Math.floor(Math.random() * 42) + 18; // Age between 18 and 60
+
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'face-details';
+            detailsDiv.innerHTML = `<p>Name: ${firstName} ${lastName}</p><p>Age: ${age}</p><p>Description: ${description}</p>`;
+            outputDiv.appendChild(detailsDiv);
+            outputDiv.scrollTop = outputDiv.scrollHeight; // Auto-scroll to bottom
+        }
+
+        showBootMessages();
+    </script>
 </body>
 </html>
