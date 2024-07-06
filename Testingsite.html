@@ -13,6 +13,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            background-color: #000;
         }
         #container {
             display: flex;
@@ -22,7 +23,9 @@
         #camera {
             flex: 1;
             background: #000;
-            object-fit: cover; /* Ensures the video fills the element */
+            object-fit: cover;
+            width: 100%;
+            height: 100%;
         }
         #black {
             flex: 1;
@@ -39,15 +42,20 @@
     <script>
         async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { exact: "user" }
+                    }
+                });
                 const camera = document.getElementById('camera');
                 camera.srcObject = stream;
             } catch (error) {
-                console.error("Error accessing the camera", error);
-                alert("Error accessing the camera: " + error.message);
+                console.error("Error accessing the camera:", error);
+                alert("Camera access is required for this site.");
             }
         }
 
+        // Ensure the camera starts when the page loads
         window.onload = startCamera;
     </script>
 </body>
