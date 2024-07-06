@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rear Camera View</title>
+    <title>Face Detection with Box</title>
     <style>
         body, html {
             margin: 0;
@@ -16,30 +16,39 @@
             background-color: #000;
         }
         #container {
+            position: relative;
             display: flex;
             width: 100%;
             height: 100%;
         }
         #camera {
             flex: 1;
-            background: #000;
-            object-fit: cover; /* Ensures the video fills the element */
+            object-fit: cover;
             width: 100%;
             height: 100%;
         }
-        #black {
-            flex: 1;
-            background: #000;
+        #face-box {
+            position: absolute;
+            border: 2px solid red;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
     <div id="container">
         <video id="camera" autoplay playsinline></video>
-        <div id="black"></div>
+        <div id="face-box"></div>
     </div>
 
+    <!-- TensorFlow.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <!-- TensorFlow.js Face Detection Model -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection"></script>
+
     <script>
+        const video = document.getElementById('camera');
+        const faceBox = document.getElementById('face-box');
+
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -47,16 +56,46 @@
                         facingMode: { exact: "environment" } // Use rear camera
                     }
                 });
-                const camera = document.getElementById('camera');
-                camera.srcObject = stream;
+                video.srcObject = stream;
             } catch (error) {
                 console.error("Error accessing the camera:", error);
                 alert("Camera access is required for this site.");
             }
         }
 
+        async function detectFaces() {
+            const model = await faceDetection.load(faceDetection.SupportedModels.MediaPipeFaceDetector, {
+                maxFaces: 1
+            });
+
+            const detect = async () => {
+                const predictions = await model.estimateFaces({
+                    input: video,
+                    returnTensors: false
+                });
+
+                if (predictions.length > 0) {
+                    const face = predictions[0].box;
+                    faceBox.style.left = `${face.xMin}px`;
+                    faceBox.style.top = `${face.yMin}px`;
+                    faceBox.style.width = `${face.width}px`;
+                    faceBox.style.height = `${face.height}px`;
+                } else {
+                    faceBox.style.width = '0px';
+                    faceBox.style.height = '0px';
+                }
+
+                requestAnimationFrame(detect);
+            };
+
+            detect();
+        }
+
         // Ensure the camera starts when the page loads
-        window.onload = startCamera;
+        window.onload = async () => {
+            await startCamera();
+            detectFaces();
+        };
     </script>
 </body>
 </html>
