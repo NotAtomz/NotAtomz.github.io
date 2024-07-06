@@ -53,7 +53,7 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        facingMode: { exact: "environment" } // Use rear camera
+                        facingMode: { ideal: "environment" } // Use rear camera
                     }
                 });
                 video.srcObject = stream;
@@ -64,37 +64,43 @@
         }
 
         async function detectFaces() {
-            const model = await faceDetection.load(faceDetection.SupportedModels.MediaPipeFaceDetector, {
-                maxFaces: 1
-            });
-
-            const detect = async () => {
-                const predictions = await model.estimateFaces({
-                    input: video,
-                    returnTensors: false
+            try {
+                const model = await faceDetection.load(faceDetection.SupportedModels.MediaPipeFaceDetector, {
+                    maxFaces: 1
                 });
 
-                if (predictions.length > 0) {
-                    const face = predictions[0].box;
-                    faceBox.style.left = `${face.xMin}px`;
-                    faceBox.style.top = `${face.yMin}px`;
-                    faceBox.style.width = `${face.width}px`;
-                    faceBox.style.height = `${face.height}px`;
-                } else {
-                    faceBox.style.width = '0px';
-                    faceBox.style.height = '0px';
-                }
+                const detect = async () => {
+                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        const predictions = await model.estimateFaces({
+                            input: video,
+                            returnTensors: false
+                        });
 
-                requestAnimationFrame(detect);
-            };
+                        if (predictions.length > 0) {
+                            const face = predictions[0].box;
+                            faceBox.style.left = `${face.xMin}px`;
+                            faceBox.style.top = `${face.yMin}px`;
+                            faceBox.style.width = `${face.width}px`;
+                            faceBox.style.height = `${face.height}px`;
+                        } else {
+                            faceBox.style.width = '0px';
+                            faceBox.style.height = '0px';
+                        }
+                    }
 
-            detect();
+                    requestAnimationFrame(detect);
+                };
+
+                detect();
+            } catch (error) {
+                console.error("Error loading or running the face detection model:", error);
+                alert("Error loading the face detection model.");
+            }
         }
 
-        // Ensure the camera starts when the page loads
         window.onload = async () => {
             await startCamera();
-            detectFaces();
+            await detectFaces();
         };
     </script>
 </body>
