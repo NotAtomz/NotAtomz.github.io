@@ -1,86 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Getting Over It Inspired </title>
-<style>
-  body {
-    margin: 0;
-    overflow: hidden;
-    cursor: none;
-  }
-  
-  #player {
-    width: 30px;
-    height: 30px;
-    background-color: red;
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    border-radius: 5px;
-  }
-  
-  #cube {
-    width: 50px;
-    height: 50px;
-    background-color: gray;
-    position: absolute;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  
-  .obstacle {
-    width: 100px;
-    height: 20px;
-    background-color: gray;
-    position: absolute;
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera View</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        #camera {
+            flex: 1;
+            background: #000;
+        }
+        #black {
+            flex: 1;
+            background: #000;
+        }
+    </style>
 </head>
 <body>
+    <div id="container">
+        <video id="camera" autoplay playsinline></video>
+        <div id="black"></div>
+    </div>
 
-<div id="cube"></div>
-<div id="player"></div>
-<div class="obstacle" style="bottom: 50px; left: 100px;"></div>
-<div class="obstacle" style="bottom: 120px; left: 250px;"></div>
+    <script>
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                const camera = document.getElementById('camera');
+                camera.srcObject = stream;
+            } catch (error) {
+                console.error("Error accessing the camera", error);
+            }
+        }
 
-<script>
-  const cube = document.getElementById('cube');
-  const player = document.getElementById('player');
-  const obstacles = document.querySelectorAll('.obstacle');
-  
-  let cubeBottom = 30;
-  let playerBottom = 0;
-  let mouseY = 0;
-  let gravity = 0.5;
-  
-  document.addEventListener('mousemove', (event) => {
-    mouseY = event.clientY;
-  });
-  
-  function moveCube() {
-    const cubeRect = cube.getBoundingClientRect();
-    
-    if (mouseY < cubeRect.top + cubeRect.height / 2) {
-      cubeBottom += 1;
-    } else {
-      cubeBottom -= 1;
-    }
-    
-    cube.style.bottom = cubeBottom + 'px';
-    
-    if (playerBottom > 0) {
-      playerBottom -= gravity;
-    }
-    
-    player.style.bottom = playerBottom + 'px';
-  }
-  
-  setInterval(moveCube, 20);
-</script>
-
+        startCamera();
+    </script>
 </body>
 </html>
