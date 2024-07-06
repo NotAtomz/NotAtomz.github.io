@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Camera View</title>
+    <title>Rear Camera View</title>
     <style>
         body, html {
             margin: 0;
@@ -23,7 +23,7 @@
         #camera {
             flex: 1;
             background: #000;
-            object-fit: cover;
+            object-fit: cover; /* Ensures the video fills the element */
             width: 100%;
             height: 100%;
         }
@@ -44,7 +44,7 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        facingMode: { exact: "user" }
+                        facingMode: { exact: "environment" } // Use rear camera
                     }
                 });
                 const camera = document.getElementById('camera');
