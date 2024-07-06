@@ -22,6 +22,7 @@
         #camera {
             flex: 1;
             background: #000;
+            object-fit: cover; /* Ensures the video fills the element */
         }
         #black {
             flex: 1;
@@ -43,10 +44,11 @@
                 camera.srcObject = stream;
             } catch (error) {
                 console.error("Error accessing the camera", error);
+                alert("Error accessing the camera: " + error.message);
             }
         }
 
-        startCamera();
+        window.onload = startCamera;
     </script>
 </body>
 </html>
