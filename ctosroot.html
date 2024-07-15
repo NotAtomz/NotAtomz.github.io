@@ -101,10 +101,11 @@
             position: absolute;
             top: 0;
             left: 0;
+            z-index: 10;
         }
         #video-screen video {
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
             object-fit: cover;
         }
     </style>
@@ -112,7 +113,7 @@
 <body>
     <div id="terminal"></div>
     <div id="video-screen">
-        <video id="intro-video" src="boots.mp4" autoplay muted></video>
+        <video id="intro-video" src="boots.mp4" autoplay playsinline></video>
     </div>
     <div id="login">
         <label>username: <input type="text" id="username" value="blume0sUser************" readonly></label><br>
@@ -232,7 +233,7 @@
                 'Door': 'Door unlocked!'
             };
 
-            outputDiv.innerHTML += `[${timestamp}] ${messages[hackType]}<br>`;
+            outputDiv.innerHTML += `[${timestamp}] ${messages[hackType] || 'Unknown hack type!'}<br>`;
             outputDiv.scrollTop = outputDiv.scrollHeight;
         }
 
