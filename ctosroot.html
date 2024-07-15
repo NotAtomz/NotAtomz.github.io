@@ -180,7 +180,7 @@
             if (index < bootMessages.length) {
                 terminal.innerText += bootMessages[index] + '\n';
                 index++;
-                setTimeout(showBootMessages, 100); // Faster display
+                setTimeout(showBootMessages, 100);
             } else {
                 setTimeout(showVideoScreen, 500);
             }
@@ -208,12 +208,10 @@
 
         function prepareHack(hackType) {
             const outputDiv = document.getElementById('output');
-
             const timestamp = new Date().toLocaleTimeString();
             outputDiv.innerHTML += `[${timestamp}] Preparing to execute ${hackType} hack...<br>`;
-            outputDiv.scrollTop = outputDiv.scrollHeight; // Auto-scroll to bottom
+            outputDiv.scrollTop = outputDiv.scrollHeight;
 
-            // Random delay between 1 and 6 seconds
             const delay = Math.floor(Math.random() * 6) + 1;
 
             if (hackType === 'ctOS Scan') {
@@ -235,28 +233,27 @@
                 'Train': 'Train systems controlled!',
                 'Blocker': 'Blockers raised!',
                 'Cellphone': 'Cellphone signals interfered!',
-'Door': 'Doors unlocked!'
-};
+                'Door': 'Doors unlocked!'
+            };
 
-        outputDiv.innerHTML += `[${timestamp}] ${messages[hackType]}<br>`;
-        outputDiv.scrollTop = outputDiv.scrollHeight; // Auto-scroll to bottom
-    }
+            outputDiv.innerHTML += `[${timestamp}] ${messages[hackType]}<br>`;
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+        }
 
-    function executeCtOSScan(duration) {
-        const outputDiv = document.getElementById('output');
-        const timestamp = new Date().toLocaleTimeString();
+        function executeCtOSScan(duration) {
+            const outputDiv = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
 
-        outputDiv.innerHTML += `[${timestamp}] ctOS scan in progress...<br>`;
-        outputDiv.scrollTop = outputDiv.scrollHeight; // Auto-scroll to bottom
+            outputDiv.innerHTML += `[${timestamp}] ctOS scan in progress...<br>`;
+            outputDiv.scrollTop = outputDiv.scrollHeight;
 
-        setTimeout(() => {
-            outputDiv.innerHTML += `[${timestamp}] ctOS scan completed!<br>`;
-            outputDiv.scrollTop = outputDiv.scrollHeight; // Auto-scroll to bottom
-        }, duration);
-    }
+            setTimeout(() => {
+                outputDiv.innerHTML += `[${timestamp}] ctOS scan completed!<br>`;
+                outputDiv.scrollTop = outputDiv.scrollHeight;
+            }, duration);
+        }
 
-    showBootMessages();
-</script>
-
+        showBootMessages();
+    </script>
 </body>
 </html>
