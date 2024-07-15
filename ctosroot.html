@@ -23,18 +23,6 @@
             overflow: hidden;
             white-space: pre;
         }
-        #video-screen {
-            display: none;
-            width: 100%;
-            height: 100%;
-            justify-content: center;
-            align-items: center;
-            background: black;
-        }
-        #video-screen video {
-            width: 100%;
-            height: auto;
-        }
         #login {
             display: none;
             flex-direction: column;
@@ -103,16 +91,28 @@
             width: 100%;
             max-width: 600px;
         }
+        #video-screen {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            background: black;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #video-screen video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
     </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
     <div id="terminal"></div>
     <div id="video-screen">
-        <video id="intro-video" autoplay muted>
-            <source src="boots.mov" type="video/quicktime">
-            Your browser does not support the video tag.
-        </video>
+        <video id="intro-video" src="boots.mov" autoplay muted></video>
     </div>
     <div id="login">
         <label>username: <input type="text" id="username" value="blume0sUser************" readonly></label><br>
@@ -169,10 +169,10 @@
             "Mounted device Dedvares dedsec00 Logins"
         ];
         const terminal = document.getElementById('terminal');
-        const videoScreen = document.getElementById('video-screen');
-        const introVideo = document.getElementById('intro-video');
         const login = document.getElementById('login');
         const ctOS = document.getElementById('ctOS');
+        const videoScreen = document.getElementById('video-screen');
+        const video = document.getElementById('intro-video');
 
         let index = 0;
 
@@ -189,11 +189,11 @@
         function showVideoScreen() {
             terminal.style.display = 'none';
             videoScreen.style.display = 'flex';
-        }
-
-        introVideo.onended = function() {
-            videoScreen.style.display = 'none';
-            login.style.display = 'flex';
+            video.play();
+            video.onended = () => {
+                videoScreen.style.display = 'none';
+                login.style.display = 'flex';
+            };
         }
 
         function checkPassword() {
@@ -216,7 +216,11 @@
             // Random delay between 1 and 6 seconds
             const delay = Math.floor(Math.random() * 6) + 1;
 
-            setTimeout(() => executeHack(hackType), delay * 1000);
+            if (hackType === 'ctOS Scan') {
+                executeCtOSScan(delay * 1000);
+            } else {
+                setTimeout(() => executeHack(hackType), delay * 1000);
+            }
         }
 
         function executeHack(hackType) {
@@ -230,12 +234,25 @@
                 'ctOS Scan': 'ctOS scan completed!',
                 'Train': 'Train systems controlled!',
                 'Blocker': 'Blockers raised!',
-                'Cellphone': 'Cellphone hacked!',
-                'Door':'Door unlocked!'
+                'Cellphone': 'Cellphone signals interfered!',
+'Door': 'Doors unlocked!'
 };
 
-                outputDiv.innerHTML += `[${timestamp}] ${messages[hackType]}<br>`;
+        outputDiv.innerHTML += `[${timestamp}] ${messages[hackType]}<br>`;
         outputDiv.scrollTop = outputDiv.scrollHeight; // Auto-scroll to bottom
+    }
+
+    function executeCtOSScan(duration) {
+        const outputDiv = document.getElementById('output');
+        const timestamp = new Date().toLocaleTimeString();
+
+        outputDiv.innerHTML += `[${timestamp}] ctOS scan in progress...<br>`;
+        outputDiv.scrollTop = outputDiv.scrollHeight; // Auto-scroll to bottom
+
+        setTimeout(() => {
+            outputDiv.innerHTML += `[${timestamp}] ctOS scan completed!<br>`;
+            outputDiv.scrollTop = outputDiv.scrollHeight; // Auto-scroll to bottom
+        }, duration);
     }
 
     showBootMessages();
