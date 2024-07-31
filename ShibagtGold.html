@@ -40,15 +40,12 @@
             align-items: center;
             background-color: rgba(0, 0, 0, 0.9);
             z-index: 9999;
+            display: none; /* Ensure jumpscare is hidden initially */
         }
 
         #jumpscare img {
             max-width: 100%;
             max-height: 100%;
-        }
-
-        .hidden {
-            display: none;
         }
     </style>
 </head>
@@ -56,7 +53,7 @@
     <div class="container">
         <h1>Shiba GT Gold Download</h1>
         <button id="download-button">Download</button>
-        <div id="jumpscare" class="hidden">
+        <div id="jumpscare">
             <img src="https://notatomz.github.io/IMG_4914.png" alt="Jumpscare">
             <audio id="jumpscare-sound" src="https://notatomz.github.io/Shh.mp3"></audio>
         </div>
@@ -64,8 +61,8 @@
     <script>
         document.getElementById('download-button').addEventListener('click', function() {
             // Hide the button and show the jumpscare
-            document.getElementById('download-button').classList.add('hidden');
-            document.getElementById('jumpscare').classList.remove('hidden');
+            document.getElementById('download-button').style.display = 'none';
+            document.getElementById('jumpscare').style.display = 'flex';
             
             // Play the jumpscare sound
             var audio = document.getElementById('jumpscare-sound');
