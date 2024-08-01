@@ -73,16 +73,16 @@
 </head>
 <body>
     <div class="container">
-        <div class="icon blue" onclick="showHackButton()">
+        <div class="icon blue" onclick="showHackButton('blue')">
             <img src="https://static.vecteezy.com/system/resources/thumbnails/020/522/574/small_2x/light-bulb-icon-creative-icon-png.png" alt="Black Light Bulb Icon">
         </div>
-        <div class="icon orange" onclick="showHackButton()">
+        <div class="icon orange" onclick="showHackButton('orange')">
             <img src="https://static.thenounproject.com/png/36915-200.png" alt="Traffic Light Icon">
         </div>
-        <div class="icon green" onclick="showHackButton()">
+        <div class="icon green" onclick="showHackButton('green')">
             <img src="https://i.pinimg.com/originals/8f/28/fe/8f28fe692234e16f1f114507d39f387d.png" alt="TV Icon">
         </div>
-        <div class="icon red" onclick="showHackButton()">
+        <div class="icon red" onclick="showHackButton('red')">
             <img src="https://cdn-icons-png.flaticon.com/512/61/61457.png" alt="Lock Icon">
         </div>
     </div>
@@ -92,8 +92,18 @@
     <div class="hack-button" id="hackButton" onclick="hideHackButton()">
         Hack
     </div>
+
+    <!-- Audio elements -->
+    <audio id="blueAudio" src="led-power.wav"></audio>
+    <audio id="orangeAudio" src="14hz.mp3"></audio>
+    <audio id="greenAudio" src="all-power.wav"></audio>
+    <audio id="redAudio" src="Lock.mp3"></audio>
+
     <script>
-        function showHackButton() {
+        let currentButton = null;
+
+        function showHackButton(button) {
+            currentButton = button;
             const hackButton = document.getElementById('hackButton');
             hackButton.style.display = 'flex';
         }
@@ -101,6 +111,16 @@
         function hideHackButton() {
             const hackButton = document.getElementById('hackButton');
             hackButton.style.display = 'none';
+            playAudio(currentButton);
+        }
+
+        function playAudio(button) {
+            if (button) {
+                const audio = document.getElementById(`${button}Audio`);
+                if (audio) {
+                    audio.play();
+                }
+            }
         }
     </script>
 </body>
