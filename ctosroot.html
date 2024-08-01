@@ -13,18 +13,19 @@
         }
         .container {
             display: grid;
-            grid-template-columns: repeat(2, 200px);
+            grid-template-columns: repeat(2, 220px);
             gap: 20px;
             justify-content: center;
             margin-top: 50px;
         }
         .icon {
-            width: 200px;
-            height: 200px;
+            width: 220px;
+            height: 220px;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: 10px;
+            cursor: pointer;
         }
         .blue {
             background-color: #00aaff;
@@ -44,35 +45,42 @@
         }
         .footer {
             margin-top: 50px;
+            display: flex;
+            justify-content: center;
+        }
+        .footer .icon {
+            margin: 0 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="icon blue">
+        <div class="icon blue" onclick="moveToFooter(this)">
             <img src="https://cdn-icons-png.flaticon.com/512/820/820315.png" alt="Light Icon">
         </div>
-        <div class="icon orange">
+        <div class="icon orange" onclick="moveToFooter(this)">
             <img src="https://cdn-icons-png.flaticon.com/512/320/320810.png" alt="Traffic Icon">
         </div>
-        <div class="icon green">
+        <div class="icon green" onclick="moveToFooter(this)">
             <img src="https://cdn-icons-png.flaticon.com/512/108/1083645.png" alt="TV Icon">
         </div>
-        <div class="icon red">
+        <div class="icon red" onclick="moveToFooter(this)">
             <img src="https://cdn-icons-png.flaticon.com/512/483/483052.png" alt="Lock Icon">
         </div>
     </div>
     <div class="footer">
-        <p>Proxy Server: 0.0.0.0</p>
-        <p>void main(int argc, char *argv[]) {</p>
-        <p>/* Start of main loop */</p>
-        <p>/* Call virus reproduction func */</p>
-        <p>getcwd(buffer, MAX_PATH); /* Get current directory */</p>
-        <p>drive_w = getdisk(); /* Get current drive number */</p>
-        <p>setdisk(2); /* Goto "C" drive */</p>
-        <p>chdir("\\"); /* Change to root directory */</p>
-        <p>done1 = findfirst("*.SYS", _A_HIDDEN, &info); /* Get 1st directory */</p>
-        <p>}</p>
+        <!-- Buttons moved to footer will appear here -->
     </div>
+    <script>
+        function moveToFooter(element) {
+            const footer = document.querySelector('.footer');
+            // Clone the clicked element
+            const clonedElement = element.cloneNode(true);
+            // Remove onclick attribute from the cloned element to avoid recursion
+            clonedElement.removeAttribute('onclick');
+            // Append the cloned element to the footer
+            footer.appendChild(clonedElement);
+        }
+    </script>
 </body>
 </html>
