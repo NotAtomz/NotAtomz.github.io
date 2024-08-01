@@ -51,35 +51,56 @@
         .footer .icon {
             margin: 0 10px;
         }
+        .hack-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 120px;
+            background-color: #00aaff;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            border: 3px solid white;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="icon blue" onclick="moveToFooter(this)">
+        <div class="icon blue" onclick="showHackButton()">
             <img src="https://cdn-icons-png.flaticon.com/512/820/820315.png" alt="Light Icon">
         </div>
-        <div class="icon orange" onclick="moveToFooter(this)">
+        <div class="icon orange" onclick="showHackButton()">
             <img src="https://cdn-icons-png.flaticon.com/512/320/320810.png" alt="Traffic Icon">
         </div>
-        <div class="icon green" onclick="moveToFooter(this)">
+        <div class="icon green" onclick="showHackButton()">
             <img src="https://cdn-icons-png.flaticon.com/512/108/1083645.png" alt="TV Icon">
         </div>
-        <div class="icon red" onclick="moveToFooter(this)">
+        <div class="icon red" onclick="showHackButton()">
             <img src="https://cdn-icons-png.flaticon.com/512/483/483052.png" alt="Lock Icon">
         </div>
     </div>
     <div class="footer">
         <!-- Buttons moved to footer will appear here -->
     </div>
+    <div class="hack-button" id="hackButton" onclick="hideHackButton()">
+        Hack
+    </div>
     <script>
-        function moveToFooter(element) {
-            const footer = document.querySelector('.footer');
-            // Clone the clicked element
-            const clonedElement = element.cloneNode(true);
-            // Remove onclick attribute from the cloned element to avoid recursion
-            clonedElement.removeAttribute('onclick');
-            // Append the cloned element to the footer
-            footer.appendChild(clonedElement);
+        function showHackButton() {
+            const hackButton = document.getElementById('hackButton');
+            hackButton.style.display = 'flex';
+        }
+
+        function hideHackButton() {
+            const hackButton = document.getElementById('hackButton');
+            hackButton.style.display = 'none';
         }
     </script>
 </body>
