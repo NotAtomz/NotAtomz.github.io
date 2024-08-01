@@ -3,241 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ctos Root</title>
+    <title>Watch Dogs Style Interface</title>
     <style>
-        body, html {
-            height: 100%;
-            margin: 0;
-            display: flex;
-            justify-content: flex-start;
-            align-items: flex-start;
-            background: black;
+        body {
+            background-color: #2c2c2c;
             color: white;
-            font-family: monospace;
-            padding: 0;
-            overflow: hidden;
-        }
-        #terminal {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            white-space: pre;
-        }
-        #login {
-            display: none;
-            flex-direction: column;
-            margin-top: 10px;
-        }
-        input {
-            background: none;
-            border: none;
-            color: white;
-            font-family: monospace;
-            outline: none;
-            caret-color: white;
-            padding: 0;
+            font-family: Arial, sans-serif;
+            text-align: center;
         }
         .container {
-            font-family: 'Courier New', Courier, monospace;
-            background-color: #000;
-            color: #adadad;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            flex-direction: column;
-            text-align: center;
-            width: 90vw;
-            max-width: 600px;
-        }
-        .button-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
-            width: 100%;
+            grid-template-columns: repeat(2, 200px);
+            gap: 20px;
+            justify-content: center;
+            margin-top: 50px;
         }
-        button {
-            background-color: #333;
-            color: #ffffff;
-            border: none;
-            padding: 20px;
-            cursor: pointer;
-            font-size: 1.2em;
+        .icon {
+            width: 200px;
+            height: 200px;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 20vh;
-            text-align: center;
+            border-radius: 10px;
         }
-        button i {
-            font-size: 2.5em;
-            margin-bottom: 5px;
+        .blue {
+            background-color: #00aaff;
         }
-        button:hover {
-            background-color: #555;
+        .orange {
+            background-color: #ffaa00;
         }
-        .terminal-output {
-            background-color: #000;
-            color: #adadad;
-            padding: 10px;
-            border: 2px solid #000000;
-            font-size: 1em;
-            height: 20vh;
-            overflow-y: auto;
-            text-align: left;
-            width: 100%;
-            max-width: 600px;
+        .green {
+            background-color: #00ff55;
         }
-        #video-screen {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: black;
-            width: 100vw;
-            height: 100vh;
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 10;
+        .red {
+            background-color: #ff4444;
         }
-        #video-screen video {
-            width: 100vw;
-            height: 100vh;
-            object-fit: cover;
+        .icon img {
+            width: 100px;
+            height: 100px;
+        }
+        .footer {
+            margin-top: 50px;
         }
     </style>
 </head>
 <body>
-    <div id="terminal"></div>
-    <div id="video-screen">
-        <video id="intro-video" src="boots.mp4" autoplay playsinline></video>
-    </div>
-    <div id="login">
-        <label>username: <input type="text" id="username" value="blume0sUser************" readonly></label><br>
-        <label>password: <input type="password" id="password" onkeydown="if(event.key === 'Enter') checkPassword()"></label>
-    </div>
-
-    <div id="ctOS" class="container" style="display:none;">
-        <div class="button-grid">
-            <button onclick="prepareHack('Pipes')"><i class="fas fa-water"></i><br>Pipes</button>
-            <button onclick="prepareHack('Blackout')"><i class="fas fa-bolt"></i><br>Blackout</button>
-            <button onclick="prepareHack('Comms Jam')"><i class="fas fa-signal"></i><br>Comms Jam</button>
-            <button onclick="prepareHack('Light')"><i class="fas fa-traffic-light"></i><br>Traffic Light</button>
-            <button onclick="prepareHack('ctOS Scan')"><i class="fas fa-fingerprint"></i><br>ctOS Scan</button>
-            <button onclick="prepareHack('Train')"><i class="fas fa-train"></i><br>Train</button>
-            <button onclick="prepareHack('Blocker')"><i class="fas fa-road"></i><br>Blocker</button>
-            <button onclick="prepareHack('Cellphone')"><i class="fas fa-mobile-alt"></i><br>Cellphone</button>
-            <button onclick="prepareHack('Door')"><i class="fas fa-door-open"></i><br>Door</button>
+    <div class="container">
+        <div class="icon blue">
+            <img src="https://cdn-icons-png.flaticon.com/512/820/820315.png" alt="Light Icon">
         </div>
-        <div id="output" class="terminal-output"></div>
+        <div class="icon orange">
+            <img src="https://cdn-icons-png.flaticon.com/512/320/320810.png" alt="Traffic Icon">
+        </div>
+        <div class="icon green">
+            <img src="https://cdn-icons-png.flaticon.com/512/108/1083645.png" alt="TV Icon">
+        </div>
+        <div class="icon red">
+            <img src="https://cdn-icons-png.flaticon.com/512/483/483052.png" alt="Lock Icon">
+        </div>
     </div>
-
-    <script>
-        const bootMessages = [
-            "Loading, please wait...",
-            "",
-            "12.20160524) ad 010101010ddbu22 (Ded) Assusing drive caches write through Valid path for Logical Volume.",
-            "",
-            "/ubl/playerı olan, 1704684/10121989 Files, 3813438/7532544 blocks Startedi Attempting to mount Dedware fuse sount.",
-            "See system ctl status zunDedware//fuse.nount for details.",
-            "",
-            "[ 0.000000] intt_memory_mappings [mem 0x00100000-OxdeFa4FFF)",
-            "[1.169734] mem 0x00100000-0x001FFFFF]",
-            "[0.310006] NetLabels protocols UNLABELED DEDS0v4",
-            "",
-            "Freeing initrd memory: 18700K (FFFF880035642000 FFFF880036d99000)",
-            "PCI-DHA: Using software bounce buffering for 10 (SFDad)",
-            "",
-            "status: Ok EXT4-Fs (sdal): orphan cleanup on readonly fs",
-            "status: Ok EXT4-Fs (sdal): recovery complete",
-            "status: Ok EXT4-Fs (sdal): mounted Filesysten with ordered data mode.",
-            "status: Ok Found BLUME MP-table mapped at [nen 0x10121989-0x000F9bff]",
-            "",
-            "Scanning 1 areas for low memory corruption Monitoring of Blume mirrors.. ng dneventd or progress polling. init memory mappings [sen 0x00000000-0x000ACK)",
-            "[#—————————]",
-            "[##————————]",
-            "[###———————]",
-            "[####——————]",
-            "[#####—————]",
-            "[######————]",
-            "[#######———]",
-            "[########——]",
-            "[#########—]",
-            "[##########]",
-            "Mounted device Dedvares dedsec00 Logins"
-        ];
-        const terminal = document.getElementById('terminal');
-        const login = document.getElementById('login');
-        const ctOS = document.getElementById('ctOS');
-        const videoScreen = document.getElementById('video-screen');
-        const video = document.getElementById('intro-video');
-
-        let index = 0;
-
-        function showBootMessages() {
-            if (index < bootMessages.length) {
-                terminal.innerText += bootMessages[index] + '\n';
-                index++;
-                setTimeout(showBootMessages, 100);
-            } else {
-                setTimeout(showVideoScreen, 500);
-            }
-        }
-
-        function showVideoScreen() {
-            terminal.style.display = 'none';
-            videoScreen.style.display = 'flex';
-            video.play();
-            video.onended = () => {
-                videoScreen.style.display = 'none';
-                login.style.display = 'flex';
-            };
-        }
-
-        function checkPassword() {
-            const password = document.getElementById('password').value;
-            if (password === 'admin') {
-                login.style.display = 'none';
-                ctOS.style.display = 'flex';
-            } else {
-                alert('Access denied!');
-            }
-        }
-
-        function prepareHack(hackType) {
-            const outputDiv = document.getElementById('output');
-            const timestamp = new Date().toLocaleTimeString();
-            outputDiv.innerHTML += `[${timestamp}] Preparing to execute ${hackType} hack...<br>`;
-            outputDiv.scrollTop = outputDiv.scrollHeight;
-
-            const delay = Math.floor(Math.random() * 6) + 1;
-
-            setTimeout(() => executeHack(hackType), delay * 1000);
-        }
-
-        function executeHack(hackType) {
-            const outputDiv = document.getElementById('output');
-            const timestamp = new Date().toLocaleTimeString();
-            const messages = {
-                'Pipes': 'Pipe burst activated!',
-                'Blackout': 'City-wide blackout initiated!',
-                'Comms Jam': 'Communications jammed!',
-                'Light': 'Traffic lights changed!',
-                'ctOS Scan': 'ctOS scan completed!',
-                'Train': 'Train systems controlled!',
-                'Blocker': 'Blockers raised!',
-                'Cellphone': 'Cellphone hacked!',
-                'Door': 'Door unlocked!'
-            };
-
-            outputDiv.innerHTML += `[${timestamp}] ${messages[hackType] || 'Unknown hack type!'}<br>`;
-            outputDiv.scrollTop = outputDiv.scrollHeight;
-        }
-
-        showBootMessages();
-    </script>
+    <div class="footer">
+        <p>Proxy Server: 0.0.0.0</p>
+        <p>void main(int argc, char *argv[]) {</p>
+        <p>/* Start of main loop */</p>
+        <p>/* Call virus reproduction func */</p>
+        <p>getcwd(buffer, MAX_PATH); /* Get current directory */</p>
+        <p>drive_w = getdisk(); /* Get current drive number */</p>
+        <p>setdisk(2); /* Goto "C" drive */</p>
+        <p>chdir("\\"); /* Change to root directory */</p>
+        <p>done1 = findfirst("*.SYS", _A_HIDDEN, &info); /* Get 1st directory */</p>
+        <p>}</p>
+    </div>
 </body>
 </html>
