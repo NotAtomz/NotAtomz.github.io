@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Dogs Style Interface</title>
+    <title>Simple Ware V3</title>
     <style>
         body {
             background-color: #2c2c2c;
@@ -13,35 +13,26 @@
         }
         .container {
             display: grid;
-            grid-template-columns: repeat(2, 330px); /* Adjusted for larger buttons */
-            gap: 30px; /* Adjusted for larger buttons */
+            grid-template-columns: repeat(2, 330px);
+            gap: 30px;
             justify-content: center;
             margin-top: 50px;
+            display: none; /* Hide initially for terminal effect */
         }
         .icon {
-            width: 330px; /* Adjusted for larger buttons */
-            height: 330px; /* Adjusted for larger buttons */
+            width: 330px;
+            height: 330px;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: 10px;
             cursor: pointer;
-        }
-        .blue {
-            background-color: #00aaff;
-        }
-        .orange {
-            background-color: #ffaa00;
-        }
-        .green {
-            background-color: #00ff55;
-        }
-        .red {
-            background-color: #ff4444;
+            background-color: grey;
+            pointer-events: none;
         }
         .icon img {
-            width: 150px; /* Adjusted for larger buttons */
-            height: 150px; /* Adjusted for larger buttons */
+            width: 150px;
+            height: 150px;
         }
         .footer {
             margin-top: 50px;
@@ -51,28 +42,72 @@
         .footer .icon {
             margin: 0 10px;
         }
+        .connect-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 100px;
+            background-color: #ff4444;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            border: 5px solid white;
+        }
+        .loading-bar {
+            position: fixed;
+            bottom: 130px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 20px;
+            background-color: #00ff55;
+            border-radius: 10px;
+            display: none;
+            transition: width 10s linear;
+        }
+        .terminal {
+            background-color: black;
+            color: green;
+            width: 80%;
+            margin: 20px auto;
+            padding: 20px;
+            font-family: "Courier New", Courier, monospace;
+            text-align: left;
+            height: 300px;
+            overflow-y: auto;
+        }
         .hack-button {
             position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 600px;
-            height: 600px;
+            width: 300px;
+            height: 100px;
             background-color: #00aaff;
-            border-radius: 50%;
+            border-radius: 20px;
             display: none;
             align-items: center;
             justify-content: center;
-            font-size: 96px;
+            font-size: 48px;
             font-weight: bold;
             color: white;
             cursor: pointer;
-            border: 10px solid white;
+            border: 5px solid white;
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="terminal" id="terminal">
+        <p>Loading...</p>
+    </div>
+    <div class="container" id="mainContainer">
         <div class="icon blue" onclick="showHackButton('blue')">
             <img src="https://static.vecteezy.com/system/resources/thumbnails/020/522/574/small_2x/light-bulb-icon-creative-icon-png.png" alt="Black Light Bulb Icon">
         </div>
@@ -86,21 +121,88 @@
             <img src="https://cdn-icons-png.flaticon.com/512/61/61457.png" alt="Lock Icon">
         </div>
     </div>
-    <div class="footer">
-        <!-- Buttons moved to footer will appear here -->
+    <div class="footer"></div>
+    <div class="connect-button" id="connectButton" onclick="startLoading()">
+        Connect
     </div>
-    <div class="hack-button" id="hackButton" onclick="hideHackButton()">
-        Hack
-    </div>
+    <div class="loading-bar" id="loadingBar"></div>
 
     <!-- Audio elements -->
+    <audio id="loadingAudio" src="lals.mp3"></audio>
     <audio id="blueAudio" src="led-power.wav"></audio>
     <audio id="orangeAudio" src="14hz.mp3"></audio>
     <audio id="greenAudio" src="all-power.wav"></audio>
     <audio id="redAudio" src="Lock.mp3"></audio>
 
+    <!-- Hack button -->
+    <div class="hack-button" id="hackButton" onclick="hideHackButton()">
+        Hack
+    </div>
+
     <script>
+        let terminal = document.getElementById('terminal');
+        let terminalText = terminal.querySelector('p');
         let currentButton = null;
+
+        function simulateTerminal() {
+            terminal.style.display = 'block';
+            let messages = [
+                "Initializing...",
+                "Loading modules...",
+                "Connecting to server...",
+                "Establishing secure connection...",
+                "Connection established.",
+                "Terminal ready.",
+                "Simple Ware V3 Initializinf...",
+                "Simple Ware V3 ready.",
+                "Use This At Your Own Risk.",
+                "You Have Been Warned.",
+                "Booting Up..."
+            ];
+            let index = 0;
+            let interval = setInterval(() => {
+                if (index < messages.length) {
+                    terminalText.innerHTML += "<br>" + messages[index];
+                    index++;
+                    terminal.scrollTop = terminal.scrollHeight;
+                } else {
+                    clearInterval(interval);
+                    terminal.style.display = 'none';
+                    document.getElementById('mainContainer').style.display = 'grid';
+                }
+            }, 1000);
+        }
+
+        window.onload = simulateTerminal;
+
+        function startLoading() {
+            const loadingBar = document.getElementById('loadingBar');
+            const connectButton = document.getElementById('connectButton');
+            const loadingAudio = document.getElementById('loadingAudio');
+            
+            loadingAudio.play();
+            loadingBar.style.display = 'block';
+            connectButton.style.pointerEvents = 'none';
+            loadingBar.style.width = '80%';
+            
+            setTimeout(() => {
+                loadingAudio.pause();
+                loadingBar.style.display = 'none';
+                connectButton.style.display = 'none';
+                enableButtons();
+            }, 10000); // 10 seconds
+        }
+
+        function enableButtons() {
+            const buttons = document.querySelectorAll('.icon');
+            buttons.forEach(button => {
+                button.style.pointerEvents = 'auto';
+                if (button.classList.contains('blue')) button.style.backgroundColor = '#00aaff';
+                if (button.classList.contains('orange')) button.style.backgroundColor = '#ffaa00';
+                if (button.classList.contains('green')) button.style.backgroundColor = '#00ff55';
+                if (button.classList.contains('red')) button.style.backgroundColor = '#ff4444';
+            });
+        }
 
         function showHackButton(button) {
             currentButton = button;
