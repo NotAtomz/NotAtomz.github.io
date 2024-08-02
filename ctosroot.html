@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Ware V3</title>
+    <title>ctOSRoot</title>
     <style>
         body {
             background-color: #2c2c2c;
@@ -90,6 +90,11 @@
             border: 10px solid white;
         }
     </style>
+    <!-- Meta tags for iOS app-like behavior -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ctOS">
+    <link rel="apple-touch-icon" href="ctos.png"> <!-- Add the path to your app icon here -->
 </head>
 <body>
     <div class="terminal" id="terminal">
@@ -140,19 +145,17 @@
                 "Establishing secure connection...",
                 "Connection established.",
                 "Terminal ready.",
-                "Simple Ware V3 Initializing...",
-                "Simple Ware V3 ready.",
-                "Use This At Your Own Risk.",
-                "You Have Been Warned.",
-                "WARNING You NEED A External Device.",
-                "Connecting To 1.1.1.1.",
-                "Connection Failed.",
-                "Connecting To Nearby Server Host.",
-                "==========================",
-                "Manual Connection Required",
-                "==========================",
-                "Checking For Updates...",
-                "Ready To Boot",
+                "ctOS Initializing...",
+                "ctOS ready.",
+                "Downloading Nearby Data...",
+                "Downloading System Data...",
+                "Downloading Host Data...",
+                "Downloading Host Data Base...",
+                "Granting Admin Controls...",
+                "Connecting To Host...",
+                "Fail",
+                "Manual Connection Is Required.",
+                "Continuing Boot...",
                 "Booting Up..."
             ];
             let index = 0;
