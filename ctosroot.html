@@ -23,7 +23,7 @@
         }
         .icon {
             width: 200px;
-            height: 250px;
+            height: 300px; /* Increased height */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -67,7 +67,7 @@
             justify-content: center;
             display: flex;
             position: absolute;
-            bottom: 200px; /* Adjust the bottom position */
+            bottom: 150px; /* Adjust the bottom position */
             left: 50%;
             transform: translateX(-50%);
         }
@@ -148,6 +148,10 @@
             largeIcon.style.display = 'none';
             executeButton.style.display = 'none';
         }
+
+        window.onload = function() {
+            document.getElementById('executeButton').style.display = 'none';
+        };
     </script>
 </body>
 </html>
