@@ -22,8 +22,8 @@
             padding-bottom: 10px;
         }
         .icon {
-            width: 175px;
-            height: 175px;
+            width: 150px;
+            height: 200px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -39,7 +39,11 @@
             display: none;
             width: 300px;
             height: 300px;
-            margin: 20px auto;
+            margin: auto; /* Center horizontally */
+            position: absolute;
+            top: 50%; /* Center vertically */
+            left: 50%;
+            transform: translate(-50%, -50%);
         }
         .large-icon img {
             filter: invert(1); /* Make the image white */
@@ -48,8 +52,8 @@
         }
         .execute-button {
             display: none;
-            width: 300px;
-            height: 80px;
+            width: 350px;
+            height: 100px;
             background-color: rgba(0, 0, 0, 0.5);
             border: 2px solid grey;
             background-image: linear-gradient(45deg, grey 25%, transparent 25%, transparent 50%, grey 50%, grey 75%, transparent 75%, transparent);
@@ -57,7 +61,7 @@
             margin: 10px auto;
             cursor: pointer;
             color: white;
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             align-items: center;
             justify-content: center;
@@ -87,11 +91,11 @@
             <div class="icon traffic-light" onclick="showLargeIcon('traffic-light', 'https://static.thenounproject.com/png/36915-200.png')">
                 <img src="https://static.thenounproject.com/png/36915-200.png" alt="Traffic Light Icon">
             </div>
-            <div class="icon light-bulb" onclick="showLargeIcon('light-bulb', 'https://static.vecteezy.com/system/resources/thumbnails/020/522/574/small_2x/light-bulb-icon-creative-icon-png.png')">
-                <img src="https://static.vecteezy.com/system/resources/thumbnails/020/522/574/small_2x/light-bulb-icon-creative-icon-png.png" alt="Light Bulb Icon">
+            <div class="icon light-bulb" onclick="showLargeIcon('light-bulb', 'https://cdn.icon-icons.com/icons2/621/PNG/512/black-light-bulb_icon-icons.com_57001.png')">
+                <img src="https://cdn.icon-icons.com/icons2/621/PNG/512/black-light-bulb_icon-icons.com_57001.png" alt="Light Bulb Icon">
             </div>
-            <div class="icon tv" onclick="showLargeIcon('tv', 'https://i.pinimg.com/originals/8f/28/fe/8f28fe692234e16f1f114507d39f387d.png')">
-                <img src="https://i.pinimg.com/originals/8f/28/fe/8f28fe692234e16f1f114507d39f387d.png" alt="TV Icon">
+            <div class="icon tv" onclick="showLargeIcon('tv', 'https://static-00.iconduck.com/assets.00/tv-icon-2048x2048-8b162pn0.png')">
+                <img src="https://static-00.iconduck.com/assets.00/tv-icon-2048x2048-8b162pn0.png" alt="TV Icon">
             </div>
             <div class="icon lock" onclick="showLargeIcon('lock', 'https://cdn-icons-png.flaticon.com/512/61/61457.png')">
                 <img src="https://cdn-icons-png.flaticon.com/512/61/61457.png" alt="Lock Icon">
