@@ -37,8 +37,8 @@
         }
         .large-icon {
             display: none;
-            width: 300px;
-            height: 300px;
+            width: 500px; /* Increased size */
+            height: 500px; /* Increased size */
             margin: auto; /* Center horizontally */
             position: absolute;
             top: 50%; /* Center vertically */
@@ -130,6 +130,7 @@
         function executeCommand() {
             if (currentButton) {
                 playAudio(currentButton);
+                hideElements();
             }
         }
 
@@ -138,6 +139,14 @@
             if (audio) {
                 audio.play();
             }
+        }
+
+        function hideElements() {
+            const largeIcon = document.getElementById('largeIcon');
+            const executeButton = document.getElementById('executeButton');
+            
+            largeIcon.style.display = 'none';
+            executeButton.style.display = 'none';
         }
     </script>
 </body>
