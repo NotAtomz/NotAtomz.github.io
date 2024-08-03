@@ -6,7 +6,7 @@
     <title>ctOSRoot</title>
     <style>
         body {
-            background-color: #000000;
+            background-color: #2c2c2c;
             color: white;
             font-family: Arial, sans-serif;
             text-align: center;
@@ -15,66 +15,84 @@
             overflow: hidden;
         }
         .container {
+            display: grid;
+            grid-template-columns: repeat(2, 330px);
+            gap: 30px;
+            justify-content: center;
+            margin-top: 50px;
+            display: none; /* Hide initially for terminal effect */
+        }
+        .icon {
+            width: 330px;
+            height: 330px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            cursor: pointer;
+            background-color: grey;
+            pointer-events: none;
+        }
+        .icon img {
+            width: 150px;
+            height: 150px;
+        }
+        .footer {
+            margin-top: 50px;
+            display: flex;
+            justify-content: center;
+        }
+        .footer .icon {
+            margin: 0 10px;
+        }
+        .connect-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background-color: #ff4444;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 96px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            border: 10px solid white;
+        }
+        .terminal {
+            background-color: black;
+            color: white;
+            width: 100%;
+            height: 100vh;
+            padding: 20px;
+            font-family: "Courier New", Courier, monospace;
+            text-align: left;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
-            height: 100vh;
-            padding-bottom: 10px;
         }
-        .icon {
-            width: 200px;
-            height: 300px; /* Increased height */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            background-color: #00ffff;
-            margin: 10px;
-        }
-        .icon img {
-            width: 100px;
-            height: 100px;
-        }
-        .large-icon {
-            display: none;
-            width: 500px; /* Increased size */
-            height: 500px; /* Increased size */
-            margin: auto; /* Center horizontally */
-            position: absolute;
-            top: 50%; /* Center vertically */
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        .large-icon img {
-            filter: invert(1); /* Make the image white */
-            width: 100%;
-            height: 100%;
-        }
-        .execute-button {
-            display: none;
-            width: 500px; /* Increased size */
-            height: 150px; /* Increased size */
-            background-color: rgba(0, 0, 0, 0.5);
-            border: 2px solid grey;
-            background-image: linear-gradient(45deg, grey 25%, transparent 25%, transparent 50%, grey 50%, grey 75%, transparent 75%, transparent);
-            background-size: 10px 10px;
-            margin: 10px auto;
-            cursor: pointer;
-            color: white;
-            font-size: 36px; /* Increased font size */
-            font-weight: bold;
-            align-items: center;
-            justify-content: center;
-            display: flex;
-            position: absolute;
-            bottom: 150px; /* Adjust the bottom position */
+        .hack-button {
+            position: fixed;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-        }
-        .footer {
-            display: flex;
+            width: 600px;
+            height: 600px;
+            background-color: #00aaff;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
             justify-content: center;
-            align-items: flex-end;
+            font-size: 96px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            border: 10px solid white;
         }
     </style>
     <!-- Meta tags for iOS app-like behavior -->
@@ -84,74 +102,136 @@
     <link rel="apple-touch-icon" href="ctos.png"> <!-- Add the path to your app icon here -->
 </head>
 <body>
-    <div class="container">
-        <div class="large-icon" id="largeIcon">
-            <img src="" alt="Large Icon" id="largeIconImage">
+    <div class="terminal" id="terminal">
+        <p>Loading...</p>
+    </div>
+    <div class="container" id="mainContainer">
+        <div class="icon blue" onclick="showHackButton('blue')">
+            <img src="https://cdn.icon-icons.com/icons2/621/PNG/512/black-light-bulb_icon-icons.com_57001.png" alt="Black Light Bulb Icon">
         </div>
-        <div class="execute-button" id="executeButton" onclick="executeCommand()">
-            Execute
+        <div class="icon orange" onclick="showHackButton('orange')">
+            <img src="https://static.thenounproject.com/png/36915-200.png" alt="Traffic Light Icon">
         </div>
-        <div class="footer">
-            <div class="icon traffic-light" onclick="showLargeIcon('traffic-light', 'https://static.thenounproject.com/png/36915-200.png')">
-                <img src="https://static.thenounproject.com/png/36915-200.png" alt="Traffic Light Icon">
-            </div>
-            <div class="icon light-bulb" onclick="showLargeIcon('light-bulb', 'https://cdn.icon-icons.com/icons2/621/PNG/512/black-light-bulb_icon-icons.com_57001.png')">
-                <img src="https://cdn.icon-icons.com/icons2/621/PNG/512/black-light-bulb_icon-icons.com_57001.png" alt="Light Bulb Icon">
-            </div>
-            <div class="icon tv" onclick="showLargeIcon('tv', 'https://static-00.iconduck.com/assets.00/tv-icon-2048x2048-8b162pn0.png')">
-                <img src="https://static-00.iconduck.com/assets.00/tv-icon-2048x2048-8b162pn0.png" alt="TV Icon">
-            </div>
-            <div class="icon lock" onclick="showLargeIcon('lock', 'https://cdn-icons-png.flaticon.com/512/61/61457.png')">
-                <img src="https://cdn-icons-png.flaticon.com/512/61/61457.png" alt="Lock Icon">
-            </div>
+        <div class="icon green" onclick="showHackButton('green')">
+            <img src="https://static-00.iconduck.com/assets.00/tv-icon-2048x2048-8b162pn0.png" alt="TV Icon">
         </div>
+        <div class="icon red" onclick="showHackButton('red')">
+            <img src="https://cdn-icons-png.flaticon.com/512/61/61457.png" alt="Lock Icon">
+        </div>
+    </div>
+    <div class="footer"></div>
+    <div class="connect-button" id="connectButton" onclick="startLoading()">
+        Connect
     </div>
 
     <!-- Audio elements -->
-    <audio id="traffic-lightAudio" src="14hz.mp3"></audio>
-    <audio id="light-bulbAudio" src="led-power.wav"></audio>
-    <audio id="tvAudio" src="all-power.wav"></audio>
-    <audio id="lockAudio" src="Lock.mp3"></audio>
+    <audio id="loadingAudio" src="lals.mp3"></audio>
+    <audio id="blueAudio" src="led-power.wav"></audio>
+    <audio id="orangeAudio" src="14hz.mp3"></audio>
+    <audio id="greenAudio" src="all-power.wav"></audio>
+    <audio id="redAudio" src="Lock.mp3"></audio>
+
+    <!-- Hack button -->
+    <div class="hack-button" id="hackButton" onclick="hideHackButton()">
+        Hack
+    </div>
 
     <script>
+        let terminal = document.getElementById('terminal');
+        let terminalText = terminal.querySelector('p');
         let currentButton = null;
 
-        function showLargeIcon(button, iconSrc) {
-            currentButton = button;
-            const largeIcon = document.getElementById('largeIcon');
-            const largeIconImage = document.getElementById('largeIconImage');
-            const executeButton = document.getElementById('executeButton');
-            
-            largeIconImage.src = iconSrc;
-            largeIcon.style.display = 'block';
-            executeButton.style.display = 'flex';
+        function simulateTerminal() {
+            terminal.style.display = 'block';
+            let messages = [
+                "Initializing...",
+                "Loading modules...",
+                "Connecting to server...",
+                "Establishing secure connection...",
+                "Connection established.",
+                "Terminal ready.",
+                "ctOS Initializing...",
+                "ctOS ready.",
+                "Downloading Nearby Data...",
+                "Downloading System Data...",
+                "Downloading Host Data...",
+                "Downloading Host Data Base...",
+                "Granting Admin Controls...",
+                "Connecting To Host...",
+                "Fail",
+                "Manual Connection Is Required.",
+                "Continuing Boot...",
+                "You are in control.",
+                "Message To USER",
+                "Have Fun With Your New Controls And Dont Get Arrested",
+                "This Is Used For Messing With Other People",
+                "But It Can Cause Harm So Use This Carefully",
+                "Unlocking System And Data...",
+                "Collecting Data Stream...",
+                "Booting Up..."
+            ];
+            let index = 0;
+            let interval = setInterval(() => {
+                if (index < messages.length) {
+                    terminalText.innerHTML += "<br>" + messages[index];
+                    index++;
+                    terminal.scrollTop = terminal.scrollHeight;
+                } else {
+                    clearInterval(interval);
+                    terminal.style.display = 'none';
+                    document.getElementById('mainContainer').style.display = 'grid';
+                    document.getElementById('connectButton').style.display = 'flex';
+                }
+            }, 1000);
         }
 
-        function executeCommand() {
-            if (currentButton) {
-                playAudio(currentButton);
-                hideElements();
-            }
+        window.onload = simulateTerminal;
+
+        function startLoading() {
+            const connectButton = document.getElementById('connectButton');
+            const loadingAudio = document.getElementById('loadingAudio');
+            
+            loadingAudio.play();
+            connectButton.style.pointerEvents = 'none';
+            
+            setTimeout(() => {
+                loadingAudio.pause();
+                connectButton.style.display = 'none';
+                enableButtons();
+            }, 10000); // 10 seconds
+        }
+
+        function enableButtons() {
+            const buttons = document.querySelectorAll('.icon');
+            buttons.forEach(button => {
+                button.style.pointerEvents = 'auto';
+                if (button.classList.contains('blue')) button.style.backgroundColor = '#00aaff';
+                if (button.classList.contains('orange')) button.style.backgroundColor = '#ffaa00';
+                if (button.classList.contains('green')) button.style.backgroundColor = '#00ff55';
+                if (button.classList.contains('red')) button.style.backgroundColor = '#ff4444';
+            });
+        }
+
+        function showHackButton(button) {
+            currentButton = button;
+            const hackButton = document.getElementById('hackButton');
+            hackButton.style.display = 'flex';
+        }
+
+        function hideHackButton() {
+            const hackButton = document.getElementById('hackButton');
+            hackButton.style.display = 'none';
+            playAudio(currentButton);
         }
 
         function playAudio(button) {
-            const audio = document.getElementById(`${button}Audio`);
-            if (audio) {
-                audio.play();
+            if (button) {
+                const audio = document.getElementById(`${button}Audio`);
+                if (audio) {
+                    audio.play();
+                }
             }
         }
-
-        function hideElements() {
-            const largeIcon = document.getElementById('largeIcon');
-            const executeButton = document.getElementById('executeButton');
-            
-            largeIcon.style.display = 'none';
-            executeButton.style.display = 'none';
-        }
-
-        window.onload = function() {
-            document.getElementById('executeButton').style.display = 'none';
-        };
     </script>
 </body>
 </html>
