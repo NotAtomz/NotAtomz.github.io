@@ -6,7 +6,7 @@
     <title>ctOSRoot</title>
     <style>
         body {
-            background-color: #2c2c2c;
+            background-color: #000000;
             color: white;
             font-family: Arial, sans-serif;
             text-align: center;
@@ -16,10 +16,10 @@
         }
         .container {
             display: flex;
-            justify-content: center;
-            align-items: center;
+            flex-direction: column;
+            justify-content: space-between;
             height: 100vh;
-            gap: 30px;
+            padding-bottom: 30px;
         }
         .icon {
             width: 100px;
@@ -27,19 +27,19 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 10px;
             cursor: pointer;
-            background-color: #00aaff;
-            pointer-events: auto;
+            background-color: #00ffff;
+            margin: 10px;
         }
         .icon img {
             width: 50px;
             height: 50px;
         }
         .large-icon {
-            width: 300px;
-            height: 300px;
-            margin-bottom: 20px;
+            display: none;
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
         }
         .large-icon img {
             width: 100%;
@@ -63,9 +63,9 @@
             display: flex;
         }
         .footer {
-            margin-top: 50px;
             display: flex;
             justify-content: center;
+            align-items: flex-end;
         }
     </style>
     <!-- Meta tags for iOS app-like behavior -->
@@ -76,25 +76,26 @@
 </head>
 <body>
     <div class="container">
-        <div class="icon traffic-light" onclick="showLargeIcon('traffic-light', 'traffic-light-icon.png')">
-            <img src="https://static.thenounproject.com/png/36915-200.png" alt="Traffic Light Icon">
+        <div class="large-icon" id="largeIcon">
+            <img src="" alt="Large Icon" id="largeIconImage">
         </div>
-        <div class="icon light-bulb" onclick="showLargeIcon('light-bulb', 'light-bulb-icon.png')">
-            <img src="https://cdn.icon-icons.com/icons2/621/PNG/512/black-light-bulb_icon-icons.com_57001.png" alt="Light Bulb Icon">
+        <div class="execute-button" id="executeButton" onclick="executeCommand()">
+            Execute
         </div>
-        <div class="icon tv" onclick="showLargeIcon('tv', 'tv-icon.png')">
-            <img src="https://static-00.iconduck.com/assets.00/tv-icon-2048x2048-8b162pn0.png" alt="TV Icon">
+        <div class="footer">
+            <div class="icon traffic-light" onclick="showLargeIcon('traffic-light', 'https://static.thenounproject.com/png/36915-200.png')">
+                <img src="https://static.thenounproject.com/png/36915-200.png" alt="Traffic Light Icon">
+            </div>
+            <div class="icon light-bulb" onclick="showLargeIcon('light-bulb', 'https://static.vecteezy.com/system/resources/thumbnails/020/522/574/small_2x/light-bulb-icon-creative-icon-png.png')">
+                <img src="https://static.vecteezy.com/system/resources/thumbnails/020/522/574/small_2x/light-bulb-icon-creative-icon-png.png" alt="Light Bulb Icon">
+            </div>
+            <div class="icon tv" onclick="showLargeIcon('tv', 'https://i.pinimg.com/originals/8f/28/fe/8f28fe692234e16f1f114507d39f387d.png')">
+                <img src="https://i.pinimg.com/originals/8f/28/fe/8f28fe692234e16f1f114507d39f387d.png" alt="TV Icon">
+            </div>
+            <div class="icon lock" onclick="showLargeIcon('lock', 'https://cdn-icons-png.flaticon.com/512/61/61457.png')">
+                <img src="https://cdn-icons-png.flaticon.com/512/61/61457.png" alt="Lock Icon">
+            </div>
         </div>
-        <div class="icon lock" onclick="showLargeIcon('lock', 'lock-icon.png')">
-            <img src="https://cdn-icons-png.flaticon.com/512/61/61457.png" alt="Lock Icon">
-        </div>
-    </div>
-
-    <div class="large-icon" id="largeIcon" style="display: none;">
-        <img src="" alt="Large Icon" id="largeIconImage">
-    </div>
-    <div class="execute-button" id="executeButton" onclick="executeCommand()">
-        Execute
     </div>
 
     <!-- Audio elements -->
