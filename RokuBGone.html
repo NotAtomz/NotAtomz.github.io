@@ -13,35 +13,50 @@
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
             function playBeep(frequency, duration) {
-                const oscillator = audioContext.createOscillator();
-                oscillator.type = 'square';
-                oscillator.frequency.value = frequency;
-                oscillator.connect(audioContext.destination);
-                oscillator.start();
+                return new Promise((resolve) => {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
 
-                setTimeout(() => oscillator.stop(), duration);
+                    oscillator.type = 'square';
+                    oscillator.frequency.value = frequency;
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+
+                    oscillator.start();
+                    gainNode.gain.setValueAtTime(1, audioContext.currentTime); // Start the beep
+                    gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration / 1000); // Stop the beep after 'duration' milliseconds
+
+                    oscillator.stop(audioContext.currentTime + duration / 1000); // Stop the oscillator
+
+                    // Resolve the promise when the beep is done
+                    oscillator.onended = resolve;
+                });
             }
 
-            // Define the IR signal timing in milliseconds (this is a simplified example)
-            const headerPulse = 9047; // header-pulse
-            const headerSpace = 4470; // header-space
-            const onePulse = 556;     // one-pulse
-            const oneSpace = 1653;    // one-space
-            const zeroPulse = 556;    // zero-pulse
-            const zeroSpace = 527;    // zero-space
-            const gapPulse = 559;     // gap-pulse
+            async function playIRSequence() {
+                // Define the IR signal timing in milliseconds
+                const headerPulse = 9047; // header-pulse
+                const headerSpace = 4470; // header-space
+                const onePulse = 556;     // one-pulse
+                const oneSpace = 1653;    // one-space
+                const zeroPulse = 556;    // zero-pulse
+                const zeroSpace = 527;    // zero-space
+                const gapPulse = 559;     // gap-pulse
 
-            // Sequence of signal (simplified example)
-            playBeep(4000, headerPulse); // Example frequency for header pulse
-            setTimeout(() => playBeep(0, headerSpace), headerPulse);
+                // Play the sequence of signal pulses and spaces
+                await playBeep(4000, headerPulse); // Header pulse
+                await playBeep(0, headerSpace);    // Header space
 
-            setTimeout(() => playBeep(4000, onePulse), headerPulse + headerSpace);
-            setTimeout(() => playBeep(0, oneSpace), headerPulse + headerSpace + onePulse);
+                await playBeep(4000, onePulse);    // One pulse
+                await playBeep(0, oneSpace);       // One space
 
-            setTimeout(() => playBeep(4000, zeroPulse), headerPulse + headerSpace + onePulse + oneSpace);
-            setTimeout(() => playBeep(0, zeroSpace), headerPulse + headerSpace + onePulse + oneSpace + zeroPulse);
+                await playBeep(4000, zeroPulse);   // Zero pulse
+                await playBeep(0, zeroSpace);      // Zero space
 
-            setTimeout(() => playBeep(4000, gapPulse), headerPulse + headerSpace + onePulse + oneSpace + zeroPulse + zeroSpace);
+                await playBeep(4000, gapPulse);    // Gap pulse
+            }
+
+            playIRSequence();
         }
     </script>
 </body>
