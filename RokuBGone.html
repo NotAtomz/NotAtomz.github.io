@@ -13,7 +13,7 @@
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const sampleRate = audioContext.sampleRate;
 
-            function generateIRPulse(durationInMicroseconds) {
+            function generateIRPulse(durationInMicroseconds, silenceAfter = 0) {
                 const durationInSeconds = durationInMicroseconds / 1e6;
                 const length = Math.floor(durationInSeconds * sampleRate);
                 const buffer = audioContext.createBuffer(1, length, sampleRate);
@@ -26,7 +26,12 @@
 
                 const bufferSource = audioContext.createBufferSource();
                 bufferSource.buffer = buffer;
-                return bufferSource;
+                return new Promise(resolve => {
+                    bufferSource.connect(audioContext.destination);
+                    bufferSource.start();
+                    bufferSource.stop(audioContext.currentTime + durationInSeconds);
+                    bufferSource.onended = () => setTimeout(resolve, silenceAfter);
+                });
             }
 
             async function playIRSequence() {
@@ -39,38 +44,29 @@
                 const zeroSpace = 527;    // zero-space
                 const gapPulse = 559;     // gap-pulse
 
+                const pulseMultiplier = 500;  // Slow down the pulses by this factor
+                const silenceAfter = 200;     // Extra silence after each pulse in ms
+
                 // Header Pulse
-                let source = generateIRPulse(headerPulse);
-                source.connect(audioContext.destination);
-                source.start();
-                await new Promise(r => setTimeout(r, headerPulse / 1000));
+                await generateIRPulse(headerPulse * pulseMultiplier, silenceAfter);
 
                 // Header Space (Silence)
-                await new Promise(r => setTimeout(r, headerSpace / 1000));
+                await new Promise(r => setTimeout(r, headerSpace * pulseMultiplier / 1000 + silenceAfter));
 
                 // One Pulse
-                source = generateIRPulse(onePulse);
-                source.connect(audioContext.destination);
-                source.start();
-                await new Promise(r => setTimeout(r, onePulse / 1000));
+                await generateIRPulse(onePulse * pulseMultiplier, silenceAfter);
 
                 // One Space (Silence)
-                await new Promise(r => setTimeout(r, oneSpace / 1000));
+                await new Promise(r => setTimeout(r, oneSpace * pulseMultiplier / 1000 + silenceAfter));
 
                 // Zero Pulse
-                source = generateIRPulse(zeroPulse);
-                source.connect(audioContext.destination);
-                source.start();
-                await new Promise(r => setTimeout(r, zeroPulse / 1000));
+                await generateIRPulse(zeroPulse * pulseMultiplier, silenceAfter);
 
                 // Zero Space (Silence)
-                await new Promise(r => setTimeout(r, zeroSpace / 1000));
+                await new Promise(r => setTimeout(r, zeroSpace * pulseMultiplier / 1000 + silenceAfter));
 
                 // Gap Pulse
-                source = generateIRPulse(gapPulse);
-                source.connect(audioContext.destination);
-                source.start();
-                await new Promise(r => setTimeout(r, gapPulse / 1000));
+                await generateIRPulse(gapPulse * pulseMultiplier, silenceAfter);
             }
 
             playIRSequence();
