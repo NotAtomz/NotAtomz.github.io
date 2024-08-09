@@ -11,47 +11,66 @@
     <script>
         function playIRSignal() {
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const sampleRate = audioContext.sampleRate;
 
-            function playBeep(frequency, duration, volume) {
-                return new Promise((resolve) => {
-                    const oscillator = audioContext.createOscillator();
-                    const gainNode = audioContext.createGain();
+            function generateIRPulse(durationInMicroseconds) {
+                const durationInSeconds = durationInMicroseconds / 1e6;
+                const length = Math.floor(durationInSeconds * sampleRate);
+                const buffer = audioContext.createBuffer(1, length, sampleRate);
+                const data = buffer.getChannelData(0);
 
-                    oscillator.type = 'square'; // Sharp beep
-                    oscillator.frequency.value = frequency;
-                    gainNode.gain.value = volume;
+                // Create a square wave (high and low signals)
+                for (let i = 0; i < length; i++) {
+                    data[i] = (i % 2 === 0) ? 1 : -1;  // Alternating high and low values
+                }
 
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
-
-                    oscillator.start();
-                    gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-
-                    setTimeout(() => {
-                        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-                        oscillator.stop();
-                        resolve();
-                    }, duration);
-                });
+                const bufferSource = audioContext.createBufferSource();
+                bufferSource.buffer = buffer;
+                return bufferSource;
             }
 
             async function playIRSequence() {
-                const headerPulse = 9.047; // header-pulse in ms
-                const headerSpace = 4.470; // header-space in ms
-                const onePulse = 0.556;    // one-pulse in ms
-                const oneSpace = 1.653;    // one-space in ms
-                const zeroPulse = 0.556;   // zero-pulse in ms
-                const zeroSpace = 0.527;   // zero-space in ms
-                const gapPulse = 0.559;    // gap-pulse in ms
+                // Define the IR signal timing in microseconds
+                const headerPulse = 9047; // header-pulse
+                const headerSpace = 4470; // header-space
+                const onePulse = 556;     // one-pulse
+                const oneSpace = 1653;    // one-space
+                const zeroPulse = 556;    // zero-pulse
+                const zeroSpace = 527;    // zero-space
+                const gapPulse = 559;     // gap-pulse
 
-                // Play sequence with varying volumes
-                await playBeep(4000, headerPulse * 20, 1.0);  // First beep, full volume
-                await playBeep(0, headerSpace * 20, 0);       // Silence
-                await playBeep(4000, onePulse * 20, 0.7);     // Second beep, slightly quieter
-                await playBeep(0, oneSpace * 20, 0);          // Silence
-                await playBeep(4000, zeroPulse * 20, 1.0);    // Third beep, full volume
-                await playBeep(0, zeroSpace * 20, 0);         // Silence
-                await playBeep(4000, gapPulse * 20, 0.5);     // Fourth beep, even quieter
+                // Header Pulse
+                let source = generateIRPulse(headerPulse);
+                source.connect(audioContext.destination);
+                source.start();
+                await new Promise(r => setTimeout(r, headerPulse / 1000));
+
+                // Header Space (Silence)
+                await new Promise(r => setTimeout(r, headerSpace / 1000));
+
+                // One Pulse
+                source = generateIRPulse(onePulse);
+                source.connect(audioContext.destination);
+                source.start();
+                await new Promise(r => setTimeout(r, onePulse / 1000));
+
+                // One Space (Silence)
+                await new Promise(r => setTimeout(r, oneSpace / 1000));
+
+                // Zero Pulse
+                source = generateIRPulse(zeroPulse);
+                source.connect(audioContext.destination);
+                source.start();
+                await new Promise(r => setTimeout(r, zeroPulse / 1000));
+
+                // Zero Space (Silence)
+                await new Promise(r => setTimeout(r, zeroSpace / 1000));
+
+                // Gap Pulse
+                source = generateIRPulse(gapPulse);
+                source.connect(audioContext.destination);
+                source.start();
+                await new Promise(r => setTimeout(r, gapPulse / 1000));
             }
 
             playIRSequence();
