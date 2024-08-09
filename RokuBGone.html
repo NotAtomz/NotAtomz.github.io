@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IR Signal to Audio</title>
+</head>
+<body>
+    <button onclick="playIRSignal()">Play IR Signal</button>
+
+    <script>
+        function playIRSignal() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            function playBeep(frequency, duration) {
+                const oscillator = audioContext.createOscillator();
+                oscillator.type = 'square';
+                oscillator.frequency.value = frequency;
+                oscillator.connect(audioContext.destination);
+                oscillator.start();
+
+                setTimeout(() => oscillator.stop(), duration);
+            }
+
+            // Define the IR signal timing in milliseconds (this is a simplified example)
+            const headerPulse = 9047; // header-pulse
+            const headerSpace = 4470; // header-space
+            const onePulse = 556;     // one-pulse
+            const oneSpace = 1653;    // one-space
+            const zeroPulse = 556;    // zero-pulse
+            const zeroSpace = 527;    // zero-space
+            const gapPulse = 559;     // gap-pulse
+
+            // Sequence of signal (simplified example)
+            playBeep(4000, headerPulse); // Example frequency for header pulse
+            setTimeout(() => playBeep(0, headerSpace), headerPulse);
+
+            setTimeout(() => playBeep(4000, onePulse), headerPulse + headerSpace);
+            setTimeout(() => playBeep(0, oneSpace), headerPulse + headerSpace + onePulse);
+
+            setTimeout(() => playBeep(4000, zeroPulse), headerPulse + headerSpace + onePulse + oneSpace);
+            setTimeout(() => playBeep(0, zeroSpace), headerPulse + headerSpace + onePulse + oneSpace + zeroPulse);
+
+            setTimeout(() => playBeep(4000, gapPulse), headerPulse + headerSpace + onePulse + oneSpace + zeroPulse + zeroSpace);
+        }
+    </script>
+</body>
+</html>
