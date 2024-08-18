@@ -1,73 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shiba GT Gold</title>
-    <meta property="og:title" content="Shiba GT Gold" />
+    <title>ShibaGT Gold</title>
+     <!-- Open Graph meta tags -->
+    <meta property="og:title" content="ShibaGT Gold" />
     <meta property="og:description" content="A Powerful And Cool Menu With Overpowered Mods For Gorilla Tag Copies, Made By Zinx, Server Invite https://discord.gg/DerYyqW7rK" />
     <meta property="og:image" content="https://notatomz.github.io/39C66B30-6F4A-4283-983B-57439A19A25E.jpeg" />
-    <meta property="og:url" content="https://notatomz.github.io/ShibagtGold" />
+    <meta property="og:url" content="https://notatomz.github.io/SecretServiceMenu" />
     <meta property="og:type" content="website" />
     <style>
+        /* Styling the body */
         body {
+            margin: 0;
+            padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            background-color: #f0f0f0;
+            height: 110vh;
+            background: linear-gradient(to bottom, yellow, black);
+            color: white;
             font-family: Arial, sans-serif;
-        }
-
-        .container {
             text-align: center;
         }
 
-        #download-button {
+        /* Styling the button */
+        button {
+            background-color: grey;
+            color: yellow;
+            border: none;
             padding: 10px 20px;
-            font-size: 16px;
+            border-radius: 5px;
             cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+            transition: all 0.3s;
         }
 
-        #jumpscare {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: rgba(0, 0, 0, 0.9);
-            z-index: 9999;
-            display: none; /* Ensure jumpscare is hidden initially */
-        }
-
-        #jumpscare img {
-            max-width: 100%;
-            max-height: 100%;
+        /* Button hover effect */
+        button:hover {
+            background-color: lightgray;
         }
     </style>
 </head>
+
 <body>
-    <div class="container">
-        <h1>Shiba GT Gold Download</h1>
-        <button id="download-button">Download</button>
-        <div id="jumpscare">
-            <img src="https://notatomz.github.io/IMG_4914.png" alt="Jumpscare">
-            <audio id="jumpscare-sound" src="https://notatomz.github.io/Shh.mp3"></audio>
-        </div>
+    <div>
+        <h1>ShibaGT Gold Menu</h1>
+            <p>Thank you for using the Shiba GT Menu Menu this is a menu created by Zinx.</p>
+        <p>This menu was created by zinx and zinx only and has N/A mods and categorized pages, it is a modern and complex version of the Overpowered Menu Created by Zinx, if there are any probloms or you just want to chill you can click the button below to join the Zinx Creations Official server.</p>
+        <button onclick="window.location.href='https://discord.gg/DerYyqW7rK';">Discord</button>
+            <p>cant join the discord? click the button below to download it if you havent!</p>
+            <button onclick="window.location.href='NULL';">Not Ready</button>
+            <p>PLEASE READ: I am not responsible for you getting into any trouble or you getting banned in any game even though the menu allows you to avoid getting banned the staff in the game can still see your user id in the reports, also please do not abuse this menu as much when zinx is in your server as he is allowed to remove you from the game and possible put you on a black list for future updates, please make sure the game community you are in is having fun atleast as it could ruin other peoples fun and make them leave which can ruin some games so just make sure every one is enjoying there experience.</p>
+        <p>© Zinx Creations, 2024. All rights reserved.</p>
+        <button onclick="window.location.href='https://docs.google.com/document/d/1NPdMwsGixpkspVyoyUG-4xSkUMNpUfqs4rJD6SoqO4U/edit';">Copyright Form</button>
     </div>
-    <script>
-        document.getElementById('download-button').addEventListener('click', function() {
-            // Hide the button and show the jumpscare
-            document.getElementById('download-button').style.display = 'none';
-            document.getElementById('jumpscare').style.display = 'flex';
-            
-            // Play the jumpscare sound
-            var audio = document.getElementById('jumpscare-sound');
-            audio.play();
-        });
-    </script>
 </body>
+
 </html>
