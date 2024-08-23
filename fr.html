@@ -7,17 +7,25 @@
     <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
     <style>
-        canvas {
+        video, canvas {
             position: absolute;
+            left: 0;
+            top: 0;
         }
         #videoElement {
-            position: relative;
+            width: 100%;
+            height: auto;
+            transform: scaleX(-1); /* Mirror the video feed for a natural front camera experience */
+        }
+        #overlay {
+            width: 100%;
+            height: auto;
         }
     </style>
 </head>
 <body>
     <h1>Facial Recognition System</h1>
-    <video id="videoElement" width="720" height="560" autoplay></video>
+    <video id="videoElement" autoplay></video>
     <canvas id="overlay"></canvas>
 
     <script>
@@ -27,7 +35,11 @@
         let labeledDescriptors = [];
 
         async function setupCamera() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: 'user'  // Use the front camera
+                } 
+            });
             video.srcObject = stream;
             await video.play();
         }
@@ -71,11 +83,18 @@
                     resizedDetections.forEach(detection => {
                         const match = faceMatcher.findBestMatch(detection.descriptor);
                         const box = detection.detection.box;
+                        const text = match.toString();
+
                         ctx.strokeStyle = '#00FF00';
                         ctx.lineWidth = 2;
                         ctx.strokeRect(box.x, box.y, box.width, box.height);
+
                         ctx.fillStyle = '#00FF00';
-                        ctx.fillText(match.toString(), box.x, box.y - 10);
+                        ctx.font = '20px Arial';
+                        const textWidth = ctx.measureText(text).width;
+                        ctx.fillRect(box.x, box.y - 25, textWidth + 10, 25);
+                        ctx.fillStyle = '#000000';
+                        ctx.fillText(text, box.x + 5, box.y - 5);
                     });
                 }, 100);
             });
