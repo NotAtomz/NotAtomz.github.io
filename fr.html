@@ -35,28 +35,43 @@
         let labeledDescriptors = [];
 
         async function setupCamera() {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: 'user'  // Use the front camera
-                } 
-            });
-            video.srcObject = stream;
-            await video.play();
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'user'  // Use the front camera
+                    } 
+                });
+                video.srcObject = stream;
+                await video.play();
+                console.log("Camera feed started");
+            } catch (error) {
+                console.error("Error accessing the camera: ", error);
+                alert("Error accessing the camera. Please ensure you have granted permission.");
+            }
         }
 
         async function loadModels() {
-            await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
-            await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
-            await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+            try {
+                await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
+                await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+                await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+                console.log("Models loaded");
+            } catch (error) {
+                console.error("Error loading models: ", error);
+            }
         }
 
         async function loadLabeledDescriptors() {
             const labels = ['Person1', 'Person2']; // Add your labeled data here
             return Promise.all(
                 labels.map(async label => {
-                    const img = await faceapi.fetchImage(`/images/${label}.jpg`);
-                    const detections = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-                    return new faceapi.LabeledFaceDescriptors(label, [detections.descriptor]);
+                    try {
+                        const img = await faceapi.fetchImage(`/images/${label}.jpg`);
+                        const detections = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+                        return new faceapi.LabeledFaceDescriptors(label, [detections.descriptor]);
+                    } catch (error) {
+                        console.error(`Error processing image for ${label}: `, error);
+                    }
                 })
             );
         }
