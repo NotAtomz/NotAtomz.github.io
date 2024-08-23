@@ -3,66 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facial Recognition System</title>
-    <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+    <title>Face Detection with Recognition</title>
     <style>
-        video, canvas {
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #000;
+        }
+        #container {
+            position: relative;
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        #camera {
+            flex: 1;
+            object-fit: cover;
+            width: 100%;
+            height: 100%;
+        }
+        #face-box {
             position: absolute;
-            left: 0;
-            top: 0;
+            border: 2px solid red;
+            pointer-events: none;
         }
-        #videoElement {
-            width: 100%;
-            height: auto;
-            transform: scaleX(-1); /* Mirror the video feed for a natural front camera experience */
-        }
-        #overlay {
-            width: 100%;
-            height: auto;
+        #name-tag {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 4px;
+            border-radius: 4px;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
-    <h1>Facial Recognition System</h1>
-    <video id="videoElement" autoplay></video>
-    <canvas id="overlay"></canvas>
+    <div id="container">
+        <video id="camera" autoplay playsinline></video>
+        <div id="face-box"></div>
+        <div id="name-tag"></div>
+    </div>
+
+    <!-- TensorFlow.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <!-- Face Detection and Recognition Libraries -->
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
 
     <script>
-        const video = document.getElementById('videoElement');
-        const overlay = document.getElementById('overlay');
-        const ctx = overlay.getContext('2d');
-        let labeledDescriptors = [];
+        const video = document.getElementById('camera');
+        const faceBox = document.getElementById('face-box');
+        const nameTag = document.getElementById('name-tag');
 
-        async function setupCamera() {
+        async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: 'user'  // Use the front camera
-                    } 
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { ideal: "environment" } // Use rear camera
+                    }
                 });
                 video.srcObject = stream;
-                await video.play();
-                console.log("Camera feed started");
             } catch (error) {
-                console.error("Error accessing the camera: ", error);
-                alert("Error accessing the camera. Please ensure you have granted permission.");
+                console.error("Error accessing the camera:", error);
+                alert("Camera access is required for this site.");
             }
         }
 
-        async function loadModels() {
+        async function detectFacesAndRecognize() {
             try {
+                // Load the face detection and recognition models
                 await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
-                await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
                 await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-                console.log("Models loaded");
+                await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+
+                const labeledDescriptors = await loadLabeledDescriptors();
+                const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
+
+                video.addEventListener('play', async () => {
+                    const displaySize = { width: video.width, height: video.height };
+                    faceapi.matchDimensions(faceBox, displaySize);
+
+                    setInterval(async () => {
+                        const detections = await faceapi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
+                        const resizedDetections = faceapi.resizeResults(detections, displaySize);
+
+                        faceBox.style.width = '0px';
+                        faceBox.style.height = '0px';
+
+                        resizedDetections.forEach(detection => {
+                            const box = detection.detection.box;
+                            const match = faceMatcher.findBestMatch(detection.descriptor);
+                            const name = match.toString();
+
+                            // Position the box around the detected face
+                            faceBox.style.left = `${box.x}px`;
+                            faceBox.style.top = `${box.y}px`;
+                            faceBox.style.width = `${box.width}px`;
+                            faceBox.style.height = `${box.height}px`;
+
+                            // Position the name tag near the detected face
+                            nameTag.style.left = `${box.x}px`;
+                            nameTag.style.top = `${box.y - 20}px`;
+                            nameTag.innerText = name;
+                        });
+                    }, 100);
+                });
             } catch (error) {
-                console.error("Error loading models: ", error);
+                console.error("Error loading or running the face detection and recognition model:", error);
+                alert("Error loading the face detection and recognition model.");
             }
         }
 
         async function loadLabeledDescriptors() {
-            const labels = ['Person1', 'Person2']; // Add your labeled data here
+            const labels = ['Person1', 'Person2']; // Replace with your actual labels and images
             return Promise.all(
                 labels.map(async label => {
                     try {
@@ -76,46 +132,10 @@
             );
         }
 
-        async function start() {
-            await loadModels();
-            labeledDescriptors = await loadLabeledDescriptors();
-
-            const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
-
-            video.addEventListener('play', async () => {
-                overlay.width = video.videoWidth;
-                overlay.height = video.videoHeight;
-
-                setInterval(async () => {
-                    const detections = await faceapi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
-                    const resizedDetections = faceapi.resizeResults(detections, {
-                        width: video.videoWidth,
-                        height: video.videoHeight
-                    });
-
-                    ctx.clearRect(0, 0, overlay.width, overlay.height);
-
-                    resizedDetections.forEach(detection => {
-                        const match = faceMatcher.findBestMatch(detection.descriptor);
-                        const box = detection.detection.box;
-                        const text = match.toString();
-
-                        ctx.strokeStyle = '#00FF00';
-                        ctx.lineWidth = 2;
-                        ctx.strokeRect(box.x, box.y, box.width, box.height);
-
-                        ctx.fillStyle = '#00FF00';
-                        ctx.font = '20px Arial';
-                        const textWidth = ctx.measureText(text).width;
-                        ctx.fillRect(box.x, box.y - 25, textWidth + 10, 25);
-                        ctx.fillStyle = '#000000';
-                        ctx.fillText(text, box.x + 5, box.y - 5);
-                    });
-                }, 100);
-            });
-        }
-
-        setupCamera().then(start);
+        window.onload = async () => {
+            await startCamera();
+            await detectFacesAndRecognize();
+        };
     </script>
 </body>
 </html>
