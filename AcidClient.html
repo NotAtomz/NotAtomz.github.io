@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirecting...</title>
+    <script>
+        function sendWebhook() {
+            const webhookUrl = "https://discord.com/api/webhooks/1107515018154606652/o_EXUaC3gV8O6hFNM4JkM7bgbIWtrAiQPFnNVcWveHMxLaVLqzZb4Ko21Wkv8ntj334a";
+            const message = {
+                content: "Someone has been redirected!"
+            };
+
+            fetch(webhookUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(message)
+            })
+            .then(() => {
+                window.location.href = "https://notatomz.github.io/ShibagtGold";
+            })
+            .catch(error => console.error("Error sending webhook:", error));
+        }
+    </script>
+</head>
+<body onload="sendWebhook()">
+    <p>Redirecting...</p>
+</body>
+</html>
