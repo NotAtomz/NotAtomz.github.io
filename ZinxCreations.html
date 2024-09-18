@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zinx Creations</title>
+    <link href="https://fonts.googleapis.com/css2?family=New+Count&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #000;
+            color: #00ff00;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Title styling */
+        .title {
+            font-size: 40px;
+            font-weight: bold;
+            font-style: italic;
+            color: white;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .slider {
+            width: 90%;
+            height: 70%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .slide.active {
+            opacity: 1;
+        }
+
+        .mod-card {
+            width: 60%;
+            background-color: #111;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+        }
+
+        .mod-card img {
+            width: 100px;
+            margin-bottom: 15px;
+        }
+
+        .mod-card h2 {
+            margin-bottom: 10px;
+            font-size: 24px;
+            color: #00ff00;
+        }
+
+        .mod-card p {
+            font-size: 16px;
+            margin-bottom: 20px;
+            color: #00ff00;
+        }
+
+        .mod-card a {
+            padding: 10px 20px;
+            background-color: #00cc44;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .mod-card a:hover {
+            background-color: #009933;
+        }
+
+        .arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #00cc44;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            transition: background-color 0.3s;
+        }
+
+        .arrow:hover {
+            background-color: #009933;
+        }
+
+        .arrow-left {
+            left: 10px;
+        }
+
+        .arrow-right {
+            right: 10px;
+        }
+
+        /* Fade overlay styles */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.95);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: #00ff00;
+            font-size: 30px;
+            z-index: 10;
+            opacity: 0; /* Start as fully transparent */
+            transition: opacity 1s ease-in-out; /* Smooth fade effect */
+        }
+
+        .overlay p {
+            font-size: 35px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Title -->
+    <div class="title">Atom Creations</div>
+
+    <div class="slider">
+        <!-- First Mod Card -->
+        <div class="slide active">
+            <div class="mod-card">
+                <img src="mod1.png" alt="BSU Client V9">
+                <h2>BSU CLIENT V9</h2>
+                <p>BSU Client is a powerful mod menu with built-in bypassers and a lot of mods.</p>
+                <a href="#" class="download-button" data-download-url="https://example.com/download1">Download</a>
+            </div>
+        </div>
+
+        <!-- Second Mod Card -->
+        <div class="slide">
+            <div class="mod-card">
+                <img src="mod2.png" alt="ShibaGT Gold V9">
+                <h2>ShibaGT Gold V9</h2>
+                <p>Experience optimized performance and unique mods with ShibaGT Gold.</p>
+                <a href="#" class="download-button" data-download-url="https://example.com/download2">Download</a>
+            </div>
+        </div>
+
+        <!-- Navigation Arrows -->
+        <button class="arrow arrow-left">&#9664;</button>
+        <button class="arrow arrow-right">&#9654;</button>
+    </div>
+
+    <!-- Overlay for the fade effect -->
+    <div class="overlay" id="overlay">
+        <p>Starting download...</p>
+    </div>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const next = document.querySelector('.arrow-right');
+        const prev = document.querySelector('.arrow-left');
+        let currentSlide = 0;
+
+        function showSlide(index) {
+            slides.forEach(slide => slide.classList.remove('active'));
+            slides[index].classList.add('active');
+        }
+
+        next.addEventListener('click', () => {
+            currentSlide = (currentSlide + 1) % slides.length;
+            showSlide(currentSlide);
+        });
+
+        prev.addEventListener('click', () => {
+            currentSlide = (currentSlide - 1 + slides.length) % slides.length;
+            showSlide(currentSlide);
+        });
+
+        // Download functionality with fade effect and redirect
+        const downloadButtons = document.querySelectorAll('.download-button');
+        const overlay = document.getElementById('overlay');
+
+        downloadButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+
+                // Show overlay with fade-in effect
+                overlay.style.display = 'flex';
+                setTimeout(() => {
+                    overlay.style.opacity = '1'; // Fade-in the overlay
+
+                    // Redirect after showing message
+                    setTimeout(() => {
+                        window.location.href = button.getAttribute('data-download-url');
+                    }, 2000); // Wait 2 seconds before redirecting
+
+                }, 200); // Initial delay to show the overlay
+            });
+        });
+    </script>
+
+</body>
+</html>
