@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zinx Creations</title>
-    <link href="https://fonts.googleapis.com/css2?family=New+Count&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -13,34 +13,35 @@
         }
 
         body {
-            font-family: 'Courier New', Courier, monospace;
-            background-color: #000;
+            font-family: 'Poppins', sans-serif;
+            background-color: #0d0d0d;
             color: #00ff00;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             flex-direction: column;
-            overflow: hidden;
+            padding: 20px;
         }
 
-        /* Title styling */
         .title {
-            font-size: 40px;
+            font-size: 50px;
             font-weight: bold;
-            font-style: italic;
-            color: white;
-            margin-bottom: 30px;
+            color: #fff;
+            margin-bottom: 50px;
             text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
 
         .slider {
-            width: 90%;
-            height: 70%;
+            width: 80%;
+            height: 70vh;
             display: flex;
             justify-content: center;
             align-items: center;
             position: relative;
+            overflow: hidden;
         }
 
         .slide {
@@ -51,7 +52,7 @@
             justify-content: center;
             align-items: center;
             opacity: 0;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.8s ease-in-out;
         }
 
         .slide.active {
@@ -59,38 +60,45 @@
         }
 
         .mod-card {
-            width: 60%;
+            width: 70%;
             background-color: #111;
-            padding: 20px;
+            padding: 30px;
             border-radius: 15px;
             text-align: center;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
+            transform: scale(1);
+            transition: transform 0.4s ease;
+        }
+
+        .mod-card:hover {
+            transform: scale(1.05);
         }
 
         .mod-card img {
-            width: 100px;
-            margin-bottom: 15px;
+            width: 150px;
+            margin-bottom: 20px;
         }
 
         .mod-card h2 {
-            margin-bottom: 10px;
-            font-size: 24px;
+            margin-bottom: 15px;
+            font-size: 28px;
             color: #00ff00;
         }
 
         .mod-card p {
-            font-size: 16px;
-            margin-bottom: 20px;
-            color: #00ff00;
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #ccc;
         }
 
         .mod-card a {
-            padding: 10px 20px;
+            padding: 12px 25px;
             background-color: #00cc44;
             color: white;
             text-decoration: none;
+            font-size: 18px;
             border-radius: 5px;
-            transition: background-color 0.3s;
+            transition: background-color 0.3s ease;
         }
 
         .mod-card a:hover {
@@ -104,10 +112,10 @@
             background-color: #00cc44;
             color: #fff;
             border: none;
-            padding: 10px;
+            padding: 15px;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 20px;
+            font-size: 24px;
             transition: background-color 0.3s;
         }
 
@@ -116,33 +124,32 @@
         }
 
         .arrow-left {
-            left: 10px;
+            left: 20px;
         }
 
         .arrow-right {
-            right: 10px;
+            right: 20px;
         }
 
-        /* Fade overlay styles */
         .overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.95);
+            background-color: rgba(0, 0, 0, 0.9);
             display: none;
             justify-content: center;
             align-items: center;
             color: #00ff00;
-            font-size: 30px;
+            font-size: 35px;
             z-index: 10;
-            opacity: 0; /* Start as fully transparent */
-            transition: opacity 1s ease-in-out; /* Smooth fade effect */
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
         }
 
         .overlay p {
-            font-size: 35px;
+            font-size: 40px;
             font-weight: bold;
             text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
         }
@@ -151,7 +158,6 @@
 </head>
 <body>
 
-    <!-- Title -->
     <div class="title">Zinx Creations</div>
 
     <div class="slider">
@@ -160,7 +166,7 @@
             <div class="mod-card">
                 <img src="IMG_4999.jpeg" alt="ShibaGT Gold v9">
                 <h2>ShibaGT Gold v9</h2>
-                <p>A menu recreation of shibagt gold thats very op and made by zinx.</p>
+                <p>A menu recreation of ShibaGT Gold that's very OP and made by Zinx.</p>
                 <a href="#" class="download-button" data-download-url="https://github.com/NotAtomz/NotAtomz.github.io/raw/main/ShibaGTGoldByZinx.dll">Download</a>
             </div>
         </div>
@@ -170,7 +176,7 @@
             <div class="mod-card">
                 <img src="IMG_5185.jpeg" alt="Proton Dark">
                 <h2>Proton Dark</h2>
-                <p>A menu in development that will be more powerful then shiba made by zinx..</p>
+                <p>A menu in development that will be more powerful than Shiba, made by Zinx.</p>
                 <a href="#" class="download-button" data-download-url="https://example.com/download2">Download</a>
             </div>
         </div>
@@ -180,7 +186,6 @@
         <button class="arrow arrow-right">&#9654;</button>
     </div>
 
-    <!-- Overlay for the fade effect -->
     <div class="overlay" id="overlay">
         <p>Starting download...</p>
     </div>
@@ -214,17 +219,15 @@
             button.addEventListener('click', (e) => {
                 e.preventDefault();
 
-                // Show overlay with fade-in effect
                 overlay.style.display = 'flex';
                 setTimeout(() => {
-                    overlay.style.opacity = '1'; // Fade-in the overlay
+                    overlay.style.opacity = '1';
 
-                    // Redirect after showing message
                     setTimeout(() => {
                         window.location.href = button.getAttribute('data-download-url');
-                    }, 2000); // Wait 2 seconds before redirecting
+                    }, 2000);
 
-                }, 200); // Initial delay to show the overlay
+                }, 200);
             });
         });
     </script>
