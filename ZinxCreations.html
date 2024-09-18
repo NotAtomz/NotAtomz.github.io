@@ -187,7 +187,7 @@
                 <img src="IMG_4999.jpeg" alt="ShibaGT Gold v9">
                 <h2>ShibaGT Gold v9</h2>
                 <p>A menu recreation of shibagt gold that's very op and made by zinx.</p>
-                <a href="#" class="download-button" data-download-url="https://github.com/NotAtomz/NotAtomz.github.io/raw/main/ShibaGTGoldByZinx.dll">Download</a>
+                <a id="shiba-download" href="#" class="download-button" data-download-url="https://github.com/NotAtomz/NotAtomz.github.io/raw/main/ShibaGTGoldByZinx.dll">Download</a>
             </div>
         </div>
 
@@ -197,7 +197,7 @@
                 <img src="IMG_5185.jpeg" alt="Proton Dark">
                 <h2>Proton Dark</h2>
                 <p>A menu in development that will be more powerful than Shiba made by Zinx.</p>
-                <a href="#" class="download-button" data-download-url="https://example.com/download2">Download</a>
+                <a id="proton-download" href="#" class="download-button" data-download-url="https://example.com/download2">Download</a>
             </div>
         </div>
 
@@ -233,33 +233,26 @@
         });
 
         // Download functionality with fade effect and redirect
-        const downloadButtons = document.querySelectorAll('.download-button');
-        const overlay = document.getElementById('overlay');
-
-        downloadButtons.forEach(button => {
-            button.addEventListener('click', (e) => {
-                e.preventDefault();
-
-                // Get the correct download URL
-                const downloadUrl = button.getAttribute('data-download-url');
-                
-                if (downloadUrl) {
-                    // Show overlay with fade-in effect
-                    overlay.style.display = 'flex';
-                    setTimeout(() => {
-                        overlay.style.opacity = '1'; // Fade-in the overlay
-
-                        // Redirect after showing message
-                        setTimeout(() => {
-                            window.location.href = downloadUrl;
-                        }, 2000); // Wait 2 seconds before redirecting
-
-                    }, 200); // Initial delay to show the overlay
-                } else {
-                    alert('Download URL not found.');
-                }
-            });
+        document.getElementById('shiba-download').addEventListener('click', (e) => {
+            e.preventDefault();
+            startDownload('https://github.com/NotAtomz/NotAtomz.github.io/raw/main/ShibaGTGoldByZinx.dll');
         });
+
+        document.getElementById('proton-download').addEventListener('click', (e) => {
+            e.preventDefault();
+            startDownload('https://example.com/download2');
+        });
+
+        function startDownload(downloadUrl) {
+            const overlay = document.getElementById('overlay');
+            overlay.style.display = 'flex';
+            setTimeout(() => {
+                overlay.style.opacity = '1'; // Fade-in the overlay
+                setTimeout(() => {
+                    window.location.href = downloadUrl;
+                }, 2000); // Wait 2 seconds before redirecting
+            }, 200);
+        }
     </script>
 
 </body>
