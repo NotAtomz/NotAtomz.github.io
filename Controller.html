@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Control</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        button { font-size: 20px; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Control Flipper Mini</h1>
+    <button id="scrollDown">Scroll Down</button>
+    <button id="click">Click</button>
+
+    <script>
+        let bleDevice;
+        let characteristic;
+
+        async function connect() {
+            try {
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'Flipper_Mini' }],
+                    optionalServices: ['FFE0']
+                });
+
+                const server = await bleDevice.gatt.connect();
+                const service = await server.getPrimaryService('FFE0');
+                characteristic = await service.getCharacteristic('FFE1');
+                console.log("Connected to Flipper Mini");
+            } catch (error) {
+                console.error('Connection failed', error);
+            }
+        }
+
+        async function sendCommand(command) {
+            if (characteristic) {
+                await characteristic.writeValue(new Uint8Array([command]));
+                console.log("Command sent:", command);
+            } else {
+                console.error("Not connected to characteristic");
+            }
+        }
+
+        document.getElementById('scrollDown').onclick = () => sendCommand(0x01); // Scroll down
+        document.getElementById('click').onclick = () => sendCommand(0x02); // Click
+
+        connect(); // Attempt to connect when the page loads
+    </script>
+</body>
+</html>
