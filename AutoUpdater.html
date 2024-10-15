@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Auto Updater</title>
+    <title>Auto Updater</title>
     <style>
         body {
             background-color: #1e1e1e;
@@ -96,7 +96,7 @@
     <div class="container">
         <!-- Left Panel with Buttons -->
         <div class="left-panel">
-            <button id="connectButton">Connect to ESP32</button>
+            <button id="connectButton">Connect to Flipper</button>
             <button id="flashButton" disabled>Flash Firmware</button>
         </div>
 
@@ -110,7 +110,9 @@
     <!-- Connection Status at the Bottom Left -->
     <div class="status-text status-disconnected" id="connectionStatus">Not Connected</div>
 
-    <script src="https://espressif.github.io/esptool-js/js/esptool.js"></script>
+    <!-- Correctly load esptool-js library from the unpkg source -->
+    <script src="https://unpkg.com/esptool-js/bundle.js"></script>
+
     <script>
         let esptool;
         let port;
@@ -127,7 +129,7 @@
                 await port.open({ baudRate: 115200 });
                 esptool = new ESPLoader(port, 115200);
 
-                logDiv.innerHTML += '<p>Connected to ESP32!</p>';
+                logDiv.innerHTML += '<p>Connected to Flipper!</p>';
                 connectionStatus.textContent = 'Connected';
                 connectionStatus.classList.remove('status-disconnected');
                 connectionStatus.classList.add('status-connected');
