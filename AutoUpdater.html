@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Auto Updater</title>
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: white;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            text-align: center;
+            color: orange;
+            padding: 20px 0;
+            font-size: 36px;
+        }
+
+        .container {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        .left-panel {
+            width: 30%;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .right-panel {
+            width: 65%;
+            background-color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            min-height: 300px;
+        }
+
+        button {
+            background-color: orange;
+            color: black;
+            padding: 15px;
+            border: none;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 18px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: darkorange;
+        }
+
+        #status {
+            font-size: 18px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .status-text {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .status-disconnected {
+            color: red;
+        }
+
+        .status-connected {
+            color: green;
+        }
+
+        #log {
+            background-color: #222;
+            color: #eee;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Auto Updater</h1>
+
+    <div class="container">
+        <!-- Left Panel with Buttons -->
+        <div class="left-panel">
+            <button id="connectButton">Connect to ESP32</button>
+            <button id="flashButton" disabled>Flash Firmware</button>
+        </div>
+
+        <!-- Right Panel with Console/Log -->
+        <div class="right-panel">
+            <h2>Upload Logs:</h2>
+            <div id="log">No logs yet...</div>
+        </div>
+    </div>
+
+    <!-- Connection Status at the Bottom Left -->
+    <div class="status-text status-disconnected" id="connectionStatus">Not Connected</div>
+
+    <script src="https://espressif.github.io/esptool-js/js/esptool.js"></script>
+    <script>
+        let esptool;
+        let port;
+
+        const connectButton = document.getElementById('connectButton');
+        const flashButton = document.getElementById('flashButton');
+        const logDiv = document.getElementById('log');
+        const connectionStatus = document.getElementById('connectionStatus');
+
+        connectButton.addEventListener('click', async () => {
+            try {
+                // Request a port and connect
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 });
+                esptool = new ESPLoader(port, 115200);
+
+                logDiv.innerHTML += '<p>Connected to ESP32!</p>';
+                connectionStatus.textContent = 'Connected';
+                connectionStatus.classList.remove('status-disconnected');
+                connectionStatus.classList.add('status-connected');
+
+                flashButton.disabled = false; // Enable the flash button
+            } catch (error) {
+                logDiv.innerHTML += `<p style="color:red;">Error: ${error.message}</p>`;
+            }
+        });
+
+        flashButton.addEventListener('click', async () => {
+            try {
+                const response = await fetch('./firmware.bin');
+                const binFile = await response.arrayBuffer();
+
+                logDiv.innerHTML += '<p>Flashing firmware...</p>';
+                await esptool.initialize();
+                await esptool.flashData(new Uint8Array(binFile));
+
+                logDiv.innerHTML += '<p>Flashing complete!</p>';
+            } catch (error) {
+                logDiv.innerHTML += `<p style="color:red;">Error: ${error.message}</p>`;
+            }
+        });
+    </script>
+
+</body>
+</html>
