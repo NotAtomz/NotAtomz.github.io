@@ -9,87 +9,170 @@
     <title>Apple-like PWA</title>
     <!-- Apple Touch Icon -->
     <link rel="apple-touch-icon" href="icon-180x180.png">
-    <!-- Favicon -->
-    <link rel="icon" href="favicon.ico" type="image/x-icon">
     <!-- Styles -->
     <style>
+        /* General Styles */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f5f5f7;
-            color: #1c1c1e;
+            background-color: #1c1c1e; /* Dark modern background */
+            color: #f5f5f7;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
         }
+
+        /* Header */
         header {
-            background-color: #007aff;
-            color: white;
+            background-color: #2c2c2e;
+            color: #f5f5f7;
             padding: 15px 20px;
             text-align: center;
             font-size: 1.5em;
             font-weight: bold;
         }
+
+        /* Main Layout */
         main {
-            padding: 20px;
+            display: flex;
+            flex: 1;
+            padding: 10px;
         }
+
+        /* Left Side: Buttons */
+        .left-panel {
+            width: 30%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
         .button {
-            display: inline-block;
-            background-color: #007aff;
+            background-color: #3a3a3c;
             color: white;
             padding: 10px 20px;
-            border-radius: 10px;
-            text-decoration: none;
+            border-radius: 8px;
+            text-align: center;
             font-size: 1em;
             font-weight: 600;
-            text-align: center;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
         }
-        .button:active {
-            background-color: #005bb5;
+
+        .button:hover {
+            background-color: #4a4a4c;
         }
-        .card {
-            background: white;
+
+        /* Right Side: Terminal */
+        .right-panel {
+            flex: 1;
+            background-color: #2c2c2e;
             border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            margin: 15px 0;
+            padding: 10px;
+            color: #39ff14;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.9em;
+            overflow-y: auto;
+            max-height: calc(100% - 20px);
         }
+
+        .log {
+            margin: 0;
+        }
+
+        /* Bottom Button */
+        .bottom-button {
+            background-color: #3a3a3c;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 1s ease;
+        }
+
+        .bottom-button.active {
+            background-color: #28a745; /* Green */
+        }
+
         footer {
             text-align: center;
-            padding: 10px 0;
-            margin-top: 20px;
+            padding: 10px;
             font-size: 0.9em;
             color: #8e8e93;
+        }
+
+        /* Save to Home Screen Notice */
+        .save-to-home {
+            background-color: #2c2c2e;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-size: 0.9em;
         }
     </style>
 </head>
 <body>
     <header>Apple-like App</header>
+    <div class="save-to-home">
+        Save this app to your home screen for the best experience.
+    </div>
     <main>
-        <div class="card">
-            <h2>Welcome to Your PWA</h2>
-            <p>This is a simple web app with an Apple-like design.</p>
+        <!-- Left Panel: Buttons -->
+        <div class="left-panel">
+            <button class="button" onclick="handleButtonClick(1)">Button 1</button>
+            <button class="button" onclick="handleButtonClick(2)">Button 2</button>
+            <button class="button" onclick="handleButtonClick(3)">Button 3</button>
+            <button class="button" onclick="handleButtonClick(4)">Button 4</button>
+            <button class="button" onclick="handleButtonClick(5)">Button 5</button>
         </div>
-        <div class="card">
-            <h2>Features</h2>
-            <ul>
-                <li>Add to Home Screen</li>
-                <li>Offline Support (with Service Worker)</li>
-                <li>Clean UI</li>
-            </ul>
+
+        <!-- Right Panel: Terminal -->
+        <div class="right-panel" id="log-container">
+            <p class="log">[Log] Terminal Ready...</p>
         </div>
-        <a href="#" class="button">Get Started</a>
     </main>
+
+    <!-- Bottom Button -->
+    <button class="bottom-button" id="bottom-button">Click a Button</button>
+
     <footer>
         &copy; 2024 Your App Name. All Rights Reserved.
     </footer>
 
-    <!-- Optional Service Worker -->
+    <!-- Script -->
     <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js').then(() => {
-                console.log('Service Worker registered successfully.');
-            }).catch(error => {
-                console.error('Service Worker registration failed:', error);
-            });
+        const logContainer = document.getElementById('log-container');
+        const bottomButton = document.getElementById('bottom-button');
+
+        // Handle button clicks
+        function handleButtonClick(buttonNumber) {
+            addLog(`[Log] Button ${buttonNumber} clicked.`);
+            animateBottomButton();
+        }
+
+        // Add a log to the terminal
+        function addLog(message) {
+            const log = document.createElement('p');
+            log.className = 'log';
+            log.textContent = message;
+            logContainer.appendChild(log);
+            logContainer.scrollTop = logContainer.scrollHeight; // Auto-scroll to the bottom
+        }
+
+        // Animate the bottom button
+        function animateBottomButton() {
+            bottomButton.classList.add('active');
+            bottomButton.textContent = "Processing...";
+            setTimeout(() => {
+                bottomButton.classList.remove('active');
+                bottomButton.textContent = "Click a Button";
+            }, 3000); // Reset after 3 seconds
         }
     </script>
 </body>
