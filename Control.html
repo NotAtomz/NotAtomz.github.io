@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="My App">
+    <link rel="apple-touch-icon" href="Control.png">
+    <link rel="icon" type="image/png" href="Control.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control</title>
+</head>
+<style>
+    /* Style */
+    body{
+        background-color: rgb(5, 5, 5);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    .ConsoleArea{
+        width: 75%;
+        height: 75px;
+        border: 2px solid rgb(40, 40, 40);
+        background-color: rgb(15, 15, 15);
+        color: white;
+        border-radius: 10px;
+        font-family: monospace;
+        resize: none;
+    }
+    .middle-stuff{
+        background-color: rgb(15, 15, 15);
+        border: 2px solid rgb(40, 40, 40);
+        border-radius: 15px;
+        width: 250px;
+        height: 350px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Courier New', Courier, monospace;
+        color: white;
+        font-size: 20px;
+        margin-top: 50px;
+    }
+    .main-clicky{
+        width: 175px;
+        height: 175px;
+        border-radius: 100%;
+        border: 5px solid white;
+        background-color: rgb(0, 235, 235);
+        font-family: 'Courier New', Courier, monospace;
+        color: white;
+        font-size: 35px;
+        /*box-shadow: 1px 1px 13px 17px rgb(0, 235, 235);*/
+    }
+    .bottem-stuff{
+        display: flex;
+        flex-direction: row;
+        margin-top: 10px;
+        background-color: rgb(5, 5, 5);
+        border: 5px solid rgb(0, 0, 0);
+        color: white;
+        width: 450px;
+        height: 75px;
+        justify-content: center;
+        gap: 20px;
+        /*font-family: monospace;
+        font-size: 17px;*/
+    }
+    .bottem-stuff img{
+        width: 75px;
+        height: 75px;
+    }
+    .bottem-stuff button{
+        border: none;
+        border-radius: 5px;
+        background-color: rgb(25, 25, 25);
+        color: white;
+        border: 2px solid rgb(40, 40, 40);
+        font-family: monospace;
+        font-size: 25px;
+    }
+    .left-arrow{
+        width: 75px;
+        height: 75px;
+    }
+    .right-arrow{
+        width: 75px;
+        height: 75px;
+    }
+</style>
+<body>
+    <div class="middle-stuff">
+        <button class="main-clicky" onclick="Hack()">Hack</button>
+        <p id="text">LED/Light Power</p>
+    </div>
+    <div class="bottem-stuff">
+        <button class="left-arrow" onclick="ChangeValue(-1)">L</button>
+        <img id="image" src="image1.png" alt="Image">
+        <button class="right-arrow" onclick="ChangeValue(1)">R</button>
+    </div>
+    <textarea class="ConsoleArea" id="Console" readonly></textarea>
+</body>
+<script>
+    let value = 1;
+    const totalimages = 5;
+    const audio1 = new Audio("led-power.wav");
+    const audio2 = new Audio("projektor-power.wav");
+    const audio3 = new Audio("Lock.mp3");
+    const audio4 = new Audio("14hz.mp3");
+    const audio5 = new Audio("all-power.wav");
+
+    function ChangeValue(amount){
+        value += amount;
+        if (value < 1) value = 1;
+        if (value > totalimages) value = totalimages;
+
+        document.getElementById("image").src = "image"+value+".png";
+        if (value == 1) document.getElementById("text").textContent = "LED/Light Power";
+        if (value == 2) document.getElementById("text").textContent = "Projector Power";
+        if (value == 3) document.getElementById("text").textContent = "Shopping Cart Lock";
+        if (value == 4) document.getElementById("text").textContent = "Traffic Light Green";
+        if (value == 5) document.getElementById("text").textContent = "TV Power";
+    }
+    function Hack(){
+        if (value == 1) {Playsound(audio1); AddLog("Hacked Nearby LED/Lights");}
+        if (value == 2) {Playsound(audio2); AddLog("Hacked Nearby Projectors");}
+        if (value == 3) {Playsound(audio3); AddLog("Hacked Nearby Shopping Cart Locks");}
+        if (value == 4) {Playsound(audio4); AddLog("Hacked Nearby Traffic Lights");}
+        if (value == 5) {Playsound(audio5); AddLog("Hacked Nearby TV's");}
+    }
+    function Playsound(sound){
+        sound.pause();
+        sound.currentTime = 0;
+        sound.play();
+    }
+    function AddLog(LogText){
+        if (document.getElementById("Console").textContent == ""){
+            document.getElementById("Console").textContent = LogText;
+            return;
+        }
+        document.getElementById("Console").textContent = document.getElementById("Console").textContent + "\n" + LogText;
+    }
+// scripttting ugh
+</script>
+</html>
