@@ -66,3 +66,16 @@ button {
   box-shadow: rgb(14, 14, 14) 2px 2px 10px;
   text-shadow: rgb(14, 14, 14) 2px 2px 10px;
 }
+.loadstring-holder{
+  background-color: rgb(61, 61, 61);
+  color: white;
+  font-family: "Kanit", serif;
+  border-style: none;
+  height: 50px;
+  width: fit-content;
+  font-weight: 500;
+  font-size: 18px;
+  border-radius: 5px;
+  box-shadow: rgb(14, 14, 14) 2px 2px 10px;
+  text-shadow: rgb(14, 14, 14) 2px 2px 10px;
+}
