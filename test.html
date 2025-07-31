@@ -3,26 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>3-Item Animated Carousel</title>
+  <title>Animated Carousel</title>
   <style>
     * {
       box-sizing: border-box;
     }
 
-    html, body {
+    body {
       margin: 0;
-      padding: 0;
-      height: 100%;
       background: black;
+      overflow: hidden;
       color: white;
       font-family: sans-serif;
-      overflow: hidden;
     }
 
     .container {
-      height: 100%;
+      height: 100vh;
+      width: 100vw;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
       position: relative;
@@ -39,71 +37,71 @@
       transform: translate(-50%, -50%) scale(0.5);
       opacity: 0;
       transition: transform 0.3s ease, opacity 0.3s ease;
-      z-index: 5;
+      pointer-events: none;
     }
 
     .carousel {
       display: flex;
       align-items: center;
-      position: absolute;
-      bottom: 40px;
-      gap: 20px;
+      position: relative;
+      width: 100%;
+      max-width: 500px;
+      justify-content: space-between;
     }
 
     .arrow {
-      font-size: 2em;
+      font-size: 2rem;
       cursor: pointer;
       user-select: none;
-      padding: 0 10px;
-      transition: transform 0.2s ease;
+      padding: 10px;
+      z-index: 10;
     }
 
-    .arrow:active {
-      transform: scale(1.2);
-    }
-
-    .item-track {
-      display: flex;
-      width: 240px;
-      height: 120px;
-      justify-content: space-between;
+    .carousel-track {
+      flex: 1;
       position: relative;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
     }
 
     .carousel-item {
       position: absolute;
       width: 70px;
       height: 70px;
+      background: rgba(255,255,255,0.1);
       border: 2px solid white;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1em;
-      border-radius: 10px;
+      font-size: 1rem;
+      transition: transform 0.5s ease, opacity 0.5s ease;
       opacity: 0;
-      transform: scale(0.8);
-      transition: all 0.4s ease;
+      pointer-events: none;
     }
 
-    .left {
-      left: 0;
+    .item-left {
+      transform: translateX(-120px) scale(0.8);
       opacity: 1;
     }
 
-    .center {
-      left: calc(50% - 50px);
+    .item-center {
+      transform: translateX(0) scale(1.2);
       width: 100px;
       height: 100px;
-      font-size: 1.2em;
       font-weight: bold;
-      transform: scale(1.2);
+      font-size: 1.2rem;
+      background: rgba(255,255,255,0.2);
       opacity: 1;
-      background: rgba(255,255,255,0.05);
-      z-index: 1;
+      pointer-events: auto;
+      cursor: pointer;
     }
 
-    .right {
-      right: 0;
+    .item-right {
+      transform: translateX(120px) scale(0.8);
       opacity: 1;
     }
   </style>
@@ -113,7 +111,7 @@
     <div class="circle" id="circle"></div>
     <div class="carousel">
       <div class="arrow" onclick="moveLeft()">&lt;</div>
-      <div class="item-track" id="item-track"></div>
+      <div class="carousel-track" id="track"></div>
       <div class="arrow" onclick="moveRight()">&gt;</div>
     </div>
   </div>
@@ -121,54 +119,57 @@
   <script>
     const items = ['Item 1', 'Item 2', 'Item 3', 'Item 4'];
     let index = 0;
-    const track = document.getElementById('item-track');
+    const track = document.getElementById('track');
     const circle = document.getElementById('circle');
 
     function getIndices(center) {
-      const left = (center - 1 + items.length) % items.length;
-      const right = (center + 1) % items.length;
-      return { left, center, right };
+      return {
+        left: (center - 1 + items.length) % items.length,
+        center: center,
+        right: (center + 1) % items.length,
+      };
     }
 
-    function renderCarousel() {
+    function render() {
       track.innerHTML = '';
 
       const { left, center, right } = getIndices(index);
 
-      const leftItem = createItem(items[left], 'left');
-      const centerItem = createItem(items[center], 'center');
-      const rightItem = createItem(items[right], 'right');
+      const positions = {
+        left: 'item-left',
+        center: 'item-center',
+        right: 'item-right',
+      };
 
-      track.appendChild(leftItem);
-      track.appendChild(centerItem);
-      track.appendChild(rightItem);
-    }
+      [left, center, right].forEach((i, idx) => {
+        const div = document.createElement('div');
+        div.classList.add('carousel-item');
 
-    function createItem(text, position) {
-      const div = document.createElement('div');
-      div.className = `carousel-item ${position}`;
-      div.textContent = text;
+        const pos = ['left', 'center', 'right'][idx];
+        div.classList.add(positions[pos]);
+        div.textContent = items[i];
 
-      if (position === 'center') {
-        div.onclick = () => {
-          showCircle();
-          doAction(text);
-        };
-      }
+        if (pos === 'center') {
+          div.onclick = () => {
+            showCircle();
+            console.log(`Clicked on ${items[i]}`);
+          };
+        }
 
-      return div;
+        track.appendChild(div);
+      });
     }
 
     function moveLeft() {
       hideCircle();
       index = (index + 1) % items.length;
-      renderCarousel();
+      render();
     }
 
     function moveRight() {
       hideCircle();
       index = (index - 1 + items.length) % items.length;
-      renderCarousel();
+      render();
     }
 
     function showCircle() {
@@ -181,11 +182,7 @@
       circle.style.transform = 'translate(-50%, -50%) scale(0.5)';
     }
 
-    function doAction(item) {
-      console.log(`Action for ${item}`);
-    }
-
-    renderCarousel();
+    render();
   </script>
 </body>
 </html>
