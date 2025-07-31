@@ -1,58 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Mobile Carousel UI</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>3-Item Animated Carousel</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     html, body {
       margin: 0;
       padding: 0;
+      height: 100%;
       background: black;
       color: white;
-      font-family: 'Segoe UI', sans-serif;
-      height: 100%;
+      font-family: sans-serif;
       overflow: hidden;
     }
 
     .container {
+      height: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100%;
       position: relative;
     }
 
-    #circle {
+    .circle {
+      position: absolute;
       width: 250px;
       height: 250px;
-      border: 5px solid white;
       border-radius: 50%;
-      position: absolute;
+      border: 5px solid white;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%) scale(0.5);
       opacity: 0;
-      transition: opacity 0.3s ease, transform 0.3s ease;
-      z-index: 2;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      z-index: 5;
     }
 
     .carousel {
-      position: absolute;
-      bottom: 30px;
       display: flex;
       align-items: center;
-      justify-content: center;
+      position: absolute;
+      bottom: 40px;
       gap: 20px;
     }
 
     .arrow {
-      font-size: 2.5em;
-      color: white;
+      font-size: 2em;
       cursor: pointer;
       user-select: none;
-      padding: 10px;
+      padding: 0 10px;
       transition: transform 0.2s ease;
     }
 
@@ -60,13 +62,16 @@
       transform: scale(1.2);
     }
 
-    .item-container {
+    .item-track {
       display: flex;
-      gap: 20px;
-      transition: transform 0.4s ease;
+      width: 240px;
+      height: 120px;
+      justify-content: space-between;
+      position: relative;
     }
 
-    .item {
+    .carousel-item {
+      position: absolute;
       width: 70px;
       height: 70px;
       border: 2px solid white;
@@ -74,70 +79,96 @@
       align-items: center;
       justify-content: center;
       font-size: 1em;
-      cursor: pointer;
-      opacity: 0.6;
       border-radius: 10px;
+      opacity: 0;
       transform: scale(0.8);
-      transition: transform 0.3s ease, opacity 0.3s ease;
+      transition: all 0.4s ease;
     }
 
-    .item.selected {
+    .left {
+      left: 0;
+      opacity: 1;
+    }
+
+    .center {
+      left: calc(50% - 50px);
       width: 100px;
       height: 100px;
       font-size: 1.2em;
       font-weight: bold;
-      opacity: 1;
       transform: scale(1.2);
-      background-color: rgba(255,255,255,0.05);
+      opacity: 1;
+      background: rgba(255,255,255,0.05);
+      z-index: 1;
+    }
+
+    .right {
+      right: 0;
+      opacity: 1;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div id="circle"></div>
-
+    <div class="circle" id="circle"></div>
     <div class="carousel">
-      <div class="arrow" onclick="prevItem()">&lt;</div>
-      <div class="item-container" id="item-container"></div>
-      <div class="arrow" onclick="nextItem()">&gt;</div>
+      <div class="arrow" onclick="moveLeft()">&lt;</div>
+      <div class="item-track" id="item-track"></div>
+      <div class="arrow" onclick="moveRight()">&gt;</div>
     </div>
   </div>
 
   <script>
     const items = ['Item 1', 'Item 2', 'Item 3', 'Item 4'];
-    let selectedIndex = 0;
-    const container = document.getElementById('item-container');
+    let index = 0;
+    const track = document.getElementById('item-track');
     const circle = document.getElementById('circle');
 
-    function updateCarousel() {
-      container.innerHTML = '';
-      for (let i = 0; i < items.length; i++) {
-        const div = document.createElement('div');
-        div.classList.add('item');
-        div.textContent = items[i];
+    function getIndices(center) {
+      const left = (center - 1 + items.length) % items.length;
+      const right = (center + 1) % items.length;
+      return { left, center, right };
+    }
 
-        if (i === selectedIndex) {
-          div.classList.add('selected');
-          div.onclick = () => {
-            showCircle();
-            doAction(items[i]);
-          };
-        }
+    function renderCarousel() {
+      track.innerHTML = '';
 
-        container.appendChild(div);
+      const { left, center, right } = getIndices(index);
+
+      const leftItem = createItem(items[left], 'left');
+      const centerItem = createItem(items[center], 'center');
+      const rightItem = createItem(items[right], 'right');
+
+      track.appendChild(leftItem);
+      track.appendChild(centerItem);
+      track.appendChild(rightItem);
+    }
+
+    function createItem(text, position) {
+      const div = document.createElement('div');
+      div.className = `carousel-item ${position}`;
+      div.textContent = text;
+
+      if (position === 'center') {
+        div.onclick = () => {
+          showCircle();
+          doAction(text);
+        };
       }
+
+      return div;
     }
 
-    function prevItem() {
-      selectedIndex = (selectedIndex - 1 + items.length) % items.length;
-      updateCarousel();
+    function moveLeft() {
       hideCircle();
+      index = (index + 1) % items.length;
+      renderCarousel();
     }
 
-    function nextItem() {
-      selectedIndex = (selectedIndex + 1) % items.length;
-      updateCarousel();
+    function moveRight() {
       hideCircle();
+      index = (index - 1 + items.length) % items.length;
+      renderCarousel();
     }
 
     function showCircle() {
@@ -154,7 +185,7 @@
       console.log(`Action for ${item}`);
     }
 
-    updateCarousel();
+    renderCarousel();
   </script>
 </body>
 </html>
