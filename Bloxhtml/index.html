@@ -6,25 +6,9 @@
     <title>Unity WebGL Player | Blox</title>
   </head>
   <body style="text-align: center; padding: 0; border: 0; margin: 0;">
-    <!-- Removed width/height attributes, kept CSS as default fallback -->
-    <canvas id="unity-canvas" style="width: 1024px; height: 600px; background: url('Build/Bloxhtml.jpg') center / cover"></canvas>
-    
+    <canvas id="unity-canvas" width=1024 height=600 style="width: 1024px; height: 600px; background: url('Build/Bloxhtml.jpg') center / cover"></canvas>
     <script src="Build/Bloxhtml.loader.js"></script>
     <script>
-      // Resize canvas to always fit browser window
-      function resizeCanvas() {
-        var canvas = document.querySelector("#unity-canvas");
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        canvas.style.width = window.innerWidth + "px";
-        canvas.style.height = window.innerHeight + "px";
-      }
-
-      // Run once at start
-      resizeCanvas();
-      // Also update when window resizes
-      window.addEventListener("resize", resizeCanvas);
-
       if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
         // Mobile device style: fill the whole browser client area with the game canvas:
         var meta = document.createElement('meta');
@@ -33,9 +17,10 @@
         document.getElementsByTagName('head')[0].appendChild(meta);
 
         var canvas = document.querySelector("#unity-canvas");
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
         canvas.style.position = "fixed";
-        canvas.style.top = "0";
-        canvas.style.left = "0";
+
         document.body.style.textAlign = "left";
       }
 
