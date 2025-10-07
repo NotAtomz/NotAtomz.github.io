@@ -5,13 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ESP32 Web Flasher</title>
 
-<!-- ✅ Load esptool-js properly -->
-<script type="module">
-  import * as esptool from "https://unpkg.com/esptool-js@0.4.5/dist/web/index.js";
-  window.esptool = esptool;
-  window.ESPLoader = esptool.ESPLoader;
-</script>
-
 <style>
   body {
     background-color: #0b0f16;
@@ -78,54 +71,57 @@
 
 <div id="thankyou">🎉 Flashing Complete!<br>Thank you for using the ESP32 Web Flasher 💫</div>
 
-<script>
-let esploader;
-let port;
+<!-- ✅ Make the entire script a module -->
+<script type="module">
+  import { ESPLoader } from "https://unpkg.com/esptool-js@0.4.5/dist/web/index.js";
 
-const log = msg => {
-  const el = document.getElementById('log');
-  el.textContent += msg + "\n";
-  el.scrollTop = el.scrollHeight;
-};
+  let esploader;
+  let port;
 
-document.getElementById('connectBtn').addEventListener('click', async () => {
-  try {
-    port = await navigator.serial.requestPort({});
-    await port.open({ baudRate: 115200 });
-    log("🔌 Port opened successfully.");
+  const log = msg => {
+    const el = document.getElementById('log');
+    el.textContent += msg + "\n";
+    el.scrollTop = el.scrollHeight;
+  };
 
-    esploader = new ESPLoader(port, { baudrate: 115200 });
-    await esploader.initialize();
-    log("✅ Connected to ESP32!");
-    document.getElementById('flashBtn').disabled = false;
-  } catch (err) {
-    log("❌ Connection error: " + err);
-  }
-});
+  document.getElementById('connectBtn').addEventListener('click', async () => {
+    try {
+      port = await navigator.serial.requestPort({});
+      await port.open({ baudRate: 115200 });
+      log("🔌 Port opened successfully.");
 
-document.getElementById('flashBtn').addEventListener('click', async () => {
-  const files = [
-    { offset: 0x0000, url: 'bootloader.bin' },
-    { offset: 0x8000, url: 'partition-table.bin' },
-    { offset: 0x10000, url: 'firmware.bin' }
-  ];
-
-  try {
-    log("⚡ Starting flash process...");
-    for (const f of files) {
-      log(`⬇️ Fetching ${f.url}...`);
-      const response = await fetch(f.url);
-      const data = new Uint8Array(await response.arrayBuffer());
-      log(`📦 Writing ${f.url} to 0x${f.offset.toString(16)}...`);
-      await esploader.flashData(data, f.offset);
-      log(`✅ Done: ${f.url}`);
+      esploader = new ESPLoader(port, { baudrate: 115200 });
+      await esploader.initialize();
+      log("✅ Connected to ESP32!");
+      document.getElementById('flashBtn').disabled = false;
+    } catch (err) {
+      log("❌ Connection error: " + err);
     }
-    log("🎉 Flashing complete!");
-    document.getElementById('thankyou').style.display = 'flex';
-  } catch (err) {
-    log("❌ Flash error: " + err);
-  }
-});
+  });
+
+  document.getElementById('flashBtn').addEventListener('click', async () => {
+    const files = [
+      { offset: 0x0000, url: 'bootloader.bin' },
+      { offset: 0x8000, url: 'partition-table.bin' },
+      { offset: 0x10000, url: 'firmware.bin' }
+    ];
+
+    try {
+      log("⚡ Starting flash process...");
+      for (const f of files) {
+        log(`⬇️ Fetching ${f.url}...`);
+        const response = await fetch(f.url);
+        const data = new Uint8Array(await response.arrayBuffer());
+        log(`📦 Writing ${f.url} to 0x${f.offset.toString(16)}...`);
+        await esploader.flashData(data, f.offset);
+        log(`✅ Done: ${f.url}`);
+      }
+      log("🎉 Flashing complete!");
+      document.getElementById('thankyou').style.display = 'flex';
+    } catch (err) {
+      log("❌ Flash error: " + err);
+    }
+  });
 </script>
 
 </body>
