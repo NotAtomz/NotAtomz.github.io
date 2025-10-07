@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ESP32 Web Flasher</title>
-<script src="https://espressif.github.io/esptool-js/esptool.min.js"></script>
+<script type="module">
+  import { ESPLoader } from "https://unpkg.com/esptool-js@0.4.5/dist/web/index.js";
+  window.ESPLoader = ESPLoader;
+</script>
 <style>
   body {
     background-color: #0b0f16;
@@ -120,3 +123,4 @@ document.getElementById('flashBtn').addEventListener('click', async () => {
 </script>
 </body>
 </html>
+
