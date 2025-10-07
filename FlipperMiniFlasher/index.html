@@ -4,10 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ESP32 Web Flasher</title>
+
+<!-- ✅ Load esptool-js properly -->
 <script type="module">
-  import { ESPLoader } from "https://unpkg.com/esptool-js@0.4.5/dist/web/index.js";
-  window.ESPLoader = ESPLoader;
+  import * as esptool from "https://unpkg.com/esptool-js@0.4.5/dist/web/index.js";
+  window.esptool = esptool;
+  window.ESPLoader = esptool.ESPLoader;
 </script>
+
 <style>
   body {
     background-color: #0b0f16;
@@ -77,9 +81,11 @@
 <script>
 let esploader;
 let port;
+
 const log = msg => {
-  document.getElementById('log').textContent += msg + "\n";
-  document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+  const el = document.getElementById('log');
+  el.textContent += msg + "\n";
+  el.scrollTop = el.scrollHeight;
 };
 
 document.getElementById('connectBtn').addEventListener('click', async () => {
@@ -121,6 +127,6 @@ document.getElementById('flashBtn').addEventListener('click', async () => {
   }
 });
 </script>
+
 </body>
 </html>
-
