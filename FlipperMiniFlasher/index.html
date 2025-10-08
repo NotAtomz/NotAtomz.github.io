@@ -85,23 +85,8 @@
       el.scrollTop = el.scrollHeight;
     };
 
-    const connectBtn = document.getElementById('connectBtn');
+    
     const flashBtn = document.getElementById('flashBtn');
-
-    connectBtn.addEventListener('click', async () => {
-      try {
-        port = await navigator.serial.requestPort({});
-        await port.open({ baudRate: 115200 });
-        log("🔌 Port opened successfully.");
-
-        esploader = new ESPLoader(port, { baudrate: 115200 });
-        await esploader.initialize();
-        log("✅ Connected to ESP32!");
-        flashBtn.disabled = false;
-      } catch (err) {
-        log("❌ Connection error: " + err);
-      }
-    });
 
     flashBtn.addEventListener('click', async () => {
       const files = [
@@ -128,8 +113,26 @@
     });
   });
 </script>
+<script>
+  const connectBtn = document.getElementById('connectBtn');
 
+    connectBtn.addEventListener('click', async () => {
+      try {
+        port = await navigator.serial.requestPort({});
+        await port.open({ baudRate: 115200 });
+        log("🔌 Port opened successfully.");
+
+        esploader = new ESPLoader(port, { baudrate: 115200 });
+        await esploader.initialize();
+        log("✅ Connected to ESP32!");
+        flashBtn.disabled = false;
+      } catch (err) {
+        log("❌ Connection error: " + err);
+      }
+    });
+</script>
 
 </body>
 </html>
+
 
