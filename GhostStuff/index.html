@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghost Sensor App</title>
+
+<!-- iPhone Add to Home Screen -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #000;
+    color: #0f0;
+    text-align: center;
+    padding: 20px;
+}
+
+button {
+    width: 90%;
+    padding: 20px;
+    margin: 10px;
+    background: #111;
+    color: #0f0;
+    border: 2px solid #0f0;
+    border-radius: 10px;
+    font-size: 20px;
+}
+
+#readingBox {
+    font-size: 40px;
+    margin-top: 40px;
+}
+
+.hidden {
+    display: none;
+}
+</style>
+</head>
+<body>
+
+<h1>Ghost Sensor</h1>
+
+<div id="permissions">
+    <p>Tap below to enable sensors:</p>
+    <button onclick="requestPermissions()">Enable Sensors</button>
+</div>
+
+<div id="menu" class="hidden">
+    <button onclick="startEMF()">📡 EMF Detector</button>
+    <button onclick="startMotion()">📱 Motion + Touch Detector</button>
+</div>
+
+<div id="readingBox" class="hidden"></div>
+
+<script>
+// --------------------------
+//  PERMISSIONS FOR IOS
+// --------------------------
+async function requestPermissions() {
+    const motion = DeviceMotionEvent.requestPermission?.();
+    const orient = DeviceOrientationEvent.requestPermission?.();
+
+    try {
+        if (motion) await DeviceMotionEvent.requestPermission();
+        if (orient) await DeviceOrientationEvent.requestPermission();
+    } catch (e) {
+        alert("Permissions denied.");
+        return;
+    }
+
+    document.getElementById("permissions").classList.add("hidden");
+    document.getElementById("menu").classList.remove("hidden");
+}
+
+// --------------------------
+//  EMF DETECTOR (MAGNETOMETER)
+// --------------------------
+let magSensor;
+
+function startEMF() {
+    document.getElementById("menu").classList.add("hidden");
+    document.getElementById("readingBox").classList.remove("hidden");
+    document.getElementById("readingBox").innerHTML = "Starting EMF sensor...";
+
+    try {
+        magSensor = new Magnetometer({frequency: 20});
+        magSensor.addEventListener("reading", () => {
+            let strength = Math.sqrt(
+                magSensor.x ** 2 +
+                magSensor.y ** 2 +
+                magSensor.z ** 2
+            );
+
+            document.getElementById("readingBox").innerHTML =
+                `EMF Strength: ${strength.toFixed(1)} µT`;
+        });
+        magSensor.start();
+    } catch (err) {
+        document.getElementById("readingBox").innerHTML =
+            "Magnetometer not supported on this device.";
+    }
+}
+
+// --------------------------
+//  MOTION + TOUCH DETECTOR
+// --------------------------
+let baseline = {x:0, y:0, z:0};
+let calibrated = false;
+let alertActive = false;
+
+function startMotion() {
+    document.getElementById("menu").classList.add("hidden");
+    document.getElementById("readingBox").classList.remove("hidden");
+    document.getElementById("readingBox").innerHTML =
+        "Place phone still... Calibrating...";
+
+    // Calibrate for 2 seconds
+    setTimeout(() => {
+        calibrated = true;
+        document.getElementById("readingBox").innerHTML =
+            "Monitoring for movement or touch...";
+    }, 2000);
+
+    window.addEventListener("devicemotion", (e) => {
+        if (!calibrated) {
+            baseline.x = e.acceleration.x;
+            baseline.y = e.acceleration.y;
+            baseline.z = e.acceleration.z;
+            return;
+        }
+
+        let dx = Math.abs(e.acceleration.x - baseline.x);
+        let dy = Math.abs(e.acceleration.y - baseline.y);
+        let dz = Math.abs(e.acceleration.z - baseline.z);
+
+        let movement = dx + dy + dz;
+
+        if (movement > 0.5) triggerAlarm("Movement detected!");
+    });
+
+    // Touch detector
+    window.addEventListener("touchstart", () => {
+        triggerAlarm("Touch detected!");
+    });
+
+    window.addEventListener("touchend", () => stopAlarm());
+}
+
+function triggerAlarm(msg) {
+    if (alertActive) return;
+    alertActive = true;
+
+    document.getElementById("readingBox").innerHTML = msg;
+
+    // SOUND WILL BE ADDED LATER
+}
+
+function stopAlarm() {
+    alertActive = false;
+    document.getElementById("readingBox").innerHTML =
+        "Monitoring for movement or touch...";
+}
+</script>
+</body>
+</html>
