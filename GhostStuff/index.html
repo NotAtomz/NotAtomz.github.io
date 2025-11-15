@@ -94,7 +94,11 @@ let motionTriggered = false;
 let touchTriggered = false;
 let alarmActive = false;
 
-let motionThreshold = 0.20;
+// More sensitivity ↓
+let motionThreshold = 0.08;
+
+// 3-second motion hold timer
+let motionCooldownTimer = null;
 
 // ---------------------------
 // Permissions
@@ -169,12 +173,21 @@ window.addEventListener("devicemotion", e => {
     let movement = dx + dy + dz;
 
     if (movement > motionThreshold) {
+        // Motion detected → hold alarm for 3 seconds minimum
         motionTriggered = true;
         updateAlarmState();
+
+        // Reset cooldown timer
+        if (motionCooldownTimer) clearTimeout(motionCooldownTimer);
+
+        motionCooldownTimer = setTimeout(() => {
+            motionTriggered = false;
+            resetMotionBox();
+            updateAlarmState();
+        }, 3000);
+
     } else {
-        motionTriggered = false;
-        resetMotionBox();
-        updateAlarmState();
+        // No motion but we do nothing — wait for cooldown timer
     }
 });
 
@@ -193,14 +206,13 @@ window.addEventListener("touchend", () => {
 });
 
 // ---------------------------
-// Update Alarm State (Main Logic Fix)
+// Update Alarm State
 // ---------------------------
 function updateAlarmState() {
     let circle = document.getElementById("alertCircle");
     let motionBox = document.getElementById("motionBox");
     let touchBox = document.getElementById("touchBox");
 
-    // If either trigger is active → alarm on
     if (motionTriggered || touchTriggered) {
         if (!alarmActive) audio.play();
         alarmActive = true;
@@ -220,10 +232,8 @@ function updateAlarmState() {
         }
 
     } else {
-        // Both stopped → alarm off
         alarmActive = false;
         audio.pause();
-
         circle.style.background = "gray";
     }
 }
@@ -245,6 +255,7 @@ function resetTouchBox() {
     touchBox.innerHTML = "Touch: None";
 }
 </script>
+
 
 
 <!-- PWA MANIFEST INSIDE HTML -->
