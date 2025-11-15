@@ -2,167 +2,251 @@
 <html lang="en">
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ghost Sensor App</title>
+<title>Motion Ghost</title>
 
-<!-- iPhone Add to Home Screen -->
+<!-- iPhone Add-to-Home-Screen -->
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
 
 <style>
 body {
-    font-family: Arial, sans-serif;
     background: #000;
-    color: #0f0;
+    color: #ff0000;
+    font-family: Arial, sans-serif;
     text-align: center;
     padding: 20px;
 }
 
 button {
     width: 90%;
-    padding: 20px;
-    margin: 10px;
-    background: #111;
-    color: #0f0;
-    border: 2px solid #0f0;
-    border-radius: 10px;
+    padding: 18px;
+    margin: 12px;
+    background: #200;
+    color: #ff0000;
+    border: 2px solid #ff0000;
     font-size: 20px;
+    border-radius: 0px; /* square buttons */
 }
 
-#readingBox {
-    font-size: 40px;
-    margin-top: 40px;
+.box {
+    border: 2px solid #ff0000;
+    padding: 20px;
+    margin: 25px;
+    width: 90%;
+    font-size: 28px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
-.hidden {
-    display: none;
+.indicator {
+    width: 25px;
+    height: 25px;
+    background: gray;
+    border: 2px solid #ff0000;
+    margin: 20px auto;
 }
 </style>
 </head>
 <body>
 
-<h1>Ghost Sensor</h1>
+<h1>Motion Ghost</h1>
 
-<div id="permissions">
-    <p>Tap below to enable sensors:</p>
+<!-- Permissions -->
+<div id="permissionArea">
+    <p>Tap below to enable motion & touch sensors:</p>
     <button onclick="requestPermissions()">Enable Sensors</button>
 </div>
 
-<div id="menu" class="hidden">
-    <button onclick="startEMF()">📡 EMF Detector</button>
-    <button onclick="startMotion()">📱 Motion + Touch Detector</button>
+<!-- Menu -->
+<div id="menu" style="display:none;">
+    <button onclick="startCalibration()">Calibrate</button>
 </div>
 
-<div id="readingBox" class="hidden"></div>
+<!-- Active Detector UI -->
+<div id="detector" style="display:none;">
+    <div class="box" id="motionBox">Motion: Stable</div>
+    <div class="box" id="touchBox">Touch: None</div>
+
+    <div class="indicator" id="alertCircle"></div>
+
+    <button onclick="startCalibration()">Recalibrate</button>
+</div>
 
 <script>
-// --------------------------
-//  PERMISSIONS FOR IOS
-// --------------------------
-async function requestPermissions() {
-    const motion = DeviceMotionEvent.requestPermission?.();
-    const orient = DeviceOrientationEvent.requestPermission?.();
+// ---------------------------
+// Audio
+// ---------------------------
+let audio = new Audio("Musicbox.mp3");
+audio.loop = false; // We will manually loop it
 
+audio.addEventListener("ended", () => {
+    audio.currentTime = 0;
+    audio.play();
+});
+
+// ---------------------------
+// Permissions for iPhone
+// ---------------------------
+async function requestPermissions() {
     try {
+        const motion = DeviceMotionEvent.requestPermission?.();
+        const orient = DeviceOrientationEvent.requestPermission?.();
+
         if (motion) await DeviceMotionEvent.requestPermission();
         if (orient) await DeviceOrientationEvent.requestPermission();
+
+        document.getElementById("permissionArea").style.display = "none";
+        document.getElementById("menu").style.display = "block";
     } catch (e) {
         alert("Permissions denied.");
+    }
+}
+
+// ---------------------------
+// Motion Detector System
+// ---------------------------
+let baseline = { x:0, y:0, z:0 };
+let calibrated = false;
+let alarmActive = false;
+let motionThreshold = 0.20; // More sensitive than before
+
+function startCalibration() {
+    calibrated = false;
+    alarmActive = false;
+
+    document.getElementById("menu").style.display = "none";
+    document.getElementById("detector").style.display = "block";
+
+    document.getElementById("motionBox").style.background = "";
+    document.getElementById("motionBox").style.color = "#ff0000";
+    document.getElementById("motionBox").innerHTML = "Motion: Calibrating...";
+
+    document.getElementById("touchBox").style.background = "";
+    document.getElementById("touchBox").style.color = "#ff0000";
+    document.getElementById("touchBox").innerHTML = "Touch: Calibrating...";
+
+    let alertCircle = document.getElementById("alertCircle");
+    alertCircle.style.background = "gray";
+
+    audio.currentTime = 0;
+    audio.play();
+
+    // 2-second calibration time
+    setTimeout(() => {
+        calibrated = true;
+        audio.pause();
+
+        document.getElementById("motionBox").innerHTML = "Motion: Stable";
+        document.getElementById("touchBox").innerHTML = "Touch: None";
+    }, 2000);
+}
+
+// ---------------------------
+// Motion Detection
+// ---------------------------
+window.addEventListener("devicemotion", e => {
+    if (!calibrated) {
+        // Capture baseline stillness
+        baseline.x = e.acceleration.x;
+        baseline.y = e.acceleration.y;
+        baseline.z = e.acceleration.z;
         return;
     }
 
-    document.getElementById("permissions").classList.add("hidden");
-    document.getElementById("menu").classList.remove("hidden");
-}
+    let dx = Math.abs(e.acceleration.x - baseline.x);
+    let dy = Math.abs(e.acceleration.y - baseline.y);
+    let dz = Math.abs(e.acceleration.z - baseline.z);
 
-// --------------------------
-//  EMF DETECTOR (MAGNETOMETER)
-// --------------------------
-let magSensor;
+    let movement = dx + dy + dz;
 
-function startEMF() {
-    document.getElementById("menu").classList.add("hidden");
-    document.getElementById("readingBox").classList.remove("hidden");
-    document.getElementById("readingBox").innerHTML = "Starting EMF sensor...";
+    if (movement > motionThreshold) {
+        triggerAlarm("motion");
+    } else if (!alarmActive) {
+        resetMotionBox();
+    }
+});
 
-    try {
-        magSensor = new Magnetometer({frequency: 20});
-        magSensor.addEventListener("reading", () => {
-            let strength = Math.sqrt(
-                magSensor.x ** 2 +
-                magSensor.y ** 2 +
-                magSensor.z ** 2
-            );
+// ---------------------------
+// Touch Detection
+// ---------------------------
+window.addEventListener("touchstart", () => triggerAlarm("touch"));
+window.addEventListener("touchend", () => {
+    if (!alarmActive) resetTouchBox();
+});
 
-            document.getElementById("readingBox").innerHTML =
-                `EMF Strength: ${strength.toFixed(1)} µT`;
-        });
-        magSensor.start();
-    } catch (err) {
-        document.getElementById("readingBox").innerHTML =
-            "Magnetometer not supported on this device.";
+// ---------------------------
+// Alarm System
+// ---------------------------
+function triggerAlarm(type) {
+    alarmActive = true;
+
+    let circle = document.getElementById("alertCircle");
+    circle.style.background = "white";
+
+    audio.play();
+
+    if (type === "motion") {
+        let box = document.getElementById("motionBox");
+        box.style.background = "#ff0000";
+        box.style.color = "#000";
+        box.innerHTML = "Motion: DETECTED";
+    }
+
+    if (type === "touch") {
+        let box = document.getElementById("touchBox");
+        box.style.background = "#ff0000";
+        box.style.color = "#000";
+        box.innerHTML = "Touch: DETECTED";
     }
 }
 
-// --------------------------
-//  MOTION + TOUCH DETECTOR
-// --------------------------
-let baseline = {x:0, y:0, z:0};
-let calibrated = false;
-let alertActive = false;
-
-function startMotion() {
-    document.getElementById("menu").classList.add("hidden");
-    document.getElementById("readingBox").classList.remove("hidden");
-    document.getElementById("readingBox").innerHTML =
-        "Place phone still... Calibrating...";
-
-    // Calibrate for 2 seconds
-    setTimeout(() => {
-        calibrated = true;
-        document.getElementById("readingBox").innerHTML =
-            "Monitoring for movement or touch...";
-    }, 2000);
-
-    window.addEventListener("devicemotion", (e) => {
-        if (!calibrated) {
-            baseline.x = e.acceleration.x;
-            baseline.y = e.acceleration.y;
-            baseline.z = e.acceleration.z;
-            return;
-        }
-
-        let dx = Math.abs(e.acceleration.x - baseline.x);
-        let dy = Math.abs(e.acceleration.y - baseline.y);
-        let dz = Math.abs(e.acceleration.z - baseline.z);
-
-        let movement = dx + dy + dz;
-
-        if (movement > 0.5) triggerAlarm("Movement detected!");
-    });
-
-    // Touch detector
-    window.addEventListener("touchstart", () => {
-        triggerAlarm("Touch detected!");
-    });
-
-    window.addEventListener("touchend", () => stopAlarm());
+function resetMotionBox() {
+    let box = document.getElementById("motionBox");
+    box.style.background = "";
+    box.style.color = "#ff0000";
+    box.innerHTML = "Motion: Stable";
 }
 
-function triggerAlarm(msg) {
-    if (alertActive) return;
-    alertActive = true;
-
-    document.getElementById("readingBox").innerHTML = msg;
-
-    // SOUND WILL BE ADDED LATER
-}
-
-function stopAlarm() {
-    alertActive = false;
-    document.getElementById("readingBox").innerHTML =
-        "Monitoring for movement or touch...";
+function resetTouchBox() {
+    let box = document.getElementById("touchBox");
+    box.style.background = "";
+    box.style.color = "#ff0000";
+    box.innerHTML = "Touch: None";
+    document.getElementById("alertCircle").style.background = "gray";
+    audio.pause();
+    alarmActive = false;
 }
 </script>
+
+<!-- PWA MANIFEST INSIDE HTML -->
+<script type="application/json" id="manifest">
+{
+  "name": "Motion Ghost",
+  "short_name": "MotionGhost",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#ff0000",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+</script>
+
+<script>
+// Inject manifest dynamically (Safari-friendly)
+const manifestContent = document.getElementById("manifest").textContent;
+const blob = new Blob([manifestContent], {type: "application/json"});
+const manifestURL = URL.createObjectURL(blob);
+const link = document.createElement("link");
+link.rel = "manifest";
+link.href = manifestURL;
+document.head.appendChild(link);
+</script>
+
 </body>
 </html>
