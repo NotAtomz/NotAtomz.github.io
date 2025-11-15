@@ -77,15 +77,27 @@ button {
 // Audio
 // ---------------------------
 let audio = new Audio("Musicbox.mp3");
-audio.loop = false; // We will manually loop it
+audio.loop = false;
 
 audio.addEventListener("ended", () => {
     audio.currentTime = 0;
-    audio.play();
+    if (alarmActive) audio.play();
 });
 
 // ---------------------------
-// Permissions for iPhone
+// States
+// ---------------------------
+let baseline = { x:0, y:0, z:0 };
+let calibrated = false;
+
+let motionTriggered = false;
+let touchTriggered = false;
+let alarmActive = false;
+
+let motionThreshold = 0.20;
+
+// ---------------------------
+// Permissions
 // ---------------------------
 async function requestPermissions() {
     try {
@@ -103,41 +115,39 @@ async function requestPermissions() {
 }
 
 // ---------------------------
-// Motion Detector System
+// Calibration
 // ---------------------------
-let baseline = { x:0, y:0, z:0 };
-let calibrated = false;
-let alarmActive = false;
-let motionThreshold = 0.20; // More sensitive than before
-
 function startCalibration() {
     calibrated = false;
+    motionTriggered = false;
+    touchTriggered = false;
     alarmActive = false;
 
     document.getElementById("menu").style.display = "none";
     document.getElementById("detector").style.display = "block";
 
-    document.getElementById("motionBox").style.background = "";
-    document.getElementById("motionBox").style.color = "#ff0000";
-    document.getElementById("motionBox").innerHTML = "Motion: Calibrating...";
+    let motionBox = document.getElementById("motionBox");
+    let touchBox = document.getElementById("touchBox");
+    let circle = document.getElementById("alertCircle");
 
-    document.getElementById("touchBox").style.background = "";
-    document.getElementById("touchBox").style.color = "#ff0000";
-    document.getElementById("touchBox").innerHTML = "Touch: Calibrating...";
+    motionBox.style.background = "";
+    motionBox.style.color = "#ff0000";
+    motionBox.innerHTML = "Motion: Calibrating...";
 
-    let alertCircle = document.getElementById("alertCircle");
-    alertCircle.style.background = "gray";
+    touchBox.style.background = "";
+    touchBox.style.color = "#ff0000";
+    touchBox.innerHTML = "Touch: Calibrating...";
+
+    circle.style.background = "gray";
 
     audio.currentTime = 0;
     audio.play();
 
-    // 2-second calibration time
     setTimeout(() => {
         calibrated = true;
         audio.pause();
-
-        document.getElementById("motionBox").innerHTML = "Motion: Stable";
-        document.getElementById("touchBox").innerHTML = "Touch: None";
+        motionBox.innerHTML = "Motion: Stable";
+        touchBox.innerHTML = "Touch: None";
     }, 2000);
 }
 
@@ -146,7 +156,6 @@ function startCalibration() {
 // ---------------------------
 window.addEventListener("devicemotion", e => {
     if (!calibrated) {
-        // Capture baseline stillness
         baseline.x = e.acceleration.x;
         baseline.y = e.acceleration.y;
         baseline.z = e.acceleration.z;
@@ -160,63 +169,83 @@ window.addEventListener("devicemotion", e => {
     let movement = dx + dy + dz;
 
     if (movement > motionThreshold) {
-        triggerAlarm("motion");
-    } else if (!alarmActive) {
+        motionTriggered = true;
+        updateAlarmState();
+    } else {
+        motionTriggered = false;
         resetMotionBox();
+        updateAlarmState();
     }
 });
 
 // ---------------------------
 // Touch Detection
 // ---------------------------
-window.addEventListener("touchstart", () => triggerAlarm("touch"));
+window.addEventListener("touchstart", () => {
+    touchTriggered = true;
+    updateAlarmState();
+});
+
 window.addEventListener("touchend", () => {
-    if (!alarmActive) resetTouchBox();
+    touchTriggered = false;
+    resetTouchBox();
+    updateAlarmState();
 });
 
 // ---------------------------
-// Alarm System
+// Update Alarm State (Main Logic Fix)
 // ---------------------------
-function triggerAlarm(type) {
-    alarmActive = true;
-
+function updateAlarmState() {
     let circle = document.getElementById("alertCircle");
-    circle.style.background = "white";
+    let motionBox = document.getElementById("motionBox");
+    let touchBox = document.getElementById("touchBox");
 
-    audio.play();
+    // If either trigger is active → alarm on
+    if (motionTriggered || touchTriggered) {
+        if (!alarmActive) audio.play();
+        alarmActive = true;
 
-    if (type === "motion") {
-        let box = document.getElementById("motionBox");
-        box.style.background = "#ff0000";
-        box.style.color = "#000";
-        box.innerHTML = "Motion: DETECTED";
-    }
+        circle.style.background = "white";
 
-    if (type === "touch") {
-        let box = document.getElementById("touchBox");
-        box.style.background = "#ff0000";
-        box.style.color = "#000";
-        box.innerHTML = "Touch: DETECTED";
+        if (motionTriggered) {
+            motionBox.style.background = "#ff0000";
+            motionBox.style.color = "#000";
+            motionBox.innerHTML = "Motion: DETECTED";
+        }
+
+        if (touchTriggered) {
+            touchBox.style.background = "#ff0000";
+            touchBox.style.color = "#000";
+            touchBox.innerHTML = "Touch: DETECTED";
+        }
+
+    } else {
+        // Both stopped → alarm off
+        alarmActive = false;
+        audio.pause();
+
+        circle.style.background = "gray";
     }
 }
 
+// ---------------------------
+// Reset Functions
+// ---------------------------
 function resetMotionBox() {
-    let box = document.getElementById("motionBox");
-    box.style.background = "";
-    box.style.color = "#ff0000";
-    box.innerHTML = "Motion: Stable";
+    let motionBox = document.getElementById("motionBox");
+    motionBox.style.background = "";
+    motionBox.style.color = "#ff0000";
+    motionBox.innerHTML = "Motion: Stable";
 }
 
 function resetTouchBox() {
-    let box = document.getElementById("touchBox");
-    box.style.background = "";
-    box.style.color = "#ff0000";
-    box.innerHTML = "Touch: None";
-    document.getElementById("alertCircle").style.background = "gray";
-    audio.pause();
-    alarmActive = false;
+    let touchBox = document.getElementById("touchBox");
+    touchBox.style.background = "";
+    touchBox.style.color = "#ff0000";
+    touchBox.innerHTML = "Touch: None";
 }
 </script>
+
 
 <!-- PWA MANIFEST INSIDE HTML -->
 <script type="application/json" id="manifest">
