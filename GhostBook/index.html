@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Ghost Book</title>
+
+<!-- PWA manifest -->
+<link rel="manifest" href="/manifest.json">
+
+<!-- Force standalone on iOS -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ghost Book">
+
+<!-- Apple touch icon (create icons/icon-192.png or replace path) -->
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+
+<!-- Theme color for Android/Chrome -->
+<meta name="theme-color" content="#faf5e6">
+<style>
+    body {
+        background: #000;
+        font-family: "Courier New", monospace;
+        padding: 40px;
+    }
+
+    .page {
+        width: 600px;
+        margin: auto;
+        background: #faf5e6;
+        padding: 30px;
+        border: 2px solid #d3c6a1;
+        box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    }
+
+    h2 {
+        margin-top: 0;
+        font-size: 24px;
+    }
+
+    .evidence-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        row-gap: 10px;
+        column-gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    hr {
+        border: none;
+        border-top: 2px solid #000;
+        margin: 20px 0;
+    }
+
+    .ghost-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        row-gap: 10px;
+        column-gap: 20px;
+        margin-top: 20px;
+    }
+
+    .ghost-grid span {
+        cursor: pointer;
+        transition: color 0.2s, opacity 0.2s;
+    }
+
+    .circled {
+        border: 2px solid black;
+        padding: 3px 8px;
+        border-radius: 100%;
+        display: inline-block;
+        background-color: rgba(0,0,0,0.05);
+    }
+
+    .disabled {
+        opacity: 0.35;
+        cursor: default;
+    }
+
+    /* Confirm Button */
+    .confirm-btn {
+        margin-top: 30px;
+        padding: 10px 20px;
+        width: 100%;
+        font-size: 18px;
+        border: 2px solid #000;
+        background: #e0d9c0;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    /* Popup / Modal */
+    .modal-bg {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal {
+        background: #faf5e6;
+        padding: 20px;
+        border: 2px solid #000;
+        width: 300px;
+        text-align: center;
+        font-size: 18px;
+    }
+
+    .close-btn {
+        margin-top: 20px;
+        padding: 8px 16px;
+        border: 2px solid #000;
+        background: #e0d9c0;
+        cursor: pointer;
+    }
+</style>
+</head>
+<body>
+
+<div class="page">
+    <h2>Evidence</h2>
+
+    <hr>
+
+    <div class="evidence-grid">
+        <label><input type="checkbox" class="ev" value="SLS"> SLS Anomaly</label>
+        <label><input type="checkbox" class="ev" value="EMF"> EMF Level 5</label>
+
+        <label><input type="checkbox" class="ev" value="SpiritBox"> Spirit Box</label>
+        <label><input type="checkbox" class="ev" value="EVP"> EVP Anomaly</label>
+
+        <label><input type="checkbox" class="ev" value="Interaction"> Interaction</label>
+        <label><input type="checkbox" class="ev" value="DOTS"> Laser D.O.T.S.</label>
+
+        <label><input type="checkbox" class="ev" value="UV"> UV Light</label>
+        <label><input type="checkbox" class="ev" value="Freezing"> Freezing Temp</label>
+
+        <label><input type="checkbox" class="ev" value="Orbs"> Ghost Orbs</label>
+    </div>
+
+    <hr>
+
+    <p>Using the evidence we've found, we believe the ghost is a</p>
+
+    <div class="ghost-grid" id="ghostGrid">
+        <span data-ev="SLS,EMF,DOTS">Shadow</span>
+        <span data-ev="Interaction,EMF,EVP">Poltergeist</span>
+        <span data-ev="Interaction,EMF,SpiritBox">Demon</span>
+
+        <span data-ev="SLS,EVP,SpiritBox">Malevolent</span>
+        <span data-ev="EMF,Interaction,Orbs,SpiritBox">Spirit</span>
+        <span data-ev="SLS,EMF,Orbs">Manifestation</span>
+
+        <span data-ev="Orbs,EMF,SpiritBox">Elemental</span>
+        <span data-ev="SpiritBox,EMF,Interaction">Bound</span>
+        <span data-ev="">Unknown</span>
+    </div>
+
+    <button class="confirm-btn" id="confirmBtn">Confirm</button>
+</div>
+
+<!-- Popup Modal -->
+<div class="modal-bg" id="modalBg">
+    <div class="modal">
+        <div id="modalContent">Loading...</div>
+        <button class="close-btn" id="closeBtn">Close</button>
+    </div>
+</div>
+
+<script>
+    const ghostGrid = document.getElementById("ghostGrid");
+    let selected = null;
+
+    // Click ghost selection
+    ghostGrid.addEventListener("click", function(e) {
+        if (e.target.tagName !== "SPAN") return;
+        if (e.target.classList.contains("disabled")) return;
+
+        let item = e.target;
+
+        if (item === selected) {
+            item.classList.remove("circled");
+            selected = null;
+            return;
+        }
+
+        if (selected) selected.classList.remove("circled");
+
+        item.classList.add("circled");
+        selected = item;
+    });
+
+    // Evidence filtering system
+    const evidenceBoxes = document.querySelectorAll(".ev");
+    evidenceBoxes.forEach(box => {
+        box.addEventListener("change", updateGhosts);
+    });
+
+    function updateGhosts() {
+        let activeEvidence = Array.from(evidenceBoxes)
+            .filter(b => b.checked)
+            .map(b => b.value);
+
+        const ghosts = ghostGrid.querySelectorAll("span");
+
+        ghosts.forEach(ghost => {
+            const ghostEvidence = ghost.dataset.ev.split(",").filter(x => x);
+
+            // Check if ghost has ALL selected evidence
+            let matches = activeEvidence.every(ev => ghostEvidence.includes(ev));
+
+            if (!matches && activeEvidence.length > 0) {
+                ghost.classList.add("disabled");
+                ghost.classList.remove("circled");
+                if (selected === ghost) selected = null;
+            } else {
+                ghost.classList.remove("disabled");
+            }
+        });
+    }
+
+    // Popup system
+    const confirmBtn = document.getElementById("confirmBtn");
+    const modalBg = document.getElementById("modalBg");
+    const modalContent = document.getElementById("modalContent");
+    const closeBtn = document.getElementById("closeBtn");
+
+    confirmBtn.addEventListener("click", () => {
+        if (!selected) {
+            modalContent.innerHTML = "<strong>No ghost selected.</strong>";
+        } else {
+            let name = selected.innerText;
+            let evidenceList = selected.dataset.ev
+                .split(",")
+                .filter(x => x)
+                .join(", ");
+
+            if (evidenceList.length === 0) evidenceList = "None";
+
+            modalContent.innerHTML = `
+                <strong>Ghost Type:</strong><br>${name}<br><br>
+                <strong>Evidence:</strong><br>${evidenceList}
+            `;
+        }
+
+        modalBg.style.display = "flex";
+    });
+
+    closeBtn.addEventListener("click", () => {
+        modalBg.style.display = "none";
+    });
+</script>
+
+</body>
+</html>
