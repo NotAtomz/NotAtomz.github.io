@@ -12,6 +12,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ghost Book">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Indie+Flower&display=swap" rel="stylesheet">
 
 <!-- Apple touch icon (create icons/icon-192.png or replace path) -->
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -23,6 +26,16 @@
         background: #000;
         font-family: "Courier New", monospace;
         padding: 40px;
+    }
+    .indie-flower-regular {
+        font-family: "Indie Flower", cursive;
+        font-weight: 400;
+        font-style: normal;
+    }
+
+    body, .page, .ghost-grid span, .evidence-grid label, .modal, button {
+        font-family: "Indie Flower", cursive !important;
+        font-size: 1.4rem; /* Increase ALL text slightly */
     }
 
     .page {
@@ -69,7 +82,7 @@
     .circled {
         border: 2px solid black;
         padding: 3px 8px;
-        border-radius: 100%;
+        border-radius: 50%;
         display: inline-block;
         background-color: rgba(0,0,0,0.05);
     }
@@ -139,9 +152,7 @@
         <label><input type="checkbox" class="ev" value="Interaction"> Interaction</label>
         <label><input type="checkbox" class="ev" value="DOTS"> Laser D.O.T.S.</label>
 
-        <label><input type="checkbox" class="ev" value="UV"> UV Light</label>
         <label><input type="checkbox" class="ev" value="Freezing"> Freezing Temp</label>
-
         <label><input type="checkbox" class="ev" value="Orbs"> Ghost Orbs</label>
     </div>
 
@@ -152,13 +163,13 @@
     <div class="ghost-grid" id="ghostGrid">
         <span data-ev="SLS,EMF,DOTS">Shadow</span>
         <span data-ev="Interaction,EMF,EVP">Poltergeist</span>
-        <span data-ev="Interaction,EMF,SpiritBox">Demon</span>
+        <span data-ev="Interaction,EMF,SpiritBox,Freezing">Demon</span>
 
         <span data-ev="SLS,EVP,SpiritBox">Malevolent</span>
         <span data-ev="EMF,Interaction,Orbs,SpiritBox">Spirit</span>
-        <span data-ev="SLS,EMF,Orbs">Manifestation</span>
+        <span data-ev="SLS,EMF,Orbs,Freezing">Manifestation</span>
 
-        <span data-ev="Orbs,EMF,SpiritBox">Elemental</span>
+        <span data-ev="Orbs,EMF,SpiritBox,Freezing">Elemental</span>
         <span data-ev="SpiritBox,EMF,Interaction">Bound</span>
         <span data-ev="">Unknown</span>
     </div>
