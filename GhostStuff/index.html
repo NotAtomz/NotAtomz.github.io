@@ -10,43 +10,64 @@
 
 <style>
 body {
-    background: #000;
-    color: #ff0000;
-    font-family: Arial, sans-serif;
+    background: radial-gradient(circle at top, #120000, #000);
+    color: #ff3b3b;
+    font-family: "Arial Black", Arial, sans-serif;
     text-align: center;
     padding: 20px;
+}
+
+h1 {
+    letter-spacing: 2px;
+    text-shadow: 0 0 12px #ff0000;
 }
 
 button {
     width: 90%;
     padding: 18px;
     margin: 12px;
-    background: #200;
-    color: #ff0000;
-    border: 2px solid #ff0000;
+    background: #180000;
+    color: #ff3b3b;
+    border: 2px solid #ff3b3b;
     font-size: 20px;
-    border-radius: 0px; /* square buttons */
 }
 
 .box {
-    border: 2px solid #ff0000;
+    border: 2px solid #ff3b3b;
     padding: 20px;
-    margin: 25px;
+    margin: 18px auto;
     width: 90%;
-    font-size: 28px;
-    margin-left: auto;
-    margin-right: auto;
+    font-size: 24px;
+    box-shadow: 0 0 15px rgba(255,0,0,0.3);
 }
 
 .indicator {
-    width: 25px;
-    height: 25px;
-    background: gray;
-    border: 2px solid #ff0000;
+    width: 30px;
+    height: 30px;
+    background: #444;
+    border: 2px solid #ff3b3b;
     margin: 20px auto;
+    box-shadow: 0 0 15px red;
+}
+
+.stats {
+    border: 2px solid #ff3b3b;
+    margin: 20px auto;
+    padding: 12px;
+    width: 90%;
+    font-size: 16px;
+}
+
+canvas {
+    width: 90%;
+    height: 140px;
+    border: 2px solid #ff3b3b;
+    background: #050000;
+    margin-top: 12px;
 }
 </style>
 </head>
+
 <body>
 
 <h1>Motion Ghost</h1>
@@ -68,6 +89,15 @@ button {
     <div class="box" id="touchBox">Touch: None</div>
 
     <div class="indicator" id="alertCircle"></div>
+
+    <!-- Stats + Graph -->
+    <div class="stats" id="statsArea">
+        <div>X: <span id="sx">0</span></div>
+        <div>Y: <span id="sy">0</span></div>
+        <div>Z: <span id="sz">0</span></div>
+        <div>Total Movement: <span id="sm">0</span></div>
+        <canvas id="motionGraph"></canvas>
+    </div>
 
     <button onclick="startCalibration()">Recalibrate</button>
 </div>
@@ -94,10 +124,7 @@ let motionTriggered = false;
 let touchTriggered = false;
 let alarmActive = false;
 
-// More sensitivity ↓
 let motionThreshold = 0.08;
-
-// 3-second motion hold timer
 let motionCooldownTimer = null;
 
 // ---------------------------
@@ -113,7 +140,7 @@ async function requestPermissions() {
 
         document.getElementById("permissionArea").style.display = "none";
         document.getElementById("menu").style.display = "block";
-    } catch (e) {
+    } catch {
         alert("Permissions denied.");
     }
 }
@@ -130,19 +157,9 @@ function startCalibration() {
     document.getElementById("menu").style.display = "none";
     document.getElementById("detector").style.display = "block";
 
-    let motionBox = document.getElementById("motionBox");
-    let touchBox = document.getElementById("touchBox");
-    let circle = document.getElementById("alertCircle");
-
-    motionBox.style.background = "";
-    motionBox.style.color = "#ff0000";
     motionBox.innerHTML = "Motion: Calibrating...";
-
-    touchBox.style.background = "";
-    touchBox.style.color = "#ff0000";
     touchBox.innerHTML = "Touch: Calibrating...";
-
-    circle.style.background = "gray";
+    alertCircle.style.background = "gray";
 
     audio.currentTime = 0;
     audio.play();
@@ -158,6 +175,26 @@ function startCalibration() {
 // ---------------------------
 // Motion Detection
 // ---------------------------
+const canvas = document.getElementById("motionGraph");
+const ctx = canvas.getContext("2d");
+
+let graphData = [];
+const maxPoints = 80;
+
+function drawGraph() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#ff0000";
+    ctx.beginPath();
+
+    graphData.forEach((v, i) => {
+        let x = (i / maxPoints) * canvas.width;
+        let y = canvas.height - (v * 800);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+}
+
 window.addEventListener("devicemotion", e => {
     if (!calibrated) {
         baseline.x = e.acceleration.x;
@@ -172,22 +209,27 @@ window.addEventListener("devicemotion", e => {
 
     let movement = dx + dy + dz;
 
+    // Stats
+    sx.textContent = dx.toFixed(3);
+    sy.textContent = dy.toFixed(3);
+    sz.textContent = dz.toFixed(3);
+    sm.textContent = movement.toFixed(3);
+
+    // Graph
+    graphData.push(movement);
+    if (graphData.length > maxPoints) graphData.shift();
+    drawGraph();
+
     if (movement > motionThreshold) {
-        // Motion detected → hold alarm for 3 seconds minimum
         motionTriggered = true;
         updateAlarmState();
 
-        // Reset cooldown timer
         if (motionCooldownTimer) clearTimeout(motionCooldownTimer);
-
         motionCooldownTimer = setTimeout(() => {
             motionTriggered = false;
             resetMotionBox();
             updateAlarmState();
         }, 3000);
-
-    } else {
-        // No motion but we do nothing — wait for cooldown timer
     }
 });
 
@@ -206,18 +248,13 @@ window.addEventListener("touchend", () => {
 });
 
 // ---------------------------
-// Update Alarm State
+// Alarm Logic
 // ---------------------------
 function updateAlarmState() {
-    let circle = document.getElementById("alertCircle");
-    let motionBox = document.getElementById("motionBox");
-    let touchBox = document.getElementById("touchBox");
-
     if (motionTriggered || touchTriggered) {
         if (!alarmActive) audio.play();
         alarmActive = true;
-
-        circle.style.background = "white";
+        alertCircle.style.background = "white";
 
         if (motionTriggered) {
             motionBox.style.background = "#ff0000";
@@ -234,58 +271,24 @@ function updateAlarmState() {
     } else {
         alarmActive = false;
         audio.pause();
-        circle.style.background = "gray";
+        alertCircle.style.background = "gray";
     }
 }
 
 // ---------------------------
-// Reset Functions
+// Reset Helpers
 // ---------------------------
 function resetMotionBox() {
-    let motionBox = document.getElementById("motionBox");
     motionBox.style.background = "";
-    motionBox.style.color = "#ff0000";
+    motionBox.style.color = "#ff3b3b";
     motionBox.innerHTML = "Motion: Stable";
 }
 
 function resetTouchBox() {
-    let touchBox = document.getElementById("touchBox");
     touchBox.style.background = "";
-    touchBox.style.color = "#ff0000";
+    touchBox.style.color = "#ff3b3b";
     touchBox.innerHTML = "Touch: None";
 }
-</script>
-
-
-
-<!-- PWA MANIFEST INSIDE HTML -->
-<script type="application/json" id="manifest">
-{
-  "name": "Motion Ghost",
-  "short_name": "MotionGhost",
-  "start_url": "./",
-  "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#ff0000",
-  "icons": [
-    {
-      "src": "icon.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
-}
-</script>
-
-<script>
-// Inject manifest dynamically (Safari-friendly)
-const manifestContent = document.getElementById("manifest").textContent;
-const blob = new Blob([manifestContent], {type: "application/json"});
-const manifestURL = URL.createObjectURL(blob);
-const link = document.createElement("link");
-link.rel = "manifest";
-link.href = manifestURL;
-document.head.appendChild(link);
 </script>
 
 </body>
