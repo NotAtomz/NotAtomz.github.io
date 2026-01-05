@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Beyond Limits On Xtreme — Download</title>
+    <style>
+        :root{
+            --bg:#e9eef5;
+            --panel:#f7f9fc;
+            --muted:#7e8b97;
+            --accent:#d32f2f;
+            --border:#c9d4df;
+            --card:#fff;
+            font-family:"Trebuchet MS",Tahoma,Arial,sans-serif;
+        }
+        html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#cfd9e6 60%);background-image: url('bg.jpg');background-size:cover;background-position:center;}
+        header{
+            height:66px;background:linear-gradient(#f5f7fa,#e6eef9);
+            border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;
+            padding:0 18px;box-sizing:border-box;
+            backdrop-filter: blur(2px);
+        }
+        .logo{display:flex;align-items:center;gap:10px;font-weight:700;color:#222;letter-spacing:2px;font-size:20px;}
+        .logo-mark{width:68px;height:30px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;box-shadow:0 1px 0 rgba(0,0,0,0.05);transform:skewX(-6deg);}
+        nav{display:flex;gap:8px;align-items:center;}
+        .tabs{list-style:none;margin:0;padding:0;display:flex;gap:8px;}
+        .tabs li{padding:8px 12px;border-radius:4px;background:transparent;color:#1b2736;cursor:pointer;font-weight:700}
+        .tabs li.active{background:#1b73b8;color:#fff}
+        .top-right{display:flex;align-items:center;gap:12px}
+        .container{width:980px;max-width:95%;margin:56px auto 48px;display:flex;gap:28px;align-items:flex-start}
+        .main-panel{flex:1;background:linear-gradient(180deg,rgba(255,255,255,0.95),rgba(242,247,255,0.9));border:1px solid var(--border);padding:24px;border-radius:6px;box-shadow:0 6px 18px rgba(18,35,64,0.06)}
+        .side-panel{width:320px;background:rgba(247,249,252,0.9);border:1px solid var(--border);padding:18px;border-radius:6px;box-shadow:0 4px 10px rgba(18,35,64,0.06)}
+        h1{margin:0 0 8px 0;font-size:24px;color:#1b2736}
+        .subtitle{color:var(--muted);margin-bottom:12px}
+        .hero-desc{background:rgba(255,255,255,0.7);padding:12px;border-radius:6px;border:1px solid var(--border);color:#1b2736}
+        .platforms{display:flex;gap:10px;margin-top:18px}
+        .plat-btn{flex:1;padding:12px;border-radius:6px;border:1px solid var(--border);background:#fff;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+        .plat-btn.disabled{opacity:.55;cursor:not-allowed}
+        .btn-download{background:var(--accent);color:#fff;border:none;padding:12px 18px;border-radius:6px;cursor:pointer;font-weight:900;box-shadow:0 6px 16px rgba(211,47,47,0.18)}
+        .small{font-size:13px;color:var(--muted)}
+        .muted-block{color:var(--muted);font-size:13px}
+        .note{margin-top:8px;color:var(--muted);font-size:13px}
+        .req-list{margin:10px 0;padding-left:18px;color:#1b2736}
+        @media (max-width:880px){
+            .container{flex-direction:column}
+            .side-panel{width:100%}
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <div class="logo-mark">BLOX</div>
+            <div>
+                <div style="font-size:12px;color:var(--muted);letter-spacing:0">PLAY & CREATE</div>
+                <div style="font-weight:800;font-size:14px">Beyond Limits On Xtreme</div>
+            </div>
+        </div>
+
+        <div class="top-right">
+            <nav>
+                <ul class="tabs" id="topTabs">
+                    <li data-tab="home">Home</li>
+                    <li data-tab="download" class="active">Download</li>
+                    <li data-tab="games">Games</li>
+                    <li data-tab="settings">Settings</li>
+                </ul>
+            </nav>
+            <div class="small" id="userArea">Guest</div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <section class="main-panel" id="contentDownload">
+                <h1>Download — Beyond Limits On Xtreme</h1>
+                <div class="subtitle">A 3D world you can play in and build on</div>
+
+                <div class="hero-desc">
+                    Beyond Limits On Xtreme is a user-driven 3D world where you can explore, create and play with others.
+                    Build environments, share creations, and join multiplayer sessions. The client is currently available
+                    for Windows only; mobile support is coming soon.
+                </div>
+
+                <div style="margin-top:18px">
+                    <div style="display:flex;align-items:center;justify-content:space-between">
+                        <div style="font-weight:800">Get the game</div>
+                        <div class="muted-block">Windows build • Mobile soon</div>
+                    </div>
+
+                    <div class="platforms" aria-hidden="false">
+                        <div id="winPanel" class="plat-btn">
+                            <div style="display:flex;flex-direction:column;align-items:center">
+                                <div style="font-size:14px">Windows</div>
+                                <div class="small" style="margin-top:6px">64-bit installer</div>
+                            </div>
+                        </div>
+
+                        <div id="macPanel" class="plat-btn disabled" title="Mac build not available yet">
+                            <div style="display:flex;flex-direction:column;align-items:center">
+                                <div style="font-size:14px">macOS</div>
+                                <div class="small" style="margin-top:6px">Not available</div>
+                            </div>
+                        </div>
+
+                        <div id="mobilePanel" class="plat-btn disabled" title="Mobile support coming soon">
+                            <div style="display:flex;flex-direction:column;align-items:center">
+                                <div style="font-size:14px">Mobile</div>
+                                <div class="small" style="margin-top:6px">Coming soon</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:16px;display:flex;gap:12px;align-items:center">
+                        <button id="downloadBtn" class="btn-download">Download for Windows</button>
+                        <div class="small">Installer: ~120 MB</div>
+                    </div>
+
+                    <div class="note">Note: This build runs on Windows 10/11 (64-bit). Mobile clients and additional platforms will be released later.</div>
+                </div>
+            </section>
+
+            <aside class="side-panel" id="sidePanel">
+                <div style="font-size:12px;color:var(--muted)">System Requirements</div>
+                <ul class="req-list">
+                    <li>OS: Windows 10 / 11 (64‑bit)</li>
+                    <li>CPU: Dual-core 2.5GHz+</li>
+                    <li>RAM: 8 GB+</li>
+                    <li>GPU: DirectX11 compatible</li>
+                    <li>Disk: 500 MB free</li>
+                    <li>Network: Broadband recommended</li>
+                </ul>
+
+                <div style="margin-top:12px" class="small">Need help? Visit Support or check the release notes included with the installer.</div>
+
+                <div style="margin-top:16px">
+                    <button id="releaseNotesBtn" class="plat-btn" style="background:#fff">Release Notes</button>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <script>
+        // Simple download handling: windows only. Replace href with real installer path.
+        const downloadBtn = document.getElementById('downloadBtn');
+        const winPanel = document.getElementById('winPanel');
+        const macPanel = document.getElementById('macPanel');
+        const mobilePanel = document.getElementById('mobilePanel');
+        const releaseNotesBtn = document.getElementById('releaseNotesBtn');
+
+        // Replace with real file name or URL
+        const windowsInstaller = 'BeyondLimitsOnXtreme-Setup.exe';
+
+        downloadBtn.addEventListener('click', () => {
+            // Start download (navigates to file). If not present, show message.
+            // In production, set windowsInstaller to actual hosted file URL.
+            const a = document.createElement('a');
+            a.href = windowsInstaller;
+            a.download = windowsInstaller.split('/').pop();
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        });
+
+        // Visual affordance: click Windows panel behaves like the download button
+        winPanel.addEventListener('click', () => downloadBtn.click());
+        macPanel.addEventListener('click', () => alert('macOS build is not available yet.'));
+        mobilePanel.addEventListener('click', () => alert('Mobile support is coming soon.'));
+
+        releaseNotesBtn.addEventListener('click', () => {
+            alert('Release notes are packaged with the installer in this demo.');
+        });
+
+        // Optional: detect platform to hint user
+        const ua = navigator.userAgent || navigator.platform || '';
+        if(/Win/i.test(ua)){
+            // friendly hint
+            winPanel.style.boxShadow = '0 6px 16px rgba(27,115,184,0.12)';
+        } else if(/Mac|iPhone|iPad|Android/i.test(ua)){
+            // suggest Windows download but inform user
+            const info = document.createElement('div');
+            info.className = 'note';
+            info.style.marginTop = '12px';
+            info.textContent = 'You are not on Windows. The installer only runs on Windows currently.';
+            document.getElementById('contentDownload').appendChild(info);
+        }
+    </script>
+</body>
+</html>
