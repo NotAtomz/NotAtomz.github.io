@@ -205,6 +205,7 @@
                     <p id="mDesc" style="line-height:1.5; margin-bottom:20px;">Description...</p>
                     <div style="font-size:12px; color:var(--muted); margin-bottom:12px;">Created: <span id="mDate"></span></div>
                     <button class="btn" id="mPlayBtn">Play Now</button>
+                    
                 </div>
             </div>
         </div>
@@ -339,9 +340,18 @@
             
             const btn = document.getElementById('mPlayBtn');
             btn.onclick = () => {
-                // Downloading the map file or launching protocol
-                window.open(game.gamemaplink, '_blank');
+                const playfabId = localStorage.getItem("playfab_id");
+                const sessionTicket = localStorage.getItem("playfab_session");
+
+                const launchUrl =
+                    "blox://play" +
+                    "?map=" + encodeURIComponent(game.gamemaplink) +
+                    "&pfid=" + encodeURIComponent(playfabId) +
+                    "&ticket=" + encodeURIComponent(sessionTicket);
+
+                window.location.href = launchUrl;
             };
+
 
             document.getElementById('gameModal').style.display = 'flex';
         }
