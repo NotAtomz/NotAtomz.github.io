@@ -3,109 +3,65 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>BLOX - Home</title>
+    <title>Beyond Limits On Xtreme - Home</title>
     <style>
-        :root {
-            --bg: #e9eef5;
-            --panel: #f7f9fc;
-            --muted: #7e8b97;
-            --accent: #d32f2f;
-            --border: #c9d4df;
-            --card: #fff;
-            --input-bg: #fff;
-            font-family: "Trebuchet MS", Tahoma, Arial, sans-serif;
+        :root{
+            --bg:#e9eef5;
+            --panel:#f7f9fc;
+            --muted:#7e8b97;
+            --accent:#d32f2f;
+            --border:#c9d4df;
+            --card:#fff;
+            font-family:"Trebuchet MS",Tahoma,Arial,sans-serif;
         }
-        html, body { height: 100%; margin: 0; background: linear-gradient(180deg, var(--bg), #cfd9e6 60%); }
-        
-        /* Header & Nav */
-        header {
-            height: 66px; background: linear-gradient(#f5f7fa, #e6eef9);
-            border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;
-            padding: 0 18px; box-sizing: border-box; position: sticky; top: 0; z-index: 50;
+        html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#cfd9e6 60%);}
+        header{
+            height:66px;background:linear-gradient(#f5f7fa,#e6eef9);
+            border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;
+            padding:0 18px;box-sizing:border-box;
         }
-        .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; color: #222; letter-spacing: 2px; font-size: 20px; }
-        .logo-mark { width: 68px; height: 30px; background: var(--accent); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; box-shadow: 0 1px 0 rgba(0,0,0,0.05); transform: skewX(-6deg); }
-        
-        .top-right { display: flex; align-items: center; gap: 20px; }
-        .tabs { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }
-        .tabs li { padding: 8px 12px; border-radius: 4px; background: transparent; color: #1b2736; cursor: pointer; font-weight: 700; transition: 0.2s; }
-        .tabs li:hover { background: rgba(0,0,0,0.03); }
-        .tabs li.active { background: #1b73b8; color: #fff; }
-        
-        /* Currency Display */
-        .currency-pill {
-            background: #fff; border: 1px solid var(--border); padding: 6px 12px;
-            border-radius: 20px; font-weight: 800; font-size: 14px; color: #2e7d32;
-            display: flex; align-items: center; gap: 6px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-        }
-        .currency-icon { width: 14px; height: 14px; background: #2e7d32; border-radius: 50%; display: inline-block; }
-
-        /* Layout */
-        main { display: flex; justify-content: center; padding: 40px 20px; }
-        .container { width: 900px; max-width: 100%; }
-        
-        .panel {
-            background: linear-gradient(180deg, #fff, #f2f7ff); border: 1px solid var(--border);
-            padding: 24px; border-radius: 4px; box-shadow: 0 6px 18px rgba(18, 35, 64, 0.06);
-            display: none; /* Hidden by default, toggled by tabs */
-        }
-        .panel.active { display: block; }
-
-        h1 { margin: 0 0 8px 0; font-size: 28px; color: #1b2736; }
-        .subtitle { color: var(--muted); margin-bottom: 24px; border-bottom: 1px solid #eee; padding-bottom: 12px; }
-        
-        /* Games Grid */
-        .games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
-        .game-card {
-            background: var(--card); border: 1px solid var(--border); border-radius: 6px;
-            overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
-            display: flex; flex-direction: column;
-        }
-        .game-card:hover { transform: translateY(-4px); box-shadow: 0 6px 12px rgba(0,0,0,0.08); }
-        
-        .game-thumb {
-            height: 120px; background: #dfe7f4; display: flex; align-items: center; justify-content: center;
-            color: var(--muted); font-weight: 700; overflow: hidden;
-        }
-        .game-thumb img { width: 100%; height: 100%; object-fit: cover; }
-        
-        .game-info { padding: 10px; }
-        .game-title { font-weight: 800; font-size: 15px; color: #1b2736; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .game-creator { font-size: 12px; color: var(--muted); margin-top: 2px; }
-
-        /* Settings Forms */
-        .settings-group { margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid #eee; }
-        .settings-group h3 { margin: 0 0 12px 0; font-size: 16px; color: #333; }
-        .field { margin-bottom: 12px; max-width: 300px; }
-        .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-        .field input {
-            width: 100%; padding: 8px 10px; border: 1px solid var(--border);
-            border-radius: 3px; font-size: 14px; box-sizing: border-box;
-        }
-        
-        .btn { background: #1b73b8; color: #fff; border: none; padding: 9px 16px; border-radius: 3px; cursor: pointer; font-weight: 700; }
-        .btn:hover { background: #15629e; }
-        .btn.red { background: #d32f2f; }
-        .btn.red:hover { background: #b71c1c; }
-        
+        .logo{display:flex;align-items:center;gap:10px;font-weight:700;color:#222;letter-spacing:2px;font-size:20px;}
+        .logo-mark{width:68px;height:30px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;box-shadow:0 1px 0 rgba(0,0,0,0.05);transform:skewX(-6deg);}
+        nav{display:flex;gap:8px;align-items:center;}
+        .tabs{list-style:none;margin:0;padding:0;display:flex;gap:8px;}
+        .tabs li{padding:8px 12px;border-radius:4px;background:transparent;color:#1b2736;cursor:pointer;font-weight:700}
+        .tabs li.active{background:#1b73b8;color:#fff}
+        .top-right{display:flex;align-items:center;gap:12px}
+        .container{width:980px;max-width:95%;margin:56px auto 48px;display:flex;gap:28px;align-items:flex-start}
+        .main-panel{flex:1;background:linear-gradient(180deg,#fff,#f2f7ff);border:1px solid var(--border);padding:24px;border-radius:4px;box-shadow:0 6px 18px rgba(18,35,64,0.06)}
+        .side-panel{width:320px;background:var(--panel);border:1px solid var(--border);padding:18px;border-radius:4px;box-shadow:0 4px 10px rgba(18,35,64,0.06)}
+        h1{margin:0 0 8px 0;font-size:24px;color:#1b2736}
+        .subtitle{color:var(--muted);margin-bottom:12px}
+        .welcome-username{font-size:18px;font-weight:800;margin:6px 0 0 0}
+        .games-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:14px}
+        .game-card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:10px;display:flex;gap:10px;cursor:pointer;transition:transform .12s}
+        .game-card:hover{transform:translateY(-4px)}
+        .thumb{width:92px;height:68px;background:#dfe7f4;border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700}
+        .game-meta{flex:1}
+        .game-title{font-weight:800;margin:0 0 6px 0}
+        .game-creator{font-size:12px;color:var(--muted);margin-bottom:8px}
+        .game-players{font-size:12px;color:var(--muted)}
+        .small{font-size:13px;color:var(--muted)}
+        .profile-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+        .btn{background:#1b73b8;color:#fff;border:none;padding:9px 12px;border-radius:3px;cursor:pointer;font-weight:700}
+        .btn.alt{background:#fff;color:#1b2736;border:1px solid var(--border);font-weight:600}
+        .tabs-right{font-size:13px;color:var(--muted)}
         /* Modal */
-        .modal-backdrop { position: fixed; inset: 0; background: rgba(10,20,40,0.5); display: none; align-items: center; justify-content: center; z-index: 100; }
-        .modal { width: 600px; max-width: 90%; background: #fff; border-radius: 6px; padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
-        .modal-header { display: flex; justify-content: space-between; margin-bottom: 16px; }
-        .modal-body { display: flex; gap: 20px; }
-        .modal-img { width: 200px; height: 150px; background: #eee; border-radius: 4px; object-fit: cover; }
-        .modal-details { flex: 1; }
-        .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--muted); }
-
-        @media (max-width: 600px) {
-            header { flex-direction: column; height: auto; padding: 10px; gap: 10px; }
-            .modal-body { flex-direction: column; }
-            .modal-img { width: 100%; height: 180px; }
+        .modal-backdrop{position:fixed;inset:0;background:rgba(10,20,40,0.45);display:none;align-items:center;justify-content:center;z-index:60}
+        .modal{width:640px;max-width:95%;background:#fff;border-radius:6px;padding:18px;border:1px solid var(--border);box-shadow:0 12px 40px rgba(18,35,64,0.35)}
+        .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+        .modal-body{display:flex;gap:14px}
+        .modal-thumb{width:220px;height:140px;background:#eef4ff;border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--muted)}
+        .modal-info{flex:1}
+        .close-x{background:transparent;border:none;font-size:18px;cursor:pointer;color:var(--muted)}
+        @media (max-width:880px){
+            .container{flex-direction:column}
+            .side-panel{width:100%}
+            .games-list{grid-template-columns:1fr}
         }
     </style>
 </head>
 <body>
-
     <header>
         <div class="logo">
             <div class="logo-mark">BLOX</div>
@@ -114,291 +70,246 @@
                 <div style="font-weight:800;font-size:14px">Beyond Limits On Xtreme</div>
             </div>
         </div>
-        
+
         <div class="top-right">
             <nav>
-                <ul class="tabs">
-                    <li onclick="switchTab('home')" id="tab-home" class="active">Home</li>
-                    <li onclick="switchTab('games')" id="tab-games">Games</li>
-                    <li onclick="switchTab('settings')" id="tab-settings">Settings</li>
+                <ul class="tabs" id="topTabs">
+                    <li data-tab="home" class="active">Home</li>
+                    <li data-tab="avatar">Avatar</li>
+                    <li data-tab="games">Games</li>
+                    <li data-tab="download">Download</li>
+                    <li data-tab="settings">Settings</li>
                 </ul>
             </nav>
-            <div class="currency-pill">
-                <span class="currency-icon"></span>
-                <span id="brixDisplay">BRIX: ...</span>
+            <div class="tabs-right" id="userArea">
+                <!-- username inserted by JS -->
             </div>
         </div>
     </header>
 
     <main>
         <div class="container">
-            <!-- HOME TAB -->
-            <section id="panel-home" class="panel active">
-                <h1>Welcome, <span id="welcomeUser">Player</span>!</h1>
-                <div class="subtitle">Here are the latest featured worlds for you to explore.</div>
-                
-                <h3 style="margin-bottom:12px">Featured Games</h3>
-                <div class="games-grid" id="homeGamesGrid">
-                    <!-- Loaded via JS -->
-                    <div style="padding:20px; color:var(--muted)">Loading games...</div>
+            <section class="main-panel" id="contentHome">
+                <h1>Welcome to BLOX</h1>
+                <div class="subtitle">Build, play and explore user-created worlds.</div>
+
+                <div style="margin-top:6px">
+                    <div style="font-size:13px;color:var(--muted)">Logged in as</div>
+                    <div class="welcome-username" id="welcomeName">Guest</div>
+                </div>
+
+                <div style="margin-top:18px">
+                    <div style="display:flex;align-items:center;justify-content:space-between">
+                        <div style="font-weight:800">Featured Games</div>
+                        <div class="small" id="gamesHint">Click a game to view details</div>
+                    </div>
+
+                    <div class="games-list" id="gamesList">
+                        <!-- populated by JS -->
+                    </div>
                 </div>
             </section>
 
-            <!-- GAMES TAB -->
-            <section id="panel-games" class="panel">
-                <h1>All Games</h1>
-                <div class="subtitle">Browse the complete library of user-created maps.</div>
-                <div class="games-grid" id="allGamesGrid">
-                    <!-- Loaded via JS -->
-                </div>
-            </section>
-
-            <!-- SETTINGS TAB -->
-            <section id="panel-settings" class="panel">
-                <h1>Account Settings</h1>
-                <div class="subtitle">Manage your BLOX account and preferences.</div>
-
-                <div class="settings-group">
-                    <h3>Change Username</h3>
-                    <div class="field">
-                        <label>New Display Name</label>
-                        <input type="text" id="newUsername" placeholder="3-16 characters" />
+            <aside class="side-panel" id="sidePanel">
+                <div class="profile-row">
+                    <div>
+                        <div style="font-size:12px;color:var(--muted)">Account</div>
+                        <div style="font-weight:800" id="sideName">Guest</div>
                     </div>
-                    <button class="btn" onclick="updateUsername()">Update Name</button>
+                    <div>
+                        <button class="btn alt" id="setNameBtn">Set Name</button>
+                    </div>
                 </div>
 
-                <div class="settings-group">
-                    <h3>Change Password</h3>
-                    <div class="field">
-                        <label>Current Password</label>
-                        <input type="password" id="oldPass" />
-                    </div>
-                    <div class="field">
-                        <label>New Password</label>
-                        <input type="password" id="newPass" />
-                    </div>
-                    <button class="btn" onclick="updatePassword()">Update Password</button>
+                <div style="margin-top:14px" class="small">Quick Links</div>
+                <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
+                    <button class="btn" id="openGamesBtn">Browse Games</button>
+                    <button class="btn alt" id="openAvatarBtn">Customize Avatar</button>
                 </div>
-
-                <div class="settings-group">
-                    <h3>Account Actions</h3>
-                    <button class="btn red" onclick="logout()">Log Out</button>
-                </div>
-                
-                <div id="settingsStatus" style="font-weight:bold; font-size:13px; margin-top:10px;"></div>
-            </section>
+            </aside>
         </div>
     </main>
 
-    <!-- Game Details Modal -->
-    <div class="modal-backdrop" id="gameModal" onclick="if(event.target===this) closeModal()">
-        <div class="modal">
+    <!-- Game Modal -->
+    <div class="modal-backdrop" id="modalRoot" role="dialog" aria-hidden="true">
+        <div class="modal" role="document">
             <div class="modal-header">
-                <h2 style="margin:0" id="mTitle">Game Title</h2>
-                <button class="close-btn" onclick="closeModal()">&times;</button>
+                <div style="font-weight:800" id="modalTitle">Game Title</div>
+                <div>
+                    <button class="close-x" id="modalCloseBtn" aria-label="Close">&times;</button>
+                </div>
             </div>
             <div class="modal-body">
-                <img id="mImage" src="" class="modal-img" alt="Game Thumbnail">
-                <div class="modal-details">
-                    <div style="color:var(--muted); font-size:13px; margin-bottom:8px;" id="mMaker">by Maker</div>
-                    <p id="mDesc" style="line-height:1.5; margin-bottom:20px;">Description...</p>
-                    <div style="font-size:12px; color:var(--muted); margin-bottom:12px;">Created: <span id="mDate"></span></div>
-                    <button class="btn" id="mPlayBtn">Play Now</button>
+                <div class="modal-thumb" id="modalThumb">THUMB</div>
+                <div class="modal-info">
+                    <div style="color:var(--muted);margin-bottom:8px" id="modalCreator">by Creator</div>
+                    <div id="modalDesc" style="margin-bottom:12px;color:#1b2736">Game description goes here.</div>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <button class="btn" id="playBtn">Play</button>
+                        <button class="btn alt" id="closeBtn">Close</button>
+                        <div style="margin-left:auto;font-size:13px;color:var(--muted)" id="modalPlayers">0 playing</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        const GameTitleId = "166CEA";
-        const sessionTicket = localStorage.getItem('playfab_session');
-
-        // --- 1. AUTH CHECK & INIT ---
-        window.onload = function() {
-            if (!sessionTicket) {
-                window.location.href = 'index.html';
-                return;
+        // Demo data: single game template
+        const games = [
+            {
+                id: 'g1',
+                title: 'Skyblock Adventures',
+                creator: 'BuilderSam',
+                players: 128,
+                thumbText: 'SKY',
+                desc: 'Explore floating islands, gather resources and build your empire. Cooperative and competitive modes.',
+                playUrl: '#' // replace with real game URL if available
             }
-            fetchProfile();
-            fetchInventory();
-            fetchGames();
-        };
+        ];
 
-        // --- 2. PLAYFAB HELPER ---
-        function PlayFabCall(path, data, onSuccess, onError) {
-            fetch(`https://${GameTitleId}.playfabapi.com${path}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Authorization': sessionTicket,
-                    'X-PlayFabSDK': 'Custom-Web-1.0'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.code === 200 && data.data) {
-                    onSuccess(data.data);
-                } else {
-                    console.error("PlayFab Error:", data);
-                    if (onError) onError(data);
-                }
-            })
-            .catch(err => console.error("Network Error:", err));
+        // Elements
+        const tabs = document.getElementById('topTabs');
+        const topTabs = tabs.querySelectorAll('li');
+        const contentHome = document.getElementById('contentHome');
+        const gamesList = document.getElementById('gamesList');
+        const modalRoot = document.getElementById('modalRoot');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalThumb = document.getElementById('modalThumb');
+        const modalCreator = document.getElementById('modalCreator');
+        const modalDesc = document.getElementById('modalDesc');
+        const modalPlayers = document.getElementById('modalPlayers');
+        const playBtn = document.getElementById('playBtn');
+        const modalCloseBtn = document.getElementById('modalCloseBtn');
+        const closeBtn = document.getElementById('closeBtn');
+        const welcomeName = document.getElementById('welcomeName');
+        const sideName = document.getElementById('sideName');
+        const userArea = document.getElementById('userArea');
+
+        // Load username from localStorage or fallback
+        function loadUsername(){
+            const name = localStorage.getItem('playfab_username') || localStorage.getItem('blox_username') || localStorage.getItem('playfab_id') || 'Guest';
+            return name;
+        }
+        function renderUsername(){
+            const name = loadUsername();
+            welcomeName.textContent = name;
+            sideName.textContent = name;
+            userArea.textContent = name;
         }
 
-        // --- 3. FETCH USER DATA ---
-        function fetchProfile() {
-            PlayFabCall('/Client/GetAccountInfo', {}, (data) => {
-                const titleInfo = data.AccountInfo.TitleInfo;
-                // Use DisplayName if set, otherwise fallback to Username, then ID
-                const name = titleInfo.DisplayName || data.AccountInfo.Username || data.AccountInfo.PlayFabId;
-                document.getElementById('welcomeUser').textContent = name;
-            });
-        }
+        // Allow setting demo username (stores to localStorage for reuse)
+        document.getElementById('setNameBtn').addEventListener('click', () => {
+            const newName = prompt('Set your display name (3-16 chars, letters/numbers/_):', loadUsername());
+            if(!newName) return;
+            const ok = /^[a-zA-Z0-9_]{3,16}$/.test(newName);
+            if(!ok){ alert('Invalid name.'); return; }
+            localStorage.setItem('blox_username', newName);
+            renderUsername();
+        });
 
-        function fetchInventory() {
-            PlayFabCall('/Client/GetUserInventory', {}, (data) => {
-                let amount = 0;
-                if (data.VirtualCurrency && data.VirtualCurrency["BX"]) {
-                    amount = data.VirtualCurrency["BX"];
-                }
-                document.getElementById('brixDisplay').textContent = "BRIX: " + formatNumber(amount);
-            });
-        }
-
-        // Formats 1200 -> 1.2k, 1500000 -> 1.5M
-        function formatNumber(num) {
-            if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-            if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-            return num;
-        }
-
-        // --- 4. FETCH GAMES FROM GITHUB ---
-        const GAMES_URL = "https://raw.githubusercontent.com/NotAtomz/BloxMapsData/refs/heads/main/games.bxd";
-
-        function fetchGames() {
-            fetch(GAMES_URL)
-                .then(res => res.json())
-                .then(data => {
-                    renderGames(data.games);
-                })
-                .catch(err => {
-                    console.error("Failed to load games:", err);
-                    document.getElementById('homeGamesGrid').innerHTML = '<div style="color:red">Failed to load games list.</div>';
-                });
-        }
-
-        function renderGames(games) {
-            const homeGrid = document.getElementById('homeGamesGrid');
-            const allGrid = document.getElementById('allGamesGrid');
-            
-            homeGrid.innerHTML = '';
-            allGrid.innerHTML = '';
-
-            games.forEach(game => {
-                // Use a default image if empty
-                const imgSrc = game.gameimage || 'https://placehold.co/200x120?text=No+Image';
-                
-                const cardHtml = `
-                    <div class="game-thumb">
-                        <img src="${imgSrc}" onerror="this.src='https://placehold.co/200x120?text=Error'">
-                    </div>
-                    <div class="game-info">
-                        <div class="game-title">${game.gamename}</div>
-                        <div class="game-creator">by ${game.gamemaker}</div>
+        // Populate games list (one template entry)
+        function renderGames(){
+            gamesList.innerHTML = '';
+            games.forEach(g=>{
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                card.setAttribute('data-id', g.id);
+                card.innerHTML = `
+                    <div class="thumb">${g.thumbText}</div>
+                    <div class="game-meta">
+                        <div class="game-title">${g.title}</div>
+                        <div class="game-creator">by ${g.creator}</div>
+                        <div class="game-players">${g.players} playing</div>
                     </div>
                 `;
-
-                // Create element for Home
-                const card1 = document.createElement('div');
-                card1.className = 'game-card';
-                card1.innerHTML = cardHtml;
-                card1.onclick = () => showGameDetails(game);
-                homeGrid.appendChild(card1);
-
-                // Create element for All Games (duplicate logic for now)
-                const card2 = document.createElement('div');
-                card2.className = 'game-card';
-                card2.innerHTML = cardHtml;
-                card2.onclick = () => showGameDetails(game);
-                allGrid.appendChild(card2);
+                card.addEventListener('click', ()=> openGameModal(g.id));
+                gamesList.appendChild(card);
             });
         }
 
-        // --- 5. GAME MODAL ---
-        function showGameDetails(game) {
-            document.getElementById('mTitle').textContent = game.gamename;
-            document.getElementById('mDesc').textContent = game.gamedesc;
-            document.getElementById('mMaker').textContent = "by " + game.gamemaker;
-            document.getElementById('mDate').textContent = game.gamecreated;
-            
-            const img = document.getElementById('mImage');
-            img.src = game.gameimage || 'https://placehold.co/400x300?text=No+Image';
-            
-            const btn = document.getElementById('mPlayBtn');
-            btn.onclick = () => {
-                // Downloading the map file or launching protocol
-                window.open(game.gamemaplink, '_blank');
-            };
-
-            document.getElementById('gameModal').style.display = 'flex';
+        // Modal logic
+        let activeGame = null;
+        function openGameModal(id){
+            const g = games.find(x=>x.id===id);
+            if(!g) return;
+            activeGame = g;
+            modalTitle.textContent = g.title;
+            modalThumb.textContent = g.thumbText;
+            modalCreator.textContent = 'by ' + g.creator;
+            modalDesc.textContent = g.desc;
+            modalPlayers.textContent = g.players + ' playing';
+            modalRoot.style.display = 'flex';
+            modalRoot.setAttribute('aria-hidden','false');
+        }
+        function closeGameModal(){
+            modalRoot.style.display = 'none';
+            modalRoot.setAttribute('aria-hidden','true');
+            activeGame = null;
         }
 
-        function closeModal() {
-            document.getElementById('gameModal').style.display = 'none';
-        }
-
-        // --- 6. SETTINGS LOGIC ---
-        const statusEl = document.getElementById('settingsStatus');
-
-        function updateUsername() {
-            const newName = document.getElementById('newUsername').value.trim();
-            if (newName.length < 3) {
-                statusEl.textContent = "Name too short."; statusEl.style.color = "red"; return;
+        // Play action
+        playBtn.addEventListener('click', ()=>{
+            if(!activeGame) return;
+            // Simulate launching: navigate or open new window. Here we open a new tab with playUrl.
+            if(activeGame.playUrl && activeGame.playUrl !== '#'){
+                window.open(activeGame.playUrl, '_blank');
+            } else {
+                // Demo fallback
+                alert('Launching "' + activeGame.title + '"...');
             }
-            
-            PlayFabCall('/Client/UpdateUserTitleDisplayName', { DisplayName: newName }, (res) => {
-                statusEl.textContent = "Username updated!"; statusEl.style.color = "green";
-                fetchProfile(); // Refresh header name
-            }, (err) => {
-                statusEl.textContent = "Error: " + (err.errorMessage || "Failed"); statusEl.style.color = "red";
+        });
+
+        modalCloseBtn.addEventListener('click', closeGameModal);
+        closeBtn.addEventListener('click', closeGameModal);
+        modalRoot.addEventListener('click', (e)=>{
+            if(e.target === modalRoot) closeGameModal();
+        });
+
+        // Tabs switching (only changes main content area for demo)
+        topTabs.forEach(tab=>{
+            tab.addEventListener('click', ()=>{
+                topTabs.forEach(t=>t.classList.remove('active'));
+                tab.classList.add('active');
+                const key = tab.getAttribute('data-tab');
+                switch(key){
+                    case 'home':
+                        contentHome.querySelector('h1').textContent = 'Welcome to BLOX';
+                        renderGames();
+                        break;
+                    case 'avatar':
+                        contentHome.querySelector('h1').textContent = 'Avatar';
+                        contentHome.querySelector('.subtitle').textContent = 'Customize your avatar (demo)';
+                        gamesList.innerHTML = '<div class="small">Avatar editor not implemented in demo.</div>';
+                        break;
+                    case 'games':
+                        contentHome.querySelector('h1').textContent = 'Games';
+                        contentHome.querySelector('.subtitle').textContent = 'Browse and play games';
+                        renderGames();
+                        break;
+                    case 'download':
+                        window.location.href = 'download.html';
+                        break;
+                    case 'settings':
+                        contentHome.querySelector('h1').textContent = 'Settings';
+                        contentHome.querySelector('.subtitle').textContent = 'Account & client settings';
+                        gamesList.innerHTML = '<div class="small">Settings panel not implemented in demo.</div>';
+                        break;
+                }
             });
-        }
+        });
 
-        function updatePassword() {
-            const oldPass = document.getElementById('oldPass').value;
-            const newPass = document.getElementById('newPass').value;
-            
-            if (newPass.length < 6) {
-                statusEl.textContent = "New password must be > 6 chars."; statusEl.style.color = "red"; return;
-            }
+        // Quick side buttons
+        document.getElementById('openGamesBtn').addEventListener('click', ()=>{
+            document.querySelector('li[data-tab="games"]').click();
+        });
+        document.getElementById('openAvatarBtn').addEventListener('click', ()=>{
+            document.querySelector('li[data-tab="avatar"]').click();
+        });
 
-            PlayFabCall('/Client/UpdateUserPassword', { OldPassword: oldPass, NewPassword: newPass }, (res) => {
-                statusEl.textContent = "Password changed successfully!"; statusEl.style.color = "green";
-                document.getElementById('oldPass').value = '';
-                document.getElementById('newPass').value = '';
-            }, (err) => {
-                statusEl.textContent = "Error: " + (err.errorMessage || "Check current password"); statusEl.style.color = "red";
-            });
-        }
-
-        function logout() {
-            localStorage.removeItem('playfab_session');
-            localStorage.removeItem('playfab_id');
-            window.location.href = 'index.html';
-        }
-
-        // --- TABS LOGIC ---
-        function switchTab(tabName) {
-            // Hide all panels
-            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.tabs li').forEach(t => t.classList.remove('active'));
-            
-            // Show selected
-            document.getElementById('panel-' + tabName).classList.add('active');
-            document.getElementById('tab-' + tabName).classList.add('active');
-        }
+        // Init
+        renderUsername();
+        renderGames();
     </script>
 </body>
 </html>
