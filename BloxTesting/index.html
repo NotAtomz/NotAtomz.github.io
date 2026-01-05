@@ -68,9 +68,9 @@
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn.alt { background: #fff; color: #1b2736; border: 1px solid var(--border); font-weight: 600; }
         .links { margin-top: 10px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
-        a { color: #1b73b8; text-decoration: none; }
+        a { color: #1b73b8; text-decoration: none; cursor: pointer; }
         .small { font-size: 12px; color: var(--muted); }
-        .signup {
+        .signup, .recovery {
             margin-top: 12px; padding: 12px; border-radius: 3px; background: #fff; border: 1px dashed var(--border);
         }
         @media (max-width: 880px) {
@@ -99,6 +99,7 @@
             </section>
 
             <aside class="login-panel">
+                <!-- LOGIN SECTION -->
                 <div id="loginSection">
                     <h2>Account Login</h2>
                     <div id="loginStatus" class="status-msg"></div>
@@ -113,17 +114,18 @@
                         </div>
                         <div class="actions">
                             <button id="loginBtn" class="btn" type="submit">Log In</button>
-                            <button class="btn alt" type="button" onclick="showSignup()">Create Account</button>
+                            <button class="btn alt" type="button" onclick="showPanel('signupSection')">Create Account</button>
                         </div>
                         <div class="links">
-                            <a href="#" onclick="alert('Please reset your password in the main game client.');return false;">Forgot Password?</a>
+                            <a onclick="showPanel('recoverySection')">Forgot Password?</a>
                             <span class="small">Remember me <input id="remember" type="checkbox" checked style="vertical-align:middle"></span>
                         </div>
                     </form>
                 </div>
 
+                <!-- SIGNUP SECTION -->
                 <div id="signupSection" class="signup" style="display:none">
-                    <h2 style="font-size:14px">Register New Account</h2>
+                    <h2 style="font-size:14px; margin-top:0;">Register New Account</h2>
                     <div id="signupStatus" class="status-msg"></div>
                     <form id="signupForm">
                         <div class="field">
@@ -140,7 +142,24 @@
                         </div>
                         <div class="actions">
                             <button id="signupBtn" class="btn" type="submit">Sign Up</button>
-                            <button class="btn alt" type="button" onclick="hideSignup()">Cancel</button>
+                            <button class="btn alt" type="button" onclick="showPanel('loginSection')">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- PASSWORD RECOVERY SECTION -->
+                <div id="recoverySection" class="recovery" style="display:none">
+                    <h2 style="font-size:14px; margin-top:0;">Reset Password</h2>
+                    <p class="small" style="margin-bottom:10px;">Enter your email to receive a reset link.</p>
+                    <div id="recoveryStatus" class="status-msg"></div>
+                    <form id="recoveryForm">
+                        <div class="field">
+                            <label for="recoveryEmail">Email Address</label>
+                            <input id="recoveryEmail" type="email" required />
+                        </div>
+                        <div class="actions">
+                            <button id="recoveryBtn" class="btn" type="submit">Send Email</button>
+                            <button class="btn alt" type="button" onclick="showPanel('loginSection')">Back</button>
                         </div>
                     </form>
                 </div>
@@ -149,31 +168,39 @@
     </main>
 
     <script>
-        // 1. Configure PlayFab
-        PlayFab.settings.titleId = "166CEA";
+        // Use a flag to ensure PlayFab is ready
+        let playFabReady = false;
 
         const loginForm = document.getElementById('loginForm');
         const signupForm = document.getElementById('signupForm');
+        const recoveryForm = document.getElementById('recoveryForm');
+        
         const loginStatus = document.getElementById('loginStatus');
         const signupStatus = document.getElementById('signupStatus');
+        const recoveryStatus = document.getElementById('recoveryStatus');
 
-        // Check for existing session on load
         window.onload = () => {
+            // Check if PlayFab loaded correctly
+            if (typeof PlayFab !== 'undefined' && PlayFab.PlayFabClientAPI) {
+                PlayFab.settings.titleId = "166CEA";
+                playFabReady = true;
+            } else {
+                setStatus(loginStatus, "Error: PlayFab SDK failed to load. Please refresh.");
+            }
+
             const savedSession = localStorage.getItem('playfab_session');
             if (savedSession) {
-                // In a real app, you'd verify the ticket. For this demo, we redirect.
                 window.location.href = 'home.html';
             }
         };
 
-        function showSignup() {
-            document.getElementById('loginSection').style.display = 'none';
-            document.getElementById('signupSection').style.display = 'block';
-        }
-
-        function hideSignup() {
-            document.getElementById('loginSection').style.display = 'block';
-            document.getElementById('signupSection').style.display = 'none';
+        function showPanel(panelId) {
+            const panels = ['loginSection', 'signupSection', 'recoverySection'];
+            panels.forEach(id => {
+                document.getElementById(id).style.display = (id === panelId) ? 'block' : 'none';
+            });
+            // Clear statuses when switching
+            [loginStatus, signupStatus, recoveryStatus].forEach(el => el.style.display = 'none');
         }
 
         function setStatus(el, msg, isError = true) {
@@ -182,7 +209,6 @@
             el.style.display = 'block';
         }
 
-        // 2. Mirror Unity Validation Logic
         function validateUsername(username, statusEl) {
             if (!username || username.length === 0) {
                 setStatus(statusEl, "Username cannot be empty.");
@@ -196,13 +222,11 @@
                 setStatus(statusEl, "Username cannot exceed 16 characters.");
                 return false;
             }
-            // Regex: letters, numbers, underscore
             const regex = /^[a-zA-Z0-9_]+$/;
             if (!regex.test(username)) {
                 setStatus(statusEl, "Username can only contain letters, numbers, and one underscore.");
                 return false;
             }
-            // Only one underscore
             const underscoreCount = (username.match(/_/g) || []).length;
             if (underscoreCount > 1) {
                 setStatus(statusEl, "Username can only contain one underscore.");
@@ -211,9 +235,10 @@
             return true;
         }
 
-        // 3. Login Logic
         loginForm.onsubmit = (e) => {
             e.preventDefault();
+            if (!playFabReady) return;
+
             const user = document.getElementById('user').value.trim();
             const pass = document.getElementById('pass').value;
             const remember = document.getElementById('remember').checked;
@@ -229,7 +254,7 @@
             document.getElementById('loginBtn').disabled = true;
             setStatus(loginStatus, "Logging in...", false);
 
-            PlayFabClientAPI.LoginWithPlayFab(loginRequest, (result, error) => {
+            PlayFab.PlayFabClientAPI.LoginWithPlayFab(loginRequest, (result, error) => {
                 document.getElementById('loginBtn').disabled = false;
                 if (result) {
                     setStatus(loginStatus, "Success! Redirecting...", false);
@@ -237,16 +262,17 @@
                         localStorage.setItem('playfab_session', result.data.SessionTicket);
                         localStorage.setItem('playfab_id', result.data.PlayFabId);
                     }
-                    setTimeout(() => { window.location.href = 'home.html'; }, 1000);
+                    setTimeout(() => { window.location.href = 'home.html'; }, 800);
                 } else {
-                    setStatus(loginStatus, "Login failed: " + error.errorMessage);
+                    setStatus(loginStatus, "Login failed: " + (error ? error.errorMessage : "Unknown error"));
                 }
             });
         };
 
-        // 4. Signup Logic
         signupForm.onsubmit = (e) => {
             e.preventDefault();
+            if (!playFabReady) return;
+
             const user = document.getElementById('newUser').value.trim();
             const email = document.getElementById('newEmail').value.trim();
             const pass = document.getElementById('newPass').value;
@@ -268,13 +294,38 @@
             document.getElementById('signupBtn').disabled = true;
             setStatus(signupStatus, "Creating account...", false);
 
-            PlayFabClientAPI.RegisterPlayFabUser(signupRequest, (result, error) => {
+            PlayFab.PlayFabClientAPI.RegisterPlayFabUser(signupRequest, (result, error) => {
                 document.getElementById('signupBtn').disabled = false;
                 if (result) {
                     setStatus(signupStatus, "Account created! You can now log in.", false);
-                    setTimeout(() => { hideSignup(); }, 2000);
+                    setTimeout(() => { showPanel('loginSection'); }, 2000);
                 } else {
-                    setStatus(signupStatus, "Sign up failed: " + error.errorMessage);
+                    setStatus(signupStatus, "Sign up failed: " + (error ? error.errorMessage : "Unknown error"));
+                }
+            });
+        };
+
+        recoveryForm.onsubmit = (e) => {
+            e.preventDefault();
+            if (!playFabReady) return;
+
+            const email = document.getElementById('recoveryEmail').value.trim();
+            const recoveryBtn = document.getElementById('recoveryBtn');
+
+            recoveryBtn.disabled = true;
+            setStatus(recoveryStatus, "Sending request...", false);
+
+            const recoveryRequest = {
+                Email: email,
+                TitleId: PlayFab.settings.titleId
+            };
+
+            PlayFab.PlayFabClientAPI.SendAccountRecoveryEmail(recoveryRequest, (result, error) => {
+                recoveryBtn.disabled = false;
+                if (result) {
+                    setStatus(recoveryStatus, "Success! Check your email for a reset link.", false);
+                } else {
+                    setStatus(recoveryStatus, "Failed: " + (error ? error.errorMessage : "Unknown error"));
                 }
             });
         };
