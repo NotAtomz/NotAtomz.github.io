@@ -4,8 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Beyond Limits On Xtreme - Login</title>
-    <!-- PlayFab JavaScript SDK with defer to ensure proper loading order -->
-    <script src="https://download.playfab.com/PlayFabClientApi.js" defer></script>
     <style>
         :root {
             --bg: #e9eef5;
@@ -168,7 +166,35 @@
     </main>
 
     <script>
-        let playFabReady = false;
+        // --- CUSTOM PLAYFAB CLIENT (No external files needed) ---
+        const GameTitleId = "166CEA";
+
+        const PlayFab = {
+            Call: function(path, requestData, onSuccess, onError) {
+                const url = `https://${GameTitleId}.playfabapi.com${path}`;
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-PlayFabSDK': 'Custom-Web-1.0'
+                    },
+                    body: JSON.stringify(requestData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200 && data.data) {
+                        onSuccess(data);
+                    } else {
+                        onError(data);
+                    }
+                })
+                .catch(err => {
+                    onError({ errorMessage: "Network error. Please check your connection." });
+                });
+            }
+        };
+
+        // --- UI LOGIC ---
 
         const loginForm = document.getElementById('loginForm');
         const signupForm = document.getElementById('signupForm');
@@ -178,37 +204,8 @@
         const signupStatus = document.getElementById('signupStatus');
         const recoveryStatus = document.getElementById('recoveryStatus');
 
-        // Function to initialize PlayFab once the script is actually available
-        function initPlayFab() {
-            if (typeof PlayFab !== 'undefined' && PlayFab.PlayFabClientAPI) {
-                PlayFab.settings.titleId = "166CEA";
-                playFabReady = true;
-                // Clear any error message that might have shown up early
-                if (loginStatus.textContent.includes("SDK failed")) {
-                    loginStatus.style.display = 'none';
-                }
-            }
-        }
-
         window.onload = () => {
-            // Try to init immediately
-            initPlayFab();
-
-            // If it didn't work, set an interval to check every 500ms for a few seconds
-            if (!playFabReady) {
-                let attempts = 0;
-                const checkInterval = setInterval(() => {
-                    attempts++;
-                    initPlayFab();
-                    if (playFabReady || attempts > 10) {
-                        clearInterval(checkInterval);
-                        if (!playFabReady) {
-                            setStatus(loginStatus, "Error: PlayFab SDK failed to load. Please check your internet connection and refresh.");
-                        }
-                    }
-                }, 500);
-            }
-
+            // Check for saved login
             const savedSession = localStorage.getItem('playfab_session');
             if (savedSession) {
                 window.location.href = 'home.html';
@@ -220,6 +217,7 @@
             panels.forEach(id => {
                 document.getElementById(id).style.display = (id === panelId) ? 'block' : 'none';
             });
+            // Reset status messages
             [loginStatus, signupStatus, recoveryStatus].forEach(el => el.style.display = 'none');
         }
 
@@ -255,47 +253,43 @@
             return true;
         }
 
+        // --- EVENT HANDLERS ---
+
+        // Login
         loginForm.onsubmit = (e) => {
             e.preventDefault();
-            if (!playFabReady) {
-                setStatus(loginStatus, "Please wait for the page to finish loading...");
-                return;
-            }
-
             const user = document.getElementById('user').value.trim();
             const pass = document.getElementById('pass').value;
             const remember = document.getElementById('remember').checked;
 
             if (!validateUsername(user, loginStatus)) return;
 
-            const loginRequest = {
-                TitleId: PlayFab.settings.titleId,
-                Username: user,
-                Password: pass
-            };
-
             document.getElementById('loginBtn').disabled = true;
             setStatus(loginStatus, "Logging in...", false);
 
-            PlayFab.PlayFabClientAPI.LoginWithPlayFab(loginRequest, (result, error) => {
+            PlayFab.Call('/Client/LoginWithPlayFab', {
+                TitleId: GameTitleId,
+                Username: user,
+                Password: pass
+            }, 
+            (result) => { // Success
                 document.getElementById('loginBtn').disabled = false;
-                if (result) {
-                    setStatus(loginStatus, "Success! Redirecting...", false);
-                    if (remember) {
-                        localStorage.setItem('playfab_session', result.data.SessionTicket);
-                        localStorage.setItem('playfab_id', result.data.PlayFabId);
-                    }
-                    setTimeout(() => { window.location.href = 'home.html'; }, 800);
-                } else {
-                    setStatus(loginStatus, "Login failed: " + (error ? error.errorMessage : "Unknown error"));
+                setStatus(loginStatus, "Success! Redirecting...", false);
+                if (remember) {
+                    localStorage.setItem('playfab_session', result.data.SessionTicket);
+                    localStorage.setItem('playfab_id', result.data.PlayFabId);
                 }
+                setTimeout(() => { window.location.href = 'home.html'; }, 800);
+            }, 
+            (error) => { // Error
+                document.getElementById('loginBtn').disabled = false;
+                setStatus(loginStatus, "Login failed: " + (error.errorMessage || "Unknown Error"));
             });
         };
 
+        // Signup
         signupForm.onsubmit = (e) => {
             e.preventDefault();
-            if (!playFabReady) return;
-
             const user = document.getElementById('newUser').value.trim();
             const email = document.getElementById('newEmail').value.trim();
             const pass = document.getElementById('newPass').value;
@@ -306,50 +300,47 @@
                 return;
             }
 
-            const signupRequest = {
-                TitleId: PlayFab.settings.titleId,
+            document.getElementById('signupBtn').disabled = true;
+            setStatus(signupStatus, "Creating account...", false);
+
+            PlayFab.Call('/Client/RegisterPlayFabUser', {
+                TitleId: GameTitleId,
                 Username: user,
                 Email: email,
                 Password: pass,
                 RequireBothUsernameAndEmail: true
-            };
-
-            document.getElementById('signupBtn').disabled = true;
-            setStatus(signupStatus, "Creating account...", false);
-
-            PlayFab.PlayFabClientAPI.RegisterPlayFabUser(signupRequest, (result, error) => {
+            }, 
+            (result) => {
                 document.getElementById('signupBtn').disabled = false;
-                if (result) {
-                    setStatus(signupStatus, "Account created! You can now log in.", false);
-                    setTimeout(() => { showPanel('loginSection'); }, 2000);
-                } else {
-                    setStatus(signupStatus, "Sign up failed: " + (error ? error.errorMessage : "Unknown error"));
-                }
+                setStatus(signupStatus, "Account created! You can now log in.", false);
+                setTimeout(() => { showPanel('loginSection'); }, 2000);
+            }, 
+            (error) => {
+                document.getElementById('signupBtn').disabled = false;
+                setStatus(signupStatus, "Sign up failed: " + (error.errorMessage || "Unknown Error"));
             });
         };
 
+        // Recovery
         recoveryForm.onsubmit = (e) => {
             e.preventDefault();
-            if (!playFabReady) return;
-
             const email = document.getElementById('recoveryEmail').value.trim();
             const recoveryBtn = document.getElementById('recoveryBtn');
 
             recoveryBtn.disabled = true;
             setStatus(recoveryStatus, "Sending request...", false);
 
-            const recoveryRequest = {
-                Email: email,
-                TitleId: PlayFab.settings.titleId
-            };
-
-            PlayFab.PlayFabClientAPI.SendAccountRecoveryEmail(recoveryRequest, (result, error) => {
+            PlayFab.Call('/Client/SendAccountRecoveryEmail', {
+                TitleId: GameTitleId,
+                Email: email
+            }, 
+            (result) => {
                 recoveryBtn.disabled = false;
-                if (result) {
-                    setStatus(recoveryStatus, "Success! Check your email for a reset link.", false);
-                } else {
-                    setStatus(recoveryStatus, "Failed: " + (error ? error.errorMessage : "Unknown error"));
-                }
+                setStatus(recoveryStatus, "Success! Check your email for a reset link.", false);
+            }, 
+            (error) => {
+                recoveryBtn.disabled = false;
+                setStatus(recoveryStatus, "Failed: " + (error.errorMessage || "Unknown Error"));
             });
         };
     </script>
