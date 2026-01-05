@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Beyond Limits On Xtreme - Login</title>
-    <!-- PlayFab JavaScript SDK -->
-    <script src="https://download.playfab.com/PlayFabClientApi.js"></script>
+    <!-- PlayFab JavaScript SDK with defer to ensure proper loading order -->
+    <script src="https://download.playfab.com/PlayFabClientApi.js" defer></script>
     <style>
         :root {
             --bg: #e9eef5;
@@ -168,7 +168,6 @@
     </main>
 
     <script>
-        // Use a flag to ensure PlayFab is ready
         let playFabReady = false;
 
         const loginForm = document.getElementById('loginForm');
@@ -179,13 +178,35 @@
         const signupStatus = document.getElementById('signupStatus');
         const recoveryStatus = document.getElementById('recoveryStatus');
 
-        window.onload = () => {
-            // Check if PlayFab loaded correctly
+        // Function to initialize PlayFab once the script is actually available
+        function initPlayFab() {
             if (typeof PlayFab !== 'undefined' && PlayFab.PlayFabClientAPI) {
                 PlayFab.settings.titleId = "166CEA";
                 playFabReady = true;
-            } else {
-                setStatus(loginStatus, "Error: PlayFab SDK failed to load. Please refresh.");
+                // Clear any error message that might have shown up early
+                if (loginStatus.textContent.includes("SDK failed")) {
+                    loginStatus.style.display = 'none';
+                }
+            }
+        }
+
+        window.onload = () => {
+            // Try to init immediately
+            initPlayFab();
+
+            // If it didn't work, set an interval to check every 500ms for a few seconds
+            if (!playFabReady) {
+                let attempts = 0;
+                const checkInterval = setInterval(() => {
+                    attempts++;
+                    initPlayFab();
+                    if (playFabReady || attempts > 10) {
+                        clearInterval(checkInterval);
+                        if (!playFabReady) {
+                            setStatus(loginStatus, "Error: PlayFab SDK failed to load. Please check your internet connection and refresh.");
+                        }
+                    }
+                }, 500);
             }
 
             const savedSession = localStorage.getItem('playfab_session');
@@ -199,7 +220,6 @@
             panels.forEach(id => {
                 document.getElementById(id).style.display = (id === panelId) ? 'block' : 'none';
             });
-            // Clear statuses when switching
             [loginStatus, signupStatus, recoveryStatus].forEach(el => el.style.display = 'none');
         }
 
@@ -237,7 +257,10 @@
 
         loginForm.onsubmit = (e) => {
             e.preventDefault();
-            if (!playFabReady) return;
+            if (!playFabReady) {
+                setStatus(loginStatus, "Please wait for the page to finish loading...");
+                return;
+            }
 
             const user = document.getElementById('user').value.trim();
             const pass = document.getElementById('pass').value;
