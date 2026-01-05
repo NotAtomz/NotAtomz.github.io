@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Beyond Limits On Xtreme - Login</title>
+    <!-- PlayFab JavaScript SDK -->
+    <script src="https://download.playfab.com/PlayFabClientApi.js"></script>
+    <style>
+        :root {
+            --bg: #e9eef5;
+            --panel: #f7f9fc;
+            --muted: #8b98a6;
+            --accent: #d32f2f;
+            --input: #ffffff;
+            --border: #c9d4df;
+            --error: #d32f2f;
+            --success: #2e7d32;
+            font-family: "Trebuchet MS", Tahoma, Arial, sans-serif;
+        }
+        html, body { height: 100%; margin: 0; background: linear-gradient(180deg, var(--bg), #cfd9e6 60%); }
+        header {
+            height: 66px;
+            background: linear-gradient(#f5f7fa, #e6eef9);
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 18px; box-sizing: border-box;
+        }
+        .logo {
+            display: flex; align-items: center; gap: 10px; font-weight: 700; color: #222;
+            letter-spacing: 2px; font-size: 20px;
+        }
+        .logo-mark {
+            width: 68px; height: 30px; background: var(--accent); display: flex;
+            align-items: center; justify-content: center; color: #fff; font-weight: 800;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.05);
+            transform: skewX(-6deg);
+        }
+        main { display: flex; justify-content: center; padding-top: 56px; }
+        .container { width: 980px; max-width: 95%; display: flex; gap: 28px; align-items: flex-start; }
+        .hero {
+            flex: 1; background: linear-gradient(180deg, #fff, #f2f7ff);
+            border: 1px solid var(--border); padding: 34px; border-radius: 4px;
+            box-shadow: 0 6px 18px rgba(18, 35, 64, 0.06);
+        }
+        .hero h1 { margin: 0 0 8px 0; font-size: 28px; color: #1b2736; }
+        .hero p { margin: 0; color: var(--muted); line-height: 1.4; }
+        .login-panel {
+            width: 320px; background: var(--panel); border: 1px solid var(--border);
+            padding: 18px; border-radius: 4px; box-shadow: 0 4px 10px rgba(18, 35, 64, 0.06);
+        }
+        .login-panel h2 { margin: 0 0 12px 0; font-size: 16px; color: #1b2736; }
+        .field { display: flex; flex-direction: column; margin-bottom: 10px; }
+        .field label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+        .field input {
+            padding: 9px 10px; border: 1px solid var(--border); border-radius: 2px;
+            background: var(--input); font-size: 14px;
+        }
+        .status-msg { font-size: 12px; margin-bottom: 10px; min-height: 1.2em; display: none; }
+        .status-error { color: var(--error); display: block; }
+        .status-success { color: var(--success); display: block; }
+        .actions { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+        .btn {
+            background: #1b73b8; color: #fff; border: none; padding: 9px 12px; border-radius: 3px;
+            cursor: pointer; font-weight: 700; box-shadow: inset 0 -2px rgba(0,0,0,0.08);
+            transition: opacity 0.2s;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn.alt { background: #fff; color: #1b2736; border: 1px solid var(--border); font-weight: 600; }
+        .links { margin-top: 10px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+        a { color: #1b73b8; text-decoration: none; }
+        .small { font-size: 12px; color: var(--muted); }
+        .signup {
+            margin-top: 12px; padding: 12px; border-radius: 3px; background: #fff; border: 1px dashed var(--border);
+        }
+        @media (max-width: 880px) {
+            .container { flex-direction: column; }
+            .login-panel { width: 100%; box-sizing: border-box; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <div class="logo-mark">BLOX</div>
+            <div>
+                <div style="font-size:12px;color:var(--muted);letter-spacing:0">PLAY & CREATE</div>
+                <div style="font-weight:800;font-size:14px">Beyond Limits On Xtreme</div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <section class="hero">
+                <h1>Welcome to BLOX</h1>
+                <p>Build, play and explore user-created worlds. Sign in to access games and creations.</p>
+                <div style="margin-top:24px" class="small">Already have an account in the Unity game? Use those same credentials here to sync your progress.</div>
+            </section>
+
+            <aside class="login-panel">
+                <div id="loginSection">
+                    <h2>Account Login</h2>
+                    <div id="loginStatus" class="status-msg"></div>
+                    <form id="loginForm">
+                        <div class="field">
+                            <label for="user">Username</label>
+                            <input id="user" type="text" autocomplete="username" required />
+                        </div>
+                        <div class="field">
+                            <label for="pass">Password</label>
+                            <input id="pass" type="password" autocomplete="current-password" required />
+                        </div>
+                        <div class="actions">
+                            <button id="loginBtn" class="btn" type="submit">Log In</button>
+                            <button class="btn alt" type="button" onclick="showSignup()">Create Account</button>
+                        </div>
+                        <div class="links">
+                            <a href="#" onclick="alert('Please reset your password in the main game client.');return false;">Forgot Password?</a>
+                            <span class="small">Remember me <input id="remember" type="checkbox" checked style="vertical-align:middle"></span>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="signupSection" class="signup" style="display:none">
+                    <h2 style="font-size:14px">Register New Account</h2>
+                    <div id="signupStatus" class="status-msg"></div>
+                    <form id="signupForm">
+                        <div class="field">
+                            <label for="newUser">Username (3-16 chars)</label>
+                            <input id="newUser" type="text" required />
+                        </div>
+                        <div class="field">
+                            <label for="newEmail">Email Address</label>
+                            <input id="newEmail" type="email" required />
+                        </div>
+                        <div class="field">
+                            <label for="newPass">Password (min 6 chars)</label>
+                            <input id="newPass" type="password" required />
+                        </div>
+                        <div class="actions">
+                            <button id="signupBtn" class="btn" type="submit">Sign Up</button>
+                            <button class="btn alt" type="button" onclick="hideSignup()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <script>
+        // 1. Configure PlayFab
+        PlayFab.settings.titleId = "166CEA";
+
+        const loginForm = document.getElementById('loginForm');
+        const signupForm = document.getElementById('signupForm');
+        const loginStatus = document.getElementById('loginStatus');
+        const signupStatus = document.getElementById('signupStatus');
+
+        // Check for existing session on load
+        window.onload = () => {
+            const savedSession = localStorage.getItem('playfab_session');
+            if (savedSession) {
+                // In a real app, you'd verify the ticket. For this demo, we redirect.
+                window.location.href = 'home.html';
+            }
+        };
+
+        function showSignup() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('signupSection').style.display = 'block';
+        }
+
+        function hideSignup() {
+            document.getElementById('loginSection').style.display = 'block';
+            document.getElementById('signupSection').style.display = 'none';
+        }
+
+        function setStatus(el, msg, isError = true) {
+            el.textContent = msg;
+            el.className = 'status-msg ' + (isError ? 'status-error' : 'status-success');
+            el.style.display = 'block';
+        }
+
+        // 2. Mirror Unity Validation Logic
+        function validateUsername(username, statusEl) {
+            if (!username || username.length === 0) {
+                setStatus(statusEl, "Username cannot be empty.");
+                return false;
+            }
+            if (username.length < 3) {
+                setStatus(statusEl, "Username cannot be below 3 characters.");
+                return false;
+            }
+            if (username.length > 16) {
+                setStatus(statusEl, "Username cannot exceed 16 characters.");
+                return false;
+            }
+            // Regex: letters, numbers, underscore
+            const regex = /^[a-zA-Z0-9_]+$/;
+            if (!regex.test(username)) {
+                setStatus(statusEl, "Username can only contain letters, numbers, and one underscore.");
+                return false;
+            }
+            // Only one underscore
+            const underscoreCount = (username.match(/_/g) || []).length;
+            if (underscoreCount > 1) {
+                setStatus(statusEl, "Username can only contain one underscore.");
+                return false;
+            }
+            return true;
+        }
+
+        // 3. Login Logic
+        loginForm.onsubmit = (e) => {
+            e.preventDefault();
+            const user = document.getElementById('user').value.trim();
+            const pass = document.getElementById('pass').value;
+            const remember = document.getElementById('remember').checked;
+
+            if (!validateUsername(user, loginStatus)) return;
+
+            const loginRequest = {
+                TitleId: PlayFab.settings.titleId,
+                Username: user,
+                Password: pass
+            };
+
+            document.getElementById('loginBtn').disabled = true;
+            setStatus(loginStatus, "Logging in...", false);
+
+            PlayFabClientAPI.LoginWithPlayFab(loginRequest, (result, error) => {
+                document.getElementById('loginBtn').disabled = false;
+                if (result) {
+                    setStatus(loginStatus, "Success! Redirecting...", false);
+                    if (remember) {
+                        localStorage.setItem('playfab_session', result.data.SessionTicket);
+                        localStorage.setItem('playfab_id', result.data.PlayFabId);
+                    }
+                    setTimeout(() => { window.location.href = 'home.html'; }, 1000);
+                } else {
+                    setStatus(loginStatus, "Login failed: " + error.errorMessage);
+                }
+            });
+        };
+
+        // 4. Signup Logic
+        signupForm.onsubmit = (e) => {
+            e.preventDefault();
+            const user = document.getElementById('newUser').value.trim();
+            const email = document.getElementById('newEmail').value.trim();
+            const pass = document.getElementById('newPass').value;
+
+            if (!validateUsername(user, signupStatus)) return;
+            if (pass.length < 6) {
+                setStatus(signupStatus, "Password must be at least 6 characters.");
+                return;
+            }
+
+            const signupRequest = {
+                TitleId: PlayFab.settings.titleId,
+                Username: user,
+                Email: email,
+                Password: pass,
+                RequireBothUsernameAndEmail: true
+            };
+
+            document.getElementById('signupBtn').disabled = true;
+            setStatus(signupStatus, "Creating account...", false);
+
+            PlayFabClientAPI.RegisterPlayFabUser(signupRequest, (result, error) => {
+                document.getElementById('signupBtn').disabled = false;
+                if (result) {
+                    setStatus(signupStatus, "Account created! You can now log in.", false);
+                    setTimeout(() => { hideSignup(); }, 2000);
+                } else {
+                    setStatus(signupStatus, "Sign up failed: " + error.errorMessage);
+                }
+            });
+        };
+    </script>
+</body>
+</html>
