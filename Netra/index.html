@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#050505" />
+  <title>Netra OS — Coming Soon</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --bg2: #0c0c0c;
+      --card: rgba(255,255,255,0.04);
+      --card-border: rgba(255,255,255,0.08);
+      --text: #f2f2f2;
+      --muted: #a8a8a8;
+      --accent: #bb86fc;
+      --accent2: #6dd6ff;
+      --shadow: 0 20px 60px rgba(0,0,0,0.45);
+      --radius: 24px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top, rgba(187,134,252,0.16), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(109,214,255,0.10), transparent 28%),
+        linear-gradient(180deg, var(--bg), var(--bg2));
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 72px 72px;
+      mask-image: radial-gradient(circle at center, black 35%, transparent 100%);
+      opacity: 0.45;
+    }
+
+    .wrap {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+
+    .logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(187,134,252,0.9), rgba(109,214,255,0.75));
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.10) inset;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .logo::after {
+      content: "";
+      position: absolute;
+      inset: 10px;
+      border-radius: 10px;
+      background: rgba(5,5,5,0.36);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--card-border);
+      color: var(--muted);
+      font-size: 14px;
+      backdrop-filter: blur(12px);
+    }
+
+    .hero {
+      min-height: calc(100vh - 88px);
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 26px;
+      align-items: center;
+      padding: 10px 0 40px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .hero-copy {
+      padding: 34px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(187,134,252,0.10);
+      color: #d8c6ff;
+      border: 1px solid rgba(187,134,252,0.16);
+      font-size: 14px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(44px, 8vw, 82px);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+    }
+
+    .highlight {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .lead {
+      margin: 20px 0 0;
+      max-width: 58ch;
+      font-size: clamp(16px, 2vw, 19px);
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .btn {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      padding: 14px 18px;
+      border-radius: 14px;
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text);
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--card-border);
+      transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn:hover { transform: translateY(-1px); background: rgba(255,255,255,0.085); }
+    .btn.primary {
+      background: linear-gradient(135deg, rgba(187,134,252,0.95), rgba(109,214,255,0.85));
+      border-color: transparent;
+      color: #090909;
+    }
+
+    .side {
+      padding: 24px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .preview {
+      aspect-ratio: 4 / 5;
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(187,134,252,0.22), transparent 28%),
+        radial-gradient(circle at 80% 30%, rgba(109,214,255,0.18), transparent 26%),
+        linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.025));
+      border: 1px solid var(--card-border);
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    .phone-ui {
+      position: absolute;
+      inset: 18px;
+      border-radius: 18px;
+      background: #040404;
+      border: 1px solid rgba(255,255,255,0.08);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .phone-top {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      color: #ddd;
+      font-size: 13px;
+    }
+
+    .dots { display: flex; gap: 6px; }
+    .dots span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.22);
+    }
+
+    .apps {
+      padding: 16px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      flex: 1;
+      align-content: start;
+    }
+
+    .app {
+      aspect-ratio: 1;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .footer-card {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 18px;
+    }
+
+    .stat {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .stat b {
+      display: block;
+      font-size: 22px;
+      margin-bottom: 4px;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .section {
+      padding: 0 0 44px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .card {
+      padding: 22px;
+      border-radius: 22px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      box-shadow: var(--shadow);
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .step {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .step strong { display: block; margin-bottom: 4px; }
+    .step span { color: var(--muted); font-size: 14px; }
+
+    .soon {
+      margin-top: 14px;
+      padding: 18px 20px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(187,134,252,0.14), rgba(109,214,255,0.10));
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #f1e8ff;
+      line-height: 1.6;
+    }
+
+    .pulse {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #7CFFB2;
+      box-shadow: 0 0 0 0 rgba(124,255,178,0.6);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(124,255,178,0.6); }
+      70% { box-shadow: 0 0 0 14px rgba(124,255,178,0); }
+      100% { box-shadow: 0 0 0 0 rgba(124,255,178,0); }
+    }
+
+    .fade-up {
+      animation: fadeUp 700ms ease both;
+    }
+
+    .fade-up.delay-1 { animation-delay: 120ms; }
+    .fade-up.delay-2 { animation-delay: 220ms; }
+    .fade-up.delay-3 { animation-delay: 320ms; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 920px) {
+      .hero { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+      .footer-card { grid-template-columns: 1fr; }
+      header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="fade-up">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <div>Netra OS</div>
+          <div style="color: var(--muted); font-size: 13px; font-weight: 500; margin-top: 2px;">Embedded web OS platform</div>
+        </div>
+      </div>
+      <div class="badge"><span class="pulse"></span> Coming soon</div>
+    </header>
+
+    <main class="hero">
+      <section class="panel hero-copy fade-up delay-1">
+        <div class="eyebrow">Local web interface • ESP32 powered • mobile-first</div>
+        <h1>Netra OS is<br><span class="highlight">coming soon.</span></h1>
+        <p class="lead">
+          Netra OS is a lightweight, browser-based interface for an ESP32 device. It is designed to feel like a modern mobile operating system while running locally over Wi‑Fi with no cloud required.
+        </p>
+        <p class="lead">
+          The project combines a polished app-style UI, device controls, live logs, settings, and hardware features into one compact experience that can be opened from a phone or tablet.
+        </p>
+        <div class="actions">
+          <a class="btn primary" href="#features">Explore features</a>
+          <a class="btn" href="#status">Project status</a>
+        </div>
+      </section>
+
+      <aside class="panel side fade-up delay-2">
+        <div class="preview" aria-label="Netra OS preview">
+          <div class="phone-ui">
+            <div class="phone-top">
+              <span>NETRA OS</span>
+              <div class="dots"><span></span><span></span><span></span></div>
+            </div>
+            <div class="apps">
+              <div class="app"></div>
+              <div class="app"></div>
+              <div class="app"></div>
+              <div class="app"></div>
+              <div class="app"></div>
+              <div class="app"></div>
+              <div class="app"></div>
+              <div class="app"></div>
+              <div class="app"></div>
+            </div>
+          </div>
+        </div>
+        <div class="footer-card">
+          <div class="stat"><b>ESP32</b><span>Local device host</span></div>
+          <div class="stat"><b>UI</b><span>Mobile-style web apps</span></div>
+          <div class="stat"><b>Live</b><span>Logs and controls</span></div>
+        </div>
+      </aside>
+    </main>
+
+    <section id="features" class="section">
+      <div class="grid">
+        <article class="card fade-up delay-1">
+          <h3>App-based interface</h3>
+          <p>Netra OS uses a phone-like layout with app windows, navigation controls, and smooth transitions to make the experience feel familiar on mobile devices.</p>
+        </article>
+        <article class="card fade-up delay-2">
+          <h3>Runs locally</h3>
+          <p>The system is designed to work over the ESP32’s own Wi‑Fi network, keeping everything self-contained and independent of internet connectivity.</p>
+        </article>
+        <article class="card fade-up delay-3">
+          <h3>Hardware features</h3>
+          <p>The platform can expose device tools, settings, logs, storage, and other embedded functions through a clean interface that feels like a mini operating system.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="status" class="section">
+      <div class="panel" style="padding: 24px;">
+        <div class="eyebrow">Status update</div>
+        <h2 style="margin: 0; font-size: clamp(28px, 5vw, 42px); letter-spacing: -0.03em;">Development is in progress.</h2>
+        <div class="soon">
+          The first public version of Netra OS is being prepared. More apps, better animations, device integrations, and system tools are planned for upcoming releases.
+        </div>
+        <div class="timeline">
+          <div class="step"><div><strong>Core UI</strong><span>Home screen, apps, and navigation</span></div><span>Done / expanding</span></div>
+          <div class="step"><div><strong>Device tools</strong><span>Logs, settings, and hardware pages</span></div><span>In progress</span></div>
+          <div class="step"><div><strong>Public release</strong><span>Website and project preview</span></div><span>Coming soon</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
