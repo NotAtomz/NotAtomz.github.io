@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#08090a">
+  <title>Realtime Audio Word Detector</title>
+  <style>
+    :root {
+      --bg: #08090a;
+      --panel: #121416;
+      --panel-soft: #181b1d;
+      --panel-raised: #202427;
+      --line: #31373b;
+      --line-soft: #24292c;
+      --text: #ece9de;
+      --muted: #aaa69b;
+      --faint: #737067;
+      --good: #b7d8ba;
+      --warn: #dfc07d;
+      --bad: #d98b8b;
+      --field: #c9c2a3;
+      --shadow: 0 18px 46px rgba(0, 0, 0, 0.36);
+      --radius: 8px;
+      --focus: 0 0 0 3px rgba(201, 194, 163, 0.26);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--bg);
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 180px),
+        var(--bg);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px);
+      background-size: 28px 28px;
+      opacity: 0.45;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 12px;
+      width: min(1040px, calc(100% - 20px));
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 12px 0 18px;
+    }
+
+    .topbar {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #101214;
+      box-shadow: var(--shadow);
+    }
+
+    .title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .title-block {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .kicker {
+      color: var(--field);
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: clamp(1.35rem, 5vw, 2rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .subhead {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.35;
+    }
+
+    .status-stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 32px;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--muted);
+      background: #0b0d0e;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--faint);
+    }
+
+    .status-pill.live {
+      color: var(--good);
+      border-color: rgba(183, 216, 186, 0.45);
+    }
+
+    .status-pill.live .dot {
+      background: var(--good);
+    }
+
+    .status-pill.warn {
+      color: var(--warn);
+      border-color: rgba(223, 192, 125, 0.45);
+    }
+
+    .status-pill.warn .dot {
+      background: var(--warn);
+    }
+
+    .status-pill.bad {
+      color: var(--bad);
+      border-color: rgba(217, 139, 139, 0.45);
+    }
+
+    .status-pill.bad .dot {
+      background: var(--bad);
+    }
+
+    .notice {
+      display: none;
+      padding: 10px 12px;
+      border: 1px solid rgba(223, 192, 125, 0.42);
+      border-radius: var(--radius);
+      color: #e6d7ac;
+      background: #18150e;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .notice.show {
+      display: block;
+    }
+
+    .notice.bad {
+      color: #e7b6b6;
+      border-color: rgba(217, 139, 139, 0.52);
+      background: #1b1010;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 310px minmax(0, 1fr);
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 48px;
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--line-soft);
+      background: #0f1112;
+    }
+
+    h2 {
+      color: var(--text);
+      font-size: 0.98rem;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .small-stat {
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .controls {
+      display: grid;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .button-grid .wide {
+      grid-column: 1 / -1;
+    }
+
+    button {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--text);
+      background: var(--panel-raised);
+      cursor: pointer;
+      transition: background 140ms ease, border-color 140ms ease, transform 140ms ease, opacity 140ms ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: #565d62;
+      background: #272c30;
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+    }
+
+    button:focus-visible,
+    input:focus-visible {
+      outline: none;
+      box-shadow: var(--focus);
+    }
+
+    .start {
+      color: #121512;
+      border-color: #b7d8ba;
+      background: var(--good);
+      font-weight: 700;
+    }
+
+    .start:hover:not(:disabled) {
+      background: #c3e2c5;
+      border-color: #c3e2c5;
+    }
+
+    .stop {
+      color: #1a1111;
+      border-color: #d98b8b;
+      background: var(--bad);
+      font-weight: 700;
+    }
+
+    .stop:hover:not(:disabled) {
+      background: #e1a0a0;
+      border-color: #e1a0a0;
+    }
+
+    .control-card {
+      display: grid;
+      gap: 9px;
+      padding: 10px;
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius);
+      background: var(--panel-soft);
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    label,
+    .label {
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.25;
+    }
+
+    .value {
+      color: var(--text);
+      font-size: 0.86rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--field);
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: var(--field);
+    }
+
+    .meter {
+      position: relative;
+      height: 10px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #0b0d0e;
+      border: 1px solid #252a2d;
+    }
+
+    .meter-fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 0%;
+      background: linear-gradient(90deg, #797462, var(--field), var(--good));
+      transition: width 90ms linear;
+    }
+
+    .signal-grid {
+      display: grid;
+      gap: 4px;
+    }
+
+    .grid-row {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 7px;
+      align-items: center;
+      min-height: 18px;
+      color: var(--faint);
+      font-size: 0.75rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .grid-line {
+      height: 10px;
+      border: 1px solid #262b2f;
+      border-radius: 999px;
+      background: #0b0d0e;
+    }
+
+    .grid-row.whisper .grid-line {
+      border-color: rgba(201, 194, 163, 0.28);
+    }
+
+    .grid-row.active {
+      color: var(--text);
+    }
+
+    .grid-row.active .grid-line {
+      background: var(--field);
+      border-color: var(--field);
+    }
+
+    .grid-row.peak .grid-line {
+      background: var(--good);
+      border-color: var(--good);
+    }
+
+    .feed-panel {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      min-height: 610px;
+    }
+
+    .feed {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      max-height: calc(100vh - 250px);
+      padding: 12px;
+      overflow-y: auto;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 130px),
+        #0b0d0e;
+      scroll-behavior: smooth;
+      scrollbar-color: #4b514f #101214;
+    }
+
+    .feed::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .feed::-webkit-scrollbar-track {
+      background: #101214;
+    }
+
+    .feed::-webkit-scrollbar-thumb {
+      border: 2px solid #101214;
+      border-radius: 999px;
+      background: #4b514f;
+    }
+
+    .empty {
+      margin: auto;
+      max-width: 340px;
+      color: var(--faint);
+      text-align: center;
+      line-height: 1.4;
+      font-size: 0.92rem;
+    }
+
+    .empty.hide {
+      display: none;
+    }
+
+    .message {
+      align-self: flex-start;
+      width: fit-content;
+      max-width: min(78%, 560px);
+      padding: 10px 11px;
+      border: 1px solid #343a3e;
+      border-radius: 8px 8px 8px 2px;
+      background: #1a1d20;
+      animation: messageIn 160ms ease both;
+    }
+
+    .message.final {
+      background: #20231f;
+      border-color: rgba(183, 216, 186, 0.34);
+    }
+
+    .message.interim {
+      color: #ded3ac;
+      background: #1c1a14;
+      border-color: rgba(223, 192, 125, 0.38);
+    }
+
+    .message.low {
+      opacity: 0.82;
+    }
+
+    @keyframes messageIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message-text {
+      overflow-wrap: anywhere;
+      font-size: 1rem;
+      line-height: 1.38;
+    }
+
+    .message-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .badge {
+      color: var(--field);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .message.final .badge {
+      color: var(--good);
+    }
+
+    .message.interim .badge {
+      color: var(--warn);
+    }
+
+    .canvas-wrap {
+      height: 176px;
+      border-top: 1px solid var(--line-soft);
+      background: #08090a;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 820px) {
+      .app {
+        width: min(100% - 14px, 680px);
+      }
+
+      .title-row {
+        display: grid;
+      }
+
+      .status-stack {
+        justify-content: flex-start;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .feed-panel {
+        min-height: 62vh;
+      }
+
+      .feed {
+        max-height: 52vh;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .button-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .button-grid .wide {
+        grid-column: auto;
+      }
+
+      .status-pill {
+        flex: 1 1 auto;
+        justify-content: center;
+      }
+
+      .message {
+        max-width: 92%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="title-row">
+        <div class="title-block">
+          <p class="kicker">Field hint app</p>
+          <h1>Realtime Audio Word Detector</h1>
+          <p class="subhead">A quiet-room word log for live microphone sessions.</p>
+        </div>
+        <div class="status-stack" aria-label="Session status">
+          <span class="status-pill" id="listenStatus"><span class="dot" aria-hidden="true"></span><span id="listenText">Idle</span></span>
+          <span class="status-pill" id="micStatus"><span class="dot" aria-hidden="true"></span><span id="micText">Mic Off</span></span>
+          <span class="status-pill" id="supportStatus"><span class="dot" aria-hidden="true"></span><span id="supportText">Checking</span></span>
+        </div>
+      </div>
+      <div class="notice" id="notice" role="status" aria-live="polite"></div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel">
+        <div class="panel-head">
+          <h2>Session</h2>
+          <span class="small-stat" id="sessionClock">00:00:00</span>
+        </div>
+        <div class="controls">
+          <div class="button-grid">
+            <button class="start" id="startButton" type="button">Start</button>
+            <button class="stop" id="stopButton" type="button" disabled>Stop</button>
+            <button class="wide" id="clearButton" type="button">Clear Chat</button>
+          </div>
+
+          <div class="control-card">
+            <div class="row">
+              <span class="label">Mic level</span>
+              <span class="value" id="levelValue">0%</span>
+            </div>
+            <div class="meter" aria-hidden="true">
+              <div class="meter-fill" id="levelFill"></div>
+            </div>
+          </div>
+
+          <div class="control-card">
+            <div class="row">
+              <label for="boostToggle">Whisper boost</label>
+              <input id="boostToggle" type="checkbox" checked>
+            </div>
+            <div class="row">
+              <label for="boostSlider">Boost amount</label>
+              <span class="value" id="boostValue">3.0x</span>
+            </div>
+            <input id="boostSlider" type="range" min="1" max="6" step="0.1" value="3">
+            <div class="row">
+              <label for="monitorToggle">Hear boosted mic</label>
+              <input id="monitorToggle" type="checkbox">
+            </div>
+          </div>
+
+          <div class="control-card">
+            <div class="row">
+              <label for="thresholdSlider">Low confidence mark</label>
+              <span class="value" id="thresholdValue">15%</span>
+            </div>
+            <input id="thresholdSlider" type="range" min="0" max="100" step="1" value="15">
+          </div>
+
+          <div class="control-card">
+            <div class="row">
+              <span class="label">Whisper grid</span>
+              <span class="value" id="quietValue">quiet 0%</span>
+            </div>
+            <div class="signal-grid" id="signalGrid" aria-label="Nine row microphone activity grid">
+              <div class="grid-row" data-row="1"><span>01</span><span class="grid-line"></span></div>
+              <div class="grid-row" data-row="2"><span>02</span><span class="grid-line"></span></div>
+              <div class="grid-row" data-row="3"><span>03</span><span class="grid-line"></span></div>
+              <div class="grid-row" data-row="4"><span>04</span><span class="grid-line"></span></div>
+              <div class="grid-row" data-row="5"><span>05</span><span class="grid-line"></span></div>
+              <div class="grid-row whisper" data-row="6"><span>06</span><span class="grid-line"></span></div>
+              <div class="grid-row whisper" data-row="7"><span>07</span><span class="grid-line"></span></div>
+              <div class="grid-row whisper" data-row="8"><span>08</span><span class="grid-line"></span></div>
+              <div class="grid-row whisper" data-row="9"><span>09</span><span class="grid-line"></span></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="panel feed-panel" aria-label="Recognized speech chat">
+        <div class="panel-head">
+          <h2>Word Chat</h2>
+          <span class="small-stat" id="countText">0 messages</span>
+        </div>
+        <div class="feed" id="feed" role="log" aria-live="polite" aria-relevant="additions text">
+          <p class="empty" id="emptyState">Start a session. Real recognized words will appear here as chat messages.</p>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="scopeCanvas" aria-label="Live microphone waveform"></canvas>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext || null;
+
+      const MAX_MESSAGES = 180;
+      const DUPLICATE_WINDOW_MS = 2200;
+      const CACHE_LIFETIME_MS = 12000;
+      const RESTART_DELAY_MS = 450;
+
+      const el = {
+        listenStatus: document.getElementById("listenStatus"),
+        listenText: document.getElementById("listenText"),
+        micStatus: document.getElementById("micStatus"),
+        micText: document.getElementById("micText"),
+        supportStatus: document.getElementById("supportStatus"),
+        supportText: document.getElementById("supportText"),
+        notice: document.getElementById("notice"),
+        startButton: document.getElementById("startButton"),
+        stopButton: document.getElementById("stopButton"),
+        clearButton: document.getElementById("clearButton"),
+        sessionClock: document.getElementById("sessionClock"),
+        levelValue: document.getElementById("levelValue"),
+        levelFill: document.getElementById("levelFill"),
+        boostToggle: document.getElementById("boostToggle"),
+        boostSlider: document.getElementById("boostSlider"),
+        boostValue: document.getElementById("boostValue"),
+        monitorToggle: document.getElementById("monitorToggle"),
+        thresholdSlider: document.getElementById("thresholdSlider"),
+        thresholdValue: document.getElementById("thresholdValue"),
+        quietValue: document.getElementById("quietValue"),
+        signalRows: Array.from(document.querySelectorAll(".grid-row")),
+        countText: document.getElementById("countText"),
+        feed: document.getElementById("feed"),
+        emptyState: document.getElementById("emptyState"),
+        canvas: document.getElementById("scopeCanvas")
+      };
+
+      const ctx = el.canvas.getContext("2d", { alpha: false });
+
+      const state = {
+        listening: false,
+        starting: false,
+        manualStop: true,
+        recognition: null,
+        recognitionRunning: false,
+        recognitionStarting: false,
+        restartTimer: 0,
+        stream: null,
+        audioContext: null,
+        source: null,
+        highPass: null,
+        voiceFilter: null,
+        compressor: null,
+        gain: null,
+        analyser: null,
+        monitorConnected: false,
+        frequencyData: null,
+        timeData: null,
+        animationId: 0,
+        sessionStartedAt: 0,
+        sessionTimer: 0,
+        smoothedLevel: 0,
+        smoothedQuiet: 0,
+        messageCount: 0,
+        interimCount: 0,
+        finalCount: 0,
+        activeInterim: null,
+        activeInterimKey: "",
+        recentFinals: new Map()
+      };
+
+      function setStatus(pill, textNode, text, mode = "") {
+        pill.classList.remove("live", "warn", "bad");
+        if (mode) pill.classList.add(mode);
+        textNode.textContent = text;
+      }
+
+      function showNotice(text, mode = "warn") {
+        el.notice.textContent = text;
+        el.notice.classList.add("show");
+        el.notice.classList.toggle("bad", mode === "bad");
+      }
+
+      function clearNotice() {
+        el.notice.textContent = "";
+        el.notice.classList.remove("show", "bad");
+      }
+
+      function speechSupported() {
+        return Boolean(SpeechRecognitionClass);
+      }
+
+      function audioSupported() {
+        return Boolean(AudioContextClass && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      }
+
+      function updateSupport() {
+        if (speechSupported() && audioSupported()) {
+          setStatus(el.supportStatus, el.supportText, "Supported", "live");
+          return;
+        }
+
+        setStatus(el.supportStatus, el.supportText, "Unsupported", "bad");
+        showNotice("Use Chrome, Edge, or Opera. This app needs browser SpeechRecognition and microphone access.", "bad");
+      }
+
+      function updateButtons() {
+        el.startButton.disabled = state.listening || state.starting || !speechSupported() || !audioSupported();
+        el.stopButton.disabled = !state.listening && !state.starting;
+      }
+
+      function updateCount() {
+        const word = state.messageCount === 1 ? "message" : "messages";
+        el.countText.textContent = `${state.messageCount} ${word}`;
+        el.emptyState.classList.toggle("hide", state.messageCount > 0);
+      }
+
+      function cleanText(text) {
+        return String(text || "").replace(/\s+/g, " ").trim();
+      }
+
+      function normalizeText(text) {
+        return cleanText(text)
+          .toLocaleLowerCase()
+          .replace(/[.,!?;:"()[\]{}<>]/g, "")
+          .trim();
+      }
+
+      function confidenceFromResult(result) {
+        if (!result || !result[0] || typeof result[0].confidence !== "number" || Number.isNaN(result[0].confidence)) {
+          return null;
+        }
+        return Math.max(0, Math.min(1, result[0].confidence));
+      }
+
+      function confidenceText(confidence) {
+        return typeof confidence === "number" ? `${Math.round(confidence * 100)}%` : "N/A";
+      }
+
+      function threshold() {
+        return Number(el.thresholdSlider.value) / 100;
+      }
+
+      function timeText(date = new Date()) {
+        return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
+      }
+
+      function durationText(ms) {
+        const total = Math.floor(Math.max(0, ms) / 1000);
+        const hours = String(Math.floor(total / 3600)).padStart(2, "0");
+        const minutes = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
+        const seconds = String(total % 60).padStart(2, "0");
+        return `${hours}:${minutes}:${seconds}`;
+      }
+
+      function isLowConfidence(confidence) {
+        return typeof confidence === "number" && confidence < threshold();
+      }
+
+      function trimMessages() {
+        const messages = el.feed.querySelectorAll(".message");
+        if (messages.length <= MAX_MESSAGES) return;
+
+        for (let i = 0; i < messages.length - MAX_MESSAGES; i += 1) {
+          messages[i].remove();
+        }
+      }
+
+      function scrollChat() {
+        el.feed.scrollTop = el.feed.scrollHeight;
+      }
+
+      function createMessage({ text, confidence, final }) {
+        const message = document.createElement("article");
+        const body = document.createElement("div");
+        const meta = document.createElement("div");
+        const badge = document.createElement("span");
+        const conf = document.createElement("span");
+        const clock = document.createElement("span");
+
+        message.className = "message";
+        body.className = "message-text";
+        meta.className = "message-meta";
+        badge.className = "badge";
+
+        message.append(body, meta);
+        meta.append(badge, conf, clock);
+        updateMessage(message, { text, confidence, final });
+        return message;
+      }
+
+      function updateMessage(message, { text, confidence, final }) {
+        const body = message.querySelector(".message-text");
+        const badge = message.querySelector(".badge");
+        const meta = message.querySelectorAll(".message-meta span");
+        const conf = meta[1];
+        const clock = meta[2];
+        const key = normalizeText(text);
+
+        body.textContent = text;
+        badge.textContent = final ? "final" : "interim";
+        conf.textContent = `confidence ${confidenceText(confidence)}`;
+        clock.textContent = timeText();
+
+        message.dataset.key = key;
+        message.dataset.confidence = typeof confidence === "number" ? String(confidence) : "";
+        message.classList.toggle("final", final);
+        message.classList.toggle("interim", !final);
+        message.classList.toggle("low", isLowConfidence(confidence));
+      }
+
+      function refreshThresholdMarks() {
+        el.thresholdValue.textContent = `${el.thresholdSlider.value}%`;
+        el.feed.querySelectorAll(".message").forEach((message) => {
+          const confidence = message.dataset.confidence === "" ? null : Number(message.dataset.confidence);
+          message.classList.toggle("low", isLowConfidence(confidence));
+        });
+      }
+
+      function duplicateFinal(key) {
+        if (!key) return true;
+
+        const now = Date.now();
+        const previous = state.recentFinals.get(key);
+        if (previous && now - previous < DUPLICATE_WINDOW_MS) return true;
+
+        state.recentFinals.set(key, now);
+        for (const [cachedKey, time] of state.recentFinals.entries()) {
+          if (now - time > CACHE_LIFETIME_MS) state.recentFinals.delete(cachedKey);
+        }
+        return false;
+      }
+
+      function addInterim(text, confidence) {
+        const clean = cleanText(text);
+        const key = normalizeText(clean);
+        if (!clean || !key) return;
+
+        if (state.activeInterim && state.activeInterim.isConnected) {
+          if (state.activeInterimKey === key) return;
+          updateMessage(state.activeInterim, { text: clean, confidence, final: false });
+          state.activeInterimKey = key;
+          scrollChat();
+          return;
+        }
+
+        const message = createMessage({ text: clean, confidence, final: false });
+        state.activeInterim = message;
+        state.activeInterimKey = key;
+        el.feed.append(message);
+        state.messageCount += 1;
+        state.interimCount += 1;
+        updateCount();
+        trimMessages();
+        scrollChat();
+      }
+
+      function addFinal(text, confidence) {
+        const clean = cleanText(text);
+        const key = normalizeText(clean);
+        if (!clean || !key) return;
+
+        if (state.activeInterim && state.activeInterim.isConnected) {
+          const activeKey = state.activeInterim.dataset.key || "";
+          const related = activeKey === key || key.includes(activeKey) || activeKey.includes(key);
+          if (related) {
+            updateMessage(state.activeInterim, { text: clean, confidence, final: true });
+            state.activeInterim = null;
+            state.activeInterimKey = "";
+            state.interimCount = Math.max(0, state.interimCount - 1);
+            state.finalCount += 1;
+            state.recentFinals.set(key, Date.now());
+            updateCount();
+            scrollChat();
+            return;
+          }
+        }
+
+        if (duplicateFinal(key)) return;
+
+        const message = createMessage({ text: clean, confidence, final: true });
+        el.feed.append(message);
+        state.messageCount += 1;
+        state.finalCount += 1;
+        updateCount();
+        trimMessages();
+        scrollChat();
+      }
+
+      function handleRecognitionResults(event) {
+        if (!state.listening) return;
+
+        let newestInterim = null;
+        const finals = [];
+
+        for (let index = event.resultIndex; index < event.results.length; index += 1) {
+          const result = event.results[index];
+          if (!result || !result[0]) continue;
+
+          const text = cleanText(result[0].transcript);
+          if (!text) continue;
+
+          const confidence = confidenceFromResult(result);
+          if (result.isFinal) {
+            finals.push({ text, confidence });
+          } else {
+            newestInterim = { text, confidence };
+          }
+        }
+
+        finals.forEach((item) => addFinal(item.text, item.confidence));
+        if (newestInterim) addInterim(newestInterim.text, newestInterim.confidence);
+      }
+
+      function makeRecognition() {
+        if (!SpeechRecognitionClass) return null;
+
+        const recognition = new SpeechRecognitionClass();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 5;
+        recognition.lang = navigator.language || "en-US";
+
+        recognition.onstart = () => {
+          state.recognitionRunning = true;
+          state.recognitionStarting = false;
+          setStatus(el.listenStatus, el.listenText, "Listening", "live");
+        };
+
+        recognition.onaudiostart = () => setStatus(el.micStatus, el.micText, "Mic Live", "live");
+        recognition.onsoundstart = () => setStatus(el.micStatus, el.micText, "Sound", "live");
+        recognition.onspeechstart = () => setStatus(el.listenStatus, el.listenText, "Speech", "live");
+        recognition.onspeechend = () => {
+          if (state.listening) setStatus(el.listenStatus, el.listenText, "Listening", "live");
+        };
+        recognition.onresult = handleRecognitionResults;
+        recognition.onnomatch = () => {
+          if (state.listening) setStatus(el.listenStatus, el.listenText, "Listening", "live");
+        };
+
+        recognition.onerror = (event) => {
+          state.recognitionStarting = false;
+          const error = event.error || "unknown";
+
+          if (error === "not-allowed" || error === "permission-denied") {
+            showNotice("Microphone or speech recognition permission was denied.", "bad");
+            stopListening();
+            return;
+          }
+
+          if (error === "audio-capture") {
+            showNotice("No microphone input was found.", "bad");
+            stopListening();
+            return;
+          }
+
+          if (error === "service-not-allowed") {
+            showNotice("The browser blocked native speech recognition on this page.", "bad");
+            stopListening();
+            return;
+          }
+
+          if (error !== "no-speech") {
+            showNotice(`Speech recognition reported: ${error}. Restarting while the session is active.`);
+          }
+
+          scheduleRecognitionRestart();
+        };
+
+        recognition.onend = () => {
+          state.recognitionRunning = false;
+          state.recognitionStarting = false;
+          if (state.listening && !state.manualStop) {
+            setStatus(el.listenStatus, el.listenText, "Restarting", "warn");
+            scheduleRecognitionRestart();
+          }
+        };
+
+        return recognition;
+      }
+
+      function startRecognition() {
+        if (!state.recognition || !state.listening || state.recognitionRunning || state.recognitionStarting) return;
+
+        state.recognitionStarting = true;
+        try {
+          state.recognition.start();
+        } catch (error) {
+          state.recognitionStarting = false;
+          if (error && error.name === "InvalidStateError") return;
+          scheduleRecognitionRestart();
+        }
+      }
+
+      function scheduleRecognitionRestart() {
+        window.clearTimeout(state.restartTimer);
+        if (!state.listening || state.manualStop) return;
+
+        state.restartTimer = window.setTimeout(() => {
+          if (state.listening && !state.manualStop) startRecognition();
+        }, RESTART_DELAY_MS);
+      }
+
+      function currentBoost() {
+        return el.boostToggle.checked ? Number(el.boostSlider.value) : 1;
+      }
+
+      function applyAudioSettings() {
+        el.boostValue.textContent = `${Number(el.boostSlider.value).toFixed(1)}x`;
+
+        if (state.gain) {
+          const now = state.audioContext ? state.audioContext.currentTime : 0;
+          state.gain.gain.setTargetAtTime(currentBoost(), now, 0.035);
+        }
+
+        if (state.voiceFilter) {
+          const now = state.audioContext ? state.audioContext.currentTime : 0;
+          state.voiceFilter.gain.setTargetAtTime(el.boostToggle.checked ? 5 : 1.5, now, 0.05);
+        }
+
+        updateMonitorConnection();
+      }
+
+      function updateMonitorConnection() {
+        if (!state.audioContext || !state.gain) return;
+
+        if (el.monitorToggle.checked && !state.monitorConnected) {
+          try {
+            state.gain.connect(state.audioContext.destination);
+            state.monitorConnected = true;
+          } catch (error) {}
+        }
+
+        if (!el.monitorToggle.checked && state.monitorConnected) {
+          try {
+            state.gain.disconnect(state.audioContext.destination);
+          } catch (error) {}
+          state.monitorConnected = false;
+        }
+      }
+
+      async function setupAudio() {
+        setStatus(el.micStatus, el.micText, "Requesting", "warn");
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: true,
+            channelCount: 1
+          },
+          video: false
+        });
+
+        const audioContext = new AudioContextClass({ latencyHint: "interactive" });
+        if (audioContext.state === "suspended") await audioContext.resume();
+
+        const source = audioContext.createMediaStreamSource(stream);
+        const highPass = audioContext.createBiquadFilter();
+        const voiceFilter = audioContext.createBiquadFilter();
+        const compressor = audioContext.createDynamicsCompressor();
+        const gain = audioContext.createGain();
+        const analyser = audioContext.createAnalyser();
+
+        highPass.type = "highpass";
+        highPass.frequency.value = 70;
+        highPass.Q.value = 0.8;
+
+        voiceFilter.type = "peaking";
+        voiceFilter.frequency.value = 2600;
+        voiceFilter.Q.value = 1.1;
+        voiceFilter.gain.value = el.boostToggle.checked ? 5 : 1.5;
+
+        compressor.threshold.value = -58;
+        compressor.knee.value = 18;
+        compressor.ratio.value = 8;
+        compressor.attack.value = 0.006;
+        compressor.release.value = 0.22;
+
+        gain.gain.value = currentBoost();
+
+        analyser.fftSize = 2048;
+        analyser.minDecibels = -112;
+        analyser.maxDecibels = -12;
+        analyser.smoothingTimeConstant = 0.82;
+
+        source.connect(highPass);
+        highPass.connect(voiceFilter);
+        voiceFilter.connect(compressor);
+        compressor.connect(gain);
+        gain.connect(analyser);
+
+        state.stream = stream;
+        state.audioContext = audioContext;
+        state.source = source;
+        state.highPass = highPass;
+        state.voiceFilter = voiceFilter;
+        state.compressor = compressor;
+        state.gain = gain;
+        state.analyser = analyser;
+        state.frequencyData = new Uint8Array(analyser.frequencyBinCount);
+        state.timeData = new Uint8Array(analyser.fftSize);
+
+        applyAudioSettings();
+        setStatus(el.micStatus, el.micText, "Mic Live", "live");
+      }
+
+      async function startListening() {
+        if (state.starting || state.listening) return;
+
+        if (!speechSupported() || !audioSupported()) {
+          updateSupport();
+          updateButtons();
+          return;
+        }
+
+        clearNotice();
+        state.starting = true;
+        state.manualStop = false;
+        setStatus(el.listenStatus, el.listenText, "Starting", "warn");
+        updateButtons();
+
+        try {
+          await setupAudio();
+          state.recognition = makeRecognition();
+          state.listening = true;
+          state.sessionStartedAt = Date.now();
+          startSessionTimer();
+          resizeCanvas();
+          startScope();
+          startRecognition();
+        } catch (error) {
+          const message = error && error.message ? error.message : "Could not start microphone capture.";
+          showNotice(message, "bad");
+          await stopListening();
+        } finally {
+          state.starting = false;
+          updateButtons();
+        }
+      }
+
+      async function stopListening() {
+        state.manualStop = true;
+        state.listening = false;
+        state.starting = false;
+        state.recognitionStarting = false;
+        window.clearTimeout(state.restartTimer);
+        stopSessionTimer();
+
+        if (state.recognition) {
+          const recognition = state.recognition;
+          recognition.onend = null;
+          recognition.onerror = null;
+          recognition.onresult = null;
+          recognition.onstart = null;
+          recognition.onaudiostart = null;
+          recognition.onsoundstart = null;
+          recognition.onspeechstart = null;
+          recognition.onspeechend = null;
+          recognition.onnomatch = null;
+          try {
+            recognition.abort();
+          } catch (error) {
+            try {
+              recognition.stop();
+            } catch (innerError) {}
+          }
+          state.recognition = null;
+        }
+
+        state.recognitionRunning = false;
+        state.activeInterim = null;
+        state.activeInterimKey = "";
+        stopScope();
+
+        if (state.gain && state.monitorConnected) {
+          try {
+            state.gain.disconnect(state.audioContext.destination);
+          } catch (error) {}
+        }
+
+        [state.source, state.highPass, state.voiceFilter, state.compressor, state.gain].forEach((node) => {
+          if (!node) return;
+          try {
+            node.disconnect();
+          } catch (error) {}
+        });
+
+        if (state.stream) {
+          state.stream.getTracks().forEach((track) => track.stop());
+          state.stream = null;
+        }
+
+        if (state.audioContext && state.audioContext.state !== "closed") {
+          try {
+            await state.audioContext.close();
+          } catch (error) {}
+        }
+
+        state.audioContext = null;
+        state.source = null;
+        state.highPass = null;
+        state.voiceFilter = null;
+        state.compressor = null;
+        state.gain = null;
+        state.analyser = null;
+        state.monitorConnected = false;
+        state.frequencyData = null;
+        state.timeData = null;
+        state.smoothedLevel = 0;
+        state.smoothedQuiet = 0;
+
+        setStatus(el.listenStatus, el.listenText, "Idle");
+        setStatus(el.micStatus, el.micText, "Mic Off");
+        updateLevel(0, 0);
+        drawIdleScope();
+        updateButtons();
+      }
+
+      function clearChat() {
+        el.feed.querySelectorAll(".message").forEach((message) => message.remove());
+        state.messageCount = 0;
+        state.interimCount = 0;
+        state.finalCount = 0;
+        state.activeInterim = null;
+        state.activeInterimKey = "";
+        state.recentFinals.clear();
+        updateCount();
+      }
+
+      function startSessionTimer() {
+        stopSessionTimer();
+        el.sessionClock.textContent = "00:00:00";
+        state.sessionTimer = window.setInterval(() => {
+          el.sessionClock.textContent = durationText(Date.now() - state.sessionStartedAt);
+        }, 250);
+      }
+
+      function stopSessionTimer() {
+        window.clearInterval(state.sessionTimer);
+        state.sessionTimer = 0;
+        if (!state.listening) el.sessionClock.textContent = "00:00:00";
+      }
+
+      function resizeCanvas() {
+        const rect = el.canvas.getBoundingClientRect();
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.max(1, Math.floor(rect.width * ratio));
+        const height = Math.max(1, Math.floor(rect.height * ratio));
+
+        if (el.canvas.width !== width || el.canvas.height !== height) {
+          el.canvas.width = width;
+          el.canvas.height = height;
+          ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        }
+      }
+
+      function drawScopeBackground(width, height) {
+        ctx.fillStyle = "#08090a";
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.strokeStyle = "#22272a";
+        ctx.lineWidth = 1;
+
+        for (let row = 1; row < 9; row += 1) {
+          const y = (height / 9) * row;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(width, y);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = "rgba(201, 194, 163, 0.055)";
+        ctx.fillRect(0, (height / 9) * 5, width, (height / 9) * 4);
+      }
+
+      function drawIdleScope() {
+        resizeCanvas();
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        const width = el.canvas.width / ratio;
+        const height = el.canvas.height / ratio;
+
+        ctx.save();
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        drawScopeBackground(width, height);
+        ctx.strokeStyle = "#5d5b53";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, height / 2);
+        ctx.lineTo(width, height / 2);
+        ctx.stroke();
+        ctx.fillStyle = "#737067";
+        ctx.font = "12px Arial, Helvetica, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("standby", width / 2, height / 2 - 12);
+        ctx.restore();
+      }
+
+      function updateLevel(level, quiet) {
+        const levelPercent = Math.max(0, Math.min(100, Math.round(level)));
+        const quietPercent = Math.max(0, Math.min(100, Math.round(quiet)));
+
+        el.levelValue.textContent = `${levelPercent}%`;
+        el.levelFill.style.width = `${levelPercent}%`;
+        el.quietValue.textContent = `quiet ${quietPercent}%`;
+
+        let rowsToLight = 0;
+        if (levelPercent > 1) rowsToLight = 4;
+        if (levelPercent > 8) rowsToLight = 6;
+        if (levelPercent > 20) rowsToLight = 8;
+        if (levelPercent > 42) rowsToLight = 9;
+
+        el.signalRows.forEach((row) => {
+          const rowNumber = Number(row.dataset.row);
+          const active = rowNumber > 9 - rowsToLight;
+          row.classList.toggle("active", active);
+          row.classList.toggle("peak", active && levelPercent > 42);
+        });
+      }
+
+      function calculateLevels(timeData) {
+        let sum = 0;
+        let peak = 0;
+
+        for (let i = 0; i < timeData.length; i += 1) {
+          const centered = (timeData[i] - 128) / 128;
+          sum += centered * centered;
+          peak = Math.max(peak, Math.abs(centered));
+        }
+
+        const rms = Math.sqrt(sum / timeData.length);
+        const rawLevel = Math.min(100, Math.max(rms * 245, peak * 92));
+        const quietLevel = rawLevel > 0 && rawLevel < 18 ? Math.min(100, rawLevel * 6) : Math.max(0, 100 - rawLevel * 1.4);
+
+        state.smoothedLevel = state.smoothedLevel * 0.78 + rawLevel * 0.22;
+        state.smoothedQuiet = state.smoothedQuiet * 0.84 + quietLevel * 0.16;
+        return { level: state.smoothedLevel, quiet: state.smoothedQuiet };
+      }
+
+      function drawWave(timeData, frequencyData, width, height) {
+        const center = height / 2;
+        const amp = height * 0.34;
+        const step = width / Math.max(1, timeData.length - 1);
+
+        ctx.strokeStyle = "#c9c2a3";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+
+        for (let i = 0; i < timeData.length; i += 1) {
+          const v = (timeData[i] - 128) / 128;
+          const x = i * step;
+          const y = center + v * amp;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+
+        ctx.stroke();
+
+        const bars = Math.min(72, Math.floor(width / 6));
+        const gap = 3;
+        const barWidth = Math.max(2, width / bars - gap);
+
+        ctx.fillStyle = "#6f765f";
+        for (let i = 0; i < bars; i += 1) {
+          const sampleIndex = Math.floor((i / bars) * frequencyData.length * 0.58);
+          const value = frequencyData[sampleIndex] / 255;
+          const barHeight = Math.max(1, value * height * 0.28);
+          const x = i * (barWidth + gap);
+          ctx.fillRect(x, height - barHeight, barWidth, barHeight);
+        }
+      }
+
+      function drawScopeFrame() {
+        if (!state.listening || !state.analyser || !state.timeData || !state.frequencyData) return;
+
+        resizeCanvas();
+        state.analyser.getByteTimeDomainData(state.timeData);
+        state.analyser.getByteFrequencyData(state.frequencyData);
+
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        const width = el.canvas.width / ratio;
+        const height = el.canvas.height / ratio;
+        const levels = calculateLevels(state.timeData);
+
+        ctx.save();
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        drawScopeBackground(width, height);
+        drawWave(state.timeData, state.frequencyData, width, height);
+        ctx.restore();
+
+        updateLevel(levels.level, levels.quiet);
+        state.animationId = window.requestAnimationFrame(drawScopeFrame);
+      }
+
+      function startScope() {
+        stopScope();
+        state.animationId = window.requestAnimationFrame(drawScopeFrame);
+      }
+
+      function stopScope() {
+        if (state.animationId) {
+          window.cancelAnimationFrame(state.animationId);
+          state.animationId = 0;
+        }
+      }
+
+      function handleVisibilityChange() {
+        if (!state.listening || !state.audioContext) return;
+
+        if (document.visibilityState === "visible" && state.audioContext.state === "suspended") {
+          state.audioContext.resume().catch(() => {
+            showNotice("Audio was paused by the browser and could not resume.");
+          });
+        }
+      }
+
+      el.startButton.addEventListener("click", startListening);
+      el.stopButton.addEventListener("click", () => stopListening());
+      el.clearButton.addEventListener("click", clearChat);
+      el.boostToggle.addEventListener("change", applyAudioSettings);
+      el.boostSlider.addEventListener("input", applyAudioSettings);
+      el.monitorToggle.addEventListener("change", applyAudioSettings);
+      el.thresholdSlider.addEventListener("input", refreshThresholdMarks);
+
+      window.addEventListener("resize", () => {
+        resizeCanvas();
+        if (!state.listening) drawIdleScope();
+      });
+
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+
+      window.addEventListener("beforeunload", () => {
+        state.manualStop = true;
+        if (state.stream) state.stream.getTracks().forEach((track) => track.stop());
+        if (state.recognition) {
+          try {
+            state.recognition.abort();
+          } catch (error) {}
+        }
+      });
+
+      updateSupport();
+      updateButtons();
+      updateCount();
+      refreshThresholdMarks();
+      applyAudioSettings();
+      drawIdleScope();
+    })();
+  </script>
+</body>
+</html>
