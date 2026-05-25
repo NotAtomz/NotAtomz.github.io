@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0f0f0f">
-  <title>Realtime Audio Word Detector</title>
+  <title>Realtime EVP Detector</title>
   <style>
     * {
       margin: 0;
@@ -249,6 +249,12 @@
       border: 1px solid rgba(210, 182, 111, 0.22);
     }
 
+    .sam-speaking-message {
+      box-shadow:
+        0 0 0 1px rgba(210, 182, 111, 0.46),
+        0 0 18px rgba(210, 182, 111, 0.2);
+    }
+
     @keyframes messageIn {
       from {
         opacity: 0;
@@ -309,6 +315,11 @@
       background: var(--panel-2);
       border: 1px solid #303030;
       overflow: hidden;
+    }
+
+    .audio-capsule.sam-speaking {
+      border-color: rgba(210, 182, 111, 0.55);
+      background: #292721;
     }
 
     #scopeCanvas {
@@ -561,7 +572,7 @@
   <div class="chat-container">
     <div class="chat-header">
       <div class="title-wrap">
-        <div class="chat-title">Realtime Audio Word Detector</div>
+        <div class="chat-title">Realtime EVP Detector</div>
         <div class="chat-status" id="mainStatus">
           <span class="status-dot" aria-hidden="true"></span>
           <span id="mainStatusText">Idle</span>
@@ -607,7 +618,7 @@
               <label class="setting-label" for="boostSlider">Boost amount</label>
               <span class="setting-value" id="boostValue">3.0x</span>
             </div>
-            <input id="boostSlider" type="range" min="1" max="6" step="0.1" value="3">
+            <input id="boostSlider" type="range" min="1" max="40" step="0.1" value="3">
 
             <div class="setting-row">
               <div>
@@ -625,6 +636,50 @@
             </div>
             <input id="thresholdSlider" type="range" min="0" max="100" step="1" value="15">
             <div class="setting-note">Low confidence words still show. They are only dimmed.</div>
+          </div>
+
+          <div class="settings-card">
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">SAM voice</div>
+                <div class="setting-note">Speaks finalized detections only, using the retro Software Automatic Mouth engine.</div>
+              </div>
+              <input id="samEnableToggle" type="checkbox" checked>
+            </div>
+
+            <div class="setting-row">
+              <label class="setting-label" for="samPitchMultiplierSlider">Pitch match</label>
+              <span class="setting-value" id="samPitchMultiplierValue">1.00x</span>
+            </div>
+            <input id="samPitchMultiplierSlider" type="range" min="0.6" max="1.4" step="0.05" value="1">
+
+            <div class="setting-row">
+              <label class="setting-label" for="samSpeedSlider">SAM speed</label>
+              <span class="setting-value" id="samSpeedValue">72</span>
+            </div>
+            <input id="samSpeedSlider" type="range" min="40" max="120" step="1" value="72">
+
+            <div class="setting-row">
+              <label class="setting-label" for="samMouthSlider">SAM mouth</label>
+              <span class="setting-value" id="samMouthValue">128</span>
+            </div>
+            <input id="samMouthSlider" type="range" min="80" max="180" step="1" value="128">
+
+            <div class="setting-row">
+              <label class="setting-label" for="samThroatSlider">SAM throat</label>
+              <span class="setting-value" id="samThroatValue">128</span>
+            </div>
+            <input id="samThroatSlider" type="range" min="80" max="180" step="1" value="128">
+
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Interrupt previous speech</div>
+                <div class="setting-note">Stops the current SAM reply when a new final phrase arrives.</div>
+              </div>
+              <input id="samInterruptToggle" type="checkbox" checked>
+            </div>
+
+            <button class="settings-action" id="samTestButton" type="button">Test Voice</button>
           </div>
 
           <div class="settings-card">
@@ -685,6 +740,10 @@
       const START_TIMEOUT_MS = 7000;
       const WATCHDOG_INTERVAL_MS = 2500;
       const AUTO_START_DELAY_MS = 450;
+      const SAM_MODULE_URL = "https://unpkg.com/sam-js@0.3.1/dist/samjs.esm.min.js";
+      const SAM_FALLBACK_MODULE_URL = "https://cdn.skypack.dev/sam-js";
+      const SAM_SAMPLE_RATE = 22050;
+      const SAM_DUPLICATE_WINDOW_MS = 12000;
 
       const el = {
         mainStatus: document.getElementById("mainStatus"),
@@ -699,6 +758,7 @@
         settingsClose: document.getElementById("settingsClose"),
         settingsLayer: document.getElementById("settingsLayer"),
         canvas: document.getElementById("scopeCanvas"),
+        audioCapsule: document.querySelector(".audio-capsule"),
         audioLabel: document.getElementById("audioLabel"),
         boostToggle: document.getElementById("boostToggle"),
         boostSlider: document.getElementById("boostSlider"),
@@ -706,6 +766,17 @@
         monitorToggle: document.getElementById("monitorToggle"),
         thresholdSlider: document.getElementById("thresholdSlider"),
         thresholdValue: document.getElementById("thresholdValue"),
+        samEnableToggle: document.getElementById("samEnableToggle"),
+        samPitchMultiplierSlider: document.getElementById("samPitchMultiplierSlider"),
+        samPitchMultiplierValue: document.getElementById("samPitchMultiplierValue"),
+        samSpeedSlider: document.getElementById("samSpeedSlider"),
+        samSpeedValue: document.getElementById("samSpeedValue"),
+        samMouthSlider: document.getElementById("samMouthSlider"),
+        samMouthValue: document.getElementById("samMouthValue"),
+        samThroatSlider: document.getElementById("samThroatSlider"),
+        samThroatValue: document.getElementById("samThroatValue"),
+        samInterruptToggle: document.getElementById("samInterruptToggle"),
+        samTestButton: document.getElementById("samTestButton"),
         autoStartToggle: document.getElementById("autoStartToggle"),
         levelValue: document.getElementById("levelValue"),
         levelFill: document.getElementById("levelFill"),
@@ -764,8 +835,30 @@
         messageCount: 0,
         activeInterim: null,
         activeInterimKey: "",
-        recentFinals: new Map()
+        recentFinals: new Map(),
+
+        sam: {
+          module: null,
+          loadPromise: null,
+          queue: [],
+          isSpeaking: false,
+          currentSource: null,
+          currentGain: null,
+          currentResolve: null,
+          currentText: "",
+          speechToken: 0,
+          speechStartedAt: 0,
+          suppressUntil: 0,
+          monitorWasConnected: false,
+          activeMessage: null,
+          spokenCache: new Map(),
+          smoothedPitchHz: 0,
+          lastPitchInfo: null,
+          pitchFrameCounter: 0
+        }
       };
+
+      const SAM_FILLER_WORDS = new Set(["uh", "um", "umm", "hmm", "hm", "ah", "er"]);
 
       function debug(message, data) {
         if (data === undefined) {
@@ -946,6 +1039,7 @@
           const related = activeKey === key || key.includes(activeKey) || activeKey.includes(key);
           if (related) {
             updateMessage(state.activeInterim, clean, confidence, true);
+            handleFinalForSAM(clean, confidence, state.activeInterim);
             state.activeInterim = null;
             state.activeInterimKey = "";
             state.recentFinals.set(key, Date.now());
@@ -961,6 +1055,7 @@
         state.messageCount += 1;
         updateMessageCount();
         trimMessages();
+        handleFinalForSAM(clean, confidence, message);
         scrollMessages();
       }
 
@@ -987,6 +1082,404 @@
 
         finals.forEach((item) => addFinal(item.text, item.confidence));
         if (newestInterim) addInterim(newestInterim.text, newestInterim.confidence);
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function updateSAMControlLabels() {
+        el.samPitchMultiplierValue.textContent = `${Number(el.samPitchMultiplierSlider.value).toFixed(2)}x`;
+        el.samSpeedValue.textContent = el.samSpeedSlider.value;
+        el.samMouthValue.textContent = el.samMouthSlider.value;
+        el.samThroatValue.textContent = el.samThroatSlider.value;
+      }
+
+      function currentSAMSettings(detectedPitch) {
+        const pitch = typeof detectedPitch === "number" ? detectedPitch : 64;
+
+        return {
+          debug: false,
+          pitch: Math.round(clamp(pitch, 20, 160)),
+          speed: Math.round(clamp(Number(el.samSpeedSlider.value), 40, 120)),
+          mouth: Math.round(clamp(Number(el.samMouthSlider.value), 80, 180)),
+          throat: Math.round(clamp(Number(el.samThroatSlider.value), 80, 180))
+        };
+      }
+
+      async function ensureSAMLoaded() {
+        if (state.sam.module) return state.sam.module;
+
+        if (!state.sam.loadPromise) {
+          const readModule = (module) => {
+            const SamJs = module.default || module.SamJs || module.SAM || module;
+            if (typeof SamJs !== "function") {
+              throw new Error("SAM module did not expose a constructor.");
+            }
+
+            state.sam.module = SamJs;
+            debug("SAM loaded");
+            return SamJs;
+          };
+
+          debug("SAM loading", SAM_MODULE_URL);
+          state.sam.loadPromise = import(SAM_MODULE_URL)
+            .then(readModule)
+            .catch((firstError) => {
+              debug("SAM primary CDN failed, trying fallback", firstError);
+              return import(SAM_FALLBACK_MODULE_URL).then(readModule);
+            })
+            .catch((error) => {
+              state.sam.loadPromise = null;
+              debug("SAM load failed", error);
+              throw error;
+            });
+        }
+
+        return state.sam.loadPromise;
+      }
+
+      function estimateDominantVocalFrequencyFromFFT() {
+        if (!state.analyser || !state.frequencyData || !state.audioContext) return null;
+
+        state.analyser.getByteFrequencyData(state.frequencyData);
+
+        const binHz = state.audioContext.sampleRate / state.analyser.fftSize;
+        const minBin = Math.max(1, Math.ceil(85 / binHz));
+        const maxBin = Math.min(state.frequencyData.length - 1, Math.floor(300 / binHz));
+        let bestBin = 0;
+        let bestValue = 0;
+
+        for (let bin = minBin; bin <= maxBin; bin += 1) {
+          const value = state.frequencyData[bin];
+          if (value > bestValue) {
+            bestValue = value;
+            bestBin = bin;
+          }
+        }
+
+        return bestValue > 18 ? bestBin * binHz : null;
+      }
+
+      function calculateVoicePitch() {
+        if (!state.analyser || !state.timeData || !state.audioContext) {
+          return { hz: null, samPitch: 64, confidence: 0, rms: 0 };
+        }
+
+        state.analyser.getByteTimeDomainData(state.timeData);
+
+        const sampleRate = state.audioContext.sampleRate;
+        const samples = new Float32Array(state.timeData.length);
+        let sum = 0;
+        let peak = 0;
+
+        for (let index = 0; index < state.timeData.length; index += 1) {
+          const centered = (state.timeData[index] - 128) / 128;
+          samples[index] = centered;
+          sum += centered * centered;
+          peak = Math.max(peak, Math.abs(centered));
+        }
+
+        const rms = Math.sqrt(sum / samples.length);
+        const quiet = rms < 0.012 && peak < 0.08;
+
+        /*
+          Pitch estimation is intentionally lightweight: autocorrelation checks
+          likely vocal lags for 85-300Hz, then the FFT peak acts as a fallback.
+          Smoothing is needed because raw pitch estimates jump around on noisy,
+          quiet, or whispered input.
+        */
+        let bestLag = 0;
+        let bestCorrelation = 0;
+        const minLag = Math.floor(sampleRate / 300);
+        const maxLag = Math.min(samples.length - 2, Math.ceil(sampleRate / 85));
+
+        if (!quiet) {
+          for (let lag = minLag; lag <= maxLag; lag += 1) {
+            let correlation = 0;
+            let energyA = 0;
+            let energyB = 0;
+
+            for (let index = 0; index < samples.length - lag; index += 2) {
+              const a = samples[index];
+              const b = samples[index + lag];
+              correlation += a * b;
+              energyA += a * a;
+              energyB += b * b;
+            }
+
+            const normalized = correlation / Math.sqrt((energyA * energyB) || 1);
+            if (normalized > bestCorrelation) {
+              bestCorrelation = normalized;
+              bestLag = lag;
+            }
+          }
+        }
+
+        let detectedHz = bestLag && bestCorrelation > 0.3 ? sampleRate / bestLag : null;
+        if (!detectedHz) detectedHz = estimateDominantVocalFrequencyFromFFT();
+
+        if (detectedHz) {
+          state.sam.smoothedPitchHz = state.sam.smoothedPitchHz
+            ? state.sam.smoothedPitchHz * 0.82 + detectedHz * 0.18
+            : detectedHz;
+        } else if (state.sam.smoothedPitchHz) {
+          state.sam.smoothedPitchHz *= 0.92;
+        }
+
+        const hz = state.sam.smoothedPitchHz || detectedHz || null;
+        let mappedPitch = 64;
+
+        if (hz) {
+          /*
+            Human speech fundamentals are roughly 85-300Hz. SAM's classic pitch
+            parameter has a useful musical range near 40-120, so low voices map
+            down and high voices map up. Whisper/low RMS reduces pitch slightly.
+          */
+          const normalized = clamp((hz - 85) / (300 - 85), 0, 1);
+          mappedPitch = 40 + normalized * 80;
+        }
+
+        if (quiet) mappedPitch -= 12;
+        if (bestCorrelation > 0 && bestCorrelation < 0.42) mappedPitch -= 5;
+
+        mappedPitch *= Number(el.samPitchMultiplierSlider.value) || 1;
+        const samPitch = Math.round(clamp(mappedPitch, 20, 160));
+        const result = { hz, samPitch, confidence: bestCorrelation, rms };
+        state.sam.lastPitchInfo = result;
+        return result;
+      }
+
+      function shouldIgnoreSAMText(text) {
+        const key = normalizeText(text);
+        if (!key) return true;
+        if (key.length < 2) return true;
+        return SAM_FILLER_WORDS.has(key);
+      }
+
+      function markSAMTextSpoken(text) {
+        const key = normalizeText(text);
+        if (!key) return false;
+
+        const now = Date.now();
+        const previous = state.sam.spokenCache.get(key);
+
+        /*
+          SpeechRecognition sometimes repeats the same final result after a
+          restart. The spoken cache prevents the SAM voice from echoing the same
+          finalized phrase over and over during that window.
+        */
+        if (previous && now - previous < SAM_DUPLICATE_WINDOW_MS) return false;
+
+        state.sam.spokenCache.set(key, now);
+        for (const [cachedKey, time] of state.sam.spokenCache.entries()) {
+          if (now - time > SAM_DUPLICATE_WINDOW_MS * 2) {
+            state.sam.spokenCache.delete(cachedKey);
+          }
+        }
+
+        return true;
+      }
+
+      function isLikelySelfTriggeredSAM(text) {
+        const key = normalizeText(text);
+        const current = normalizeText(state.sam.currentText || "");
+        const now = Date.now();
+
+        if (!key) return true;
+        if (now < state.sam.suppressUntil) return true;
+        if (!current) return false;
+        return key === current || key.includes(current) || current.includes(key);
+      }
+
+      function handleFinalForSAM(text, confidence, message) {
+        if (!el.samEnableToggle.checked) return;
+        if (shouldIgnoreSAMText(text)) return;
+        if (isLikelySelfTriggeredSAM(text)) {
+          debug("SAM speech skipped", { reason: "self-trigger guard", text });
+          return;
+        }
+
+        const pitchInfo = calculateVoicePitch();
+        queueSAMSpeech(text, pitchInfo, message);
+      }
+
+      function queueSAMSpeech(text, pitchInfo, message, options = {}) {
+        const clean = cleanText(text);
+        if (!clean || shouldIgnoreSAMText(clean)) return;
+        if (!options.force && !el.samEnableToggle.checked) return;
+        if (!options.force && !markSAMTextSpoken(clean)) {
+          debug("SAM speech skipped", { reason: "recent duplicate", text: clean });
+          return;
+        }
+
+        if (state.sam.isSpeaking && el.samInterruptToggle.checked) {
+          stopCurrentSAMPlayback({ clearQueue: true });
+        }
+
+        state.sam.queue.push({
+          text: clean.slice(0, 180),
+          pitchInfo: pitchInfo || calculateVoicePitch(),
+          message: message || null
+        });
+
+        processSAMQueue();
+      }
+
+      async function processSAMQueue() {
+        if (state.sam.isSpeaking) return;
+
+        const item = state.sam.queue.shift();
+        if (!item) return;
+
+        state.sam.isSpeaking = true;
+        state.sam.currentText = item.text;
+        state.sam.speechStartedAt = Date.now();
+        state.sam.suppressUntil = Date.now() + 900;
+        state.sam.activeMessage = item.message;
+
+        if (item.message) item.message.classList.add("sam-speaking-message");
+        if (el.audioCapsule) el.audioCapsule.classList.add("sam-speaking");
+        el.audioLabel.textContent = "sam voice";
+        setMainStatus("SAM speaking", "warn");
+        pauseMonitorForSAM();
+
+        const token = ++state.sam.speechToken;
+
+        try {
+          await speakWithSAM(item.text, item.pitchInfo);
+        } catch (error) {
+          showNotice("SAM voice could not speak. Check the CDN connection and try Test Voice again.", "bad");
+          debug("SAM speak failed", error);
+        } finally {
+          if (token === state.sam.speechToken) {
+            if (item.message) item.message.classList.remove("sam-speaking-message");
+            if (el.audioCapsule) el.audioCapsule.classList.remove("sam-speaking");
+            if (state.sam.currentSource) {
+              try {
+                state.sam.currentSource.disconnect();
+              } catch (error) {}
+            }
+            if (state.sam.currentGain) {
+              try {
+                state.sam.currentGain.disconnect();
+              } catch (error) {}
+            }
+            state.sam.activeMessage = null;
+            state.sam.currentText = "";
+            state.sam.currentSource = null;
+            state.sam.currentGain = null;
+            state.sam.currentResolve = null;
+            state.sam.isSpeaking = false;
+            state.sam.suppressUntil = Date.now() + 1200;
+            restoreMonitorAfterSAM();
+            el.audioLabel.textContent = state.listening ? "recording" : "mic idle";
+            if (state.listening) setMainStatus("Listening", "live");
+            else if (speechSupported() && audioSupported()) setMainStatus("Ready", "");
+            processSAMQueue();
+          }
+        }
+      }
+
+      async function speakWithSAM(text, detectedPitch) {
+        const SamJs = await ensureSAMLoaded();
+        const settings = currentSAMSettings(detectedPitch && detectedPitch.samPitch);
+        const sam = new SamJs(settings);
+
+        if (typeof sam.buf32 === "function") {
+          const audioContext = await ensureAudioContext();
+          const raw = sam.buf32(text);
+          const samples = raw instanceof Float32Array ? raw : Float32Array.from(raw);
+          if (!samples.length) return Promise.resolve();
+          const buffer = audioContext.createBuffer(1, samples.length, SAM_SAMPLE_RATE);
+          buffer.copyToChannel(samples, 0);
+
+          return new Promise((resolve) => {
+            const source = audioContext.createBufferSource();
+            const gainNode = audioContext.createGain();
+
+            source.buffer = buffer;
+            gainNode.gain.value = 0.72;
+            source.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            state.sam.currentSource = source;
+            state.sam.currentGain = gainNode;
+            state.sam.currentResolve = resolve;
+
+            source.onended = () => resolve();
+            source.start();
+          });
+        }
+
+        if (typeof sam.speak === "function") {
+          state.sam.currentResolve = null;
+          return sam.speak(text);
+        }
+
+        throw new Error("SAM engine has no speech renderer.");
+      }
+
+      function pauseMonitorForSAM() {
+        state.sam.monitorWasConnected = Boolean(state.monitorConnected);
+
+        if (state.gain && state.monitorConnected && state.audioContext) {
+          try {
+            state.gain.disconnect(state.audioContext.destination);
+          } catch (error) {}
+          state.monitorConnected = false;
+          debug("monitor paused for SAM");
+        }
+      }
+
+      function restoreMonitorAfterSAM() {
+        if (!state.sam.monitorWasConnected) return;
+
+        state.sam.monitorWasConnected = false;
+        if (el.monitorToggle.checked) updateMonitorConnection();
+      }
+
+      function stopCurrentSAMPlayback({ clearQueue = false } = {}) {
+        if (clearQueue) state.sam.queue = [];
+
+        state.sam.speechToken += 1;
+
+        if (state.sam.currentSource) {
+          try {
+            state.sam.currentSource.onended = null;
+            state.sam.currentSource.stop();
+          } catch (error) {}
+          try {
+            state.sam.currentSource.disconnect();
+          } catch (error) {}
+        }
+
+        if (state.sam.currentGain) {
+          try {
+            state.sam.currentGain.disconnect();
+          } catch (error) {}
+        }
+
+        if (state.sam.currentResolve) {
+          const resolve = state.sam.currentResolve;
+          state.sam.currentResolve = null;
+          resolve();
+        }
+
+        if (state.sam.activeMessage) {
+          state.sam.activeMessage.classList.remove("sam-speaking-message");
+        }
+
+        if (el.audioCapsule) el.audioCapsule.classList.remove("sam-speaking");
+
+        state.sam.isSpeaking = false;
+        state.sam.currentSource = null;
+        state.sam.currentGain = null;
+        state.sam.activeMessage = null;
+        state.sam.currentText = "";
+        state.sam.suppressUntil = Date.now() + 900;
+        restoreMonitorAfterSAM();
+        el.audioLabel.textContent = state.listening ? "recording" : "mic idle";
       }
 
       function streamIsActive(stream = state.stream) {
@@ -1603,6 +2096,7 @@
 
         window.clearTimeout(state.recognitionRestartTimer);
         window.clearTimeout(state.recognitionStartTimer);
+        stopCurrentSAMPlayback({ clearQueue: true });
 
         if (state.recognition) {
           try {
@@ -1648,6 +2142,9 @@
         state.audioContext = null;
         state.smoothedLevel = 0;
         state.smoothedQuiet = 0;
+        state.sam.smoothedPitchHz = 0;
+        state.sam.lastPitchInfo = null;
+        state.sam.pitchFrameCounter = 0;
 
         updateLevel(0, 0);
         drawIdleScope();
@@ -1664,6 +2161,7 @@
         state.activeInterim = null;
         state.activeInterimKey = "";
         state.recentFinals.clear();
+        state.sam.spokenCache.clear();
         updateMessageCount();
       }
 
@@ -1762,8 +2260,8 @@
         const amp = height * 0.34;
         const step = width / Math.max(1, timeData.length - 1);
 
-        ctx.strokeStyle = "#d2b66f";
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = state.sam.isSpeaking ? "#e0c984" : "#d2b66f";
+        ctx.lineWidth = state.sam.isSpeaking ? 2.5 : 2;
         ctx.beginPath();
 
         for (let i = 0; i < timeData.length; i += 1) {
@@ -1801,6 +2299,10 @@
         const width = el.canvas.width / ratio;
         const height = el.canvas.height / ratio;
         const levels = calculateLevels(state.timeData);
+        state.sam.pitchFrameCounter = (state.sam.pitchFrameCounter + 1) % 12;
+        if (state.sam.pitchFrameCounter === 0) {
+          calculateVoicePitch();
+        }
 
         ctx.save();
         ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -1917,6 +2419,22 @@
       el.boostSlider.addEventListener("input", applyAudioSettings);
       el.monitorToggle.addEventListener("change", applyAudioSettings);
       el.thresholdSlider.addEventListener("input", refreshThresholdMarks);
+      el.samEnableToggle.addEventListener("change", () => {
+        if (!el.samEnableToggle.checked) stopCurrentSAMPlayback({ clearQueue: true });
+      });
+      el.samPitchMultiplierSlider.addEventListener("input", updateSAMControlLabels);
+      el.samSpeedSlider.addEventListener("input", updateSAMControlLabels);
+      el.samMouthSlider.addEventListener("input", updateSAMControlLabels);
+      el.samThroatSlider.addEventListener("input", updateSAMControlLabels);
+      el.samTestButton.addEventListener("click", async () => {
+        try {
+          await ensureAudioContext();
+        } catch (error) {
+          debug("SAM test audio context failed", error);
+        }
+        const pitchInfo = state.sam.lastPitchInfo || calculateVoicePitch();
+        queueSAMSpeech("SAM ONLINE", pitchInfo, null, { force: true });
+      });
 
       window.addEventListener("resize", () => {
         resizeCanvas();
@@ -1934,6 +2452,7 @@
             state.recognition.abort();
           } catch (error) {}
         }
+        stopCurrentSAMPlayback({ clearQueue: true });
         if (state.stream) {
           state.stream.getTracks().forEach((track) => track.stop());
         }
@@ -1944,6 +2463,7 @@
       updateButtons();
       updateMessageCount();
       refreshThresholdMarks();
+      updateSAMControlLabels();
       applyAudioSettings();
       drawIdleScope();
       queryMicPermission().then(tryAutoStart);
