@@ -2,875 +2,1482 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#1a1a2e">
-<meta name="description" content="Minesweeper — Classic game with Easy, Medium, Hard, Extreme & Custom modes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#18181b">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Minesweeper">
+<meta name="description" content="Minesweeper with themes, assists, and custom boards">
 <title>Minesweeper</title>
-<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiTWluZXN3ZWVwZXIiLCJzaG9ydF9uYW1lIjoiTWluZXMiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzFhMWEyZSIsInRoZW1lX2NvbG9yIjoiIzFhMWEyZSIsImljb25zIjpbeyJzcmMiOiJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUIzYVdSMGFEMGlNakF3SWlCb1pXbG5hSFE5SWpJd01DSWdkbWxsZDBKdmVEMGlNQ0F3SURJd01DQXlNREFpSUhacFpYZENiM2c5SWpBZ01DQXlNQ0F5TUNJS1BHUmxaanBnWVhOelpYSitlbTl1SUdGeVpTQXhJRU5oYm5NZ1kyOXVkR0ZwYmlCc1lYa2djMjluY21GdGN5QnNZWGtnU1c1a1lYa2djMlZ5ZG1seWJqd3ZaR1ZtT2dwbFlXNXZiblF1ZG1Wa2Myc2dQand2YzNablBnPT0iLCJ0eXBlIjoiaW1hZ2Uvc3ZnK3htbCIsInNpemVzIjoiYW55In1dfQ==">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;500;700;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── TOKENS (overridden by themes) ───────────────── */
+:root {
+  --bg:          #18181b;
+  --surface:     #27272a;
+  --surface2:    #3f3f46;
+  --border:      #52525b;
+  --text:        #f4f4f5;
+  --text-muted:  #a1a1aa;
+  --accent:      #6366f1;
+  --accent-soft: rgba(99,102,241,0.15);
+  --danger:      #ef4444;
+  --danger-soft: rgba(239,68,68,0.15);
+  --safe:        #22c55e;
+  --safe-soft:   rgba(34,197,94,0.15);
+  --flag-c:      #f97316;
+  --cell-un:     #3f3f46;
+  --cell-rev:    #27272a;
+  --cell-hover:  #52525b;
+  --cell-border: #52525b;
+  --cell-rev-border: #3f3f46;
+  --radius:      6px;
+  --cell-size:   32px;
+  --font:        system-ui, -apple-system, sans-serif;
+  --font-mono:   ui-monospace, 'Cascadia Code', monospace;
+  /* number colors */
+  --n1:#6366f1; --n2:#22c55e; --n3:#ef4444; --n4:#a855f7;
+  --n5:#f97316; --n6:#06b6d4; --n7:#ec4899; --n8:#a1a1aa;
+}
 
-  :root {
-    --bg: #0d0d1a;
-    --surface: #13132a;
-    --panel: #1a1a38;
-    --border: #2a2a5a;
-    --accent: #4fc3f7;
-    --accent2: #7c4dff;
-    --danger: #ff5252;
-    --flag: #ff6d00;
-    --safe: #00e676;
-    --text: #e8eaf6;
-    --muted: #7986cb;
-    --cell-un: #1e1e42;
-    --cell-rev: #0d0d28;
-    --cell-hover: #252550;
-    --glow: 0 0 20px rgba(79,195,247,0.3);
-    --font-display: 'Exo 2', sans-serif;
-    --font-mono: 'Share Tech Mono', monospace;
-  }
+/* ── THEMES ──────────────────────────────────────── */
+[data-theme="light"] {
+  --bg:#f4f4f5; --surface:#ffffff; --surface2:#e4e4e7;
+  --border:#d4d4d8; --text:#18181b; --text-muted:#71717a;
+  --cell-un:#e4e4e7; --cell-rev:#f4f4f5; --cell-hover:#d4d4d8;
+  --cell-border:#d4d4d8; --cell-rev-border:#e4e4e7;
+}
+[data-theme="forest"] {
+  --bg:#0f1f0f; --surface:#162216; --surface2:#1e321e;
+  --border:#2d4a2d; --text:#d4edda; --text-muted:#7fad7f;
+  --accent:#4ade80; --accent-soft:rgba(74,222,128,0.15);
+  --cell-un:#1e321e; --cell-rev:#0f1f0f; --cell-hover:#2d4a2d;
+  --cell-border:#2d4a2d; --cell-rev-border:#1e321e;
+  --n1:#4ade80; --n2:#86efac; --n3:#ef4444; --n4:#a78bfa;
+  --n5:#fb923c; --n6:#22d3ee; --n7:#f472b6; --n8:#6b7280;
+}
+[data-theme="ocean"] {
+  --bg:#0a1628; --surface:#0f2040; --surface2:#162c54;
+  --border:#1e3a6e; --text:#e0f0ff; --text-muted:#7aaccc;
+  --accent:#38bdf8; --accent-soft:rgba(56,189,248,0.15);
+  --cell-un:#162c54; --cell-rev:#0a1628; --cell-hover:#1e3a6e;
+  --cell-border:#1e3a6e; --cell-rev-border:#162c54;
+  --n1:#38bdf8; --n2:#34d399; --n3:#f87171; --n4:#c084fc;
+  --n5:#fb923c; --n6:#2dd4bf; --n7:#f472b6; --n8:#94a3b8;
+}
+[data-theme="retro"] {
+  --bg:#1a1a0a; --surface:#2a2a10; --surface2:#3a3a18;
+  --border:#5a5a28; --text:#f0f0c0; --text-muted:#a0a060;
+  --accent:#d4d428; --accent-soft:rgba(212,212,40,0.15);
+  --cell-un:#3a3a18; --cell-rev:#1a1a0a; --cell-hover:#4a4a20;
+  --cell-border:#5a5a28; --cell-rev-border:#2a2a10;
+  --n1:#d4d428; --n2:#60d460; --n3:#d44040; --n4:#9060d4;
+  --n5:#d47820; --n6:#20d4c4; --n7:#d460a0; --n8:#808060;
+  --font:monospace;
+}
+[data-theme="rose"] {
+  --bg:#1a0f12; --surface:#2a1820; --surface2:#3d2030;
+  --border:#6b3050; --text:#fce7f3; --text-muted:#d48aaa;
+  --accent:#fb7185; --accent-soft:rgba(251,113,133,0.15);
+  --cell-un:#3d2030; --cell-rev:#1a0f12; --cell-hover:#6b3050;
+  --cell-border:#6b3050; --cell-rev-border:#2a1820;
+  --n1:#fb7185; --n2:#f9a8d4; --n3:#f43f5e; --n4:#c084fc;
+  --n5:#fb923c; --n6:#38bdf8; --n7:#a78bfa; --n8:#9f8799;
+}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-display);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 16px;
-    background-image:
-      radial-gradient(ellipse at 20% 20%, rgba(76,195,247,0.04) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 80%, rgba(124,77,255,0.04) 0%, transparent 50%);
-  }
+/* ── BASE ─────────────────────────────────────────── */
+body {
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font);
+  font-size:14px;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:16px 12px 32px;
+  transition:background 0.25s, color 0.25s;
+}
 
-  /* HEADER */
-  header {
-    width: 100%;
-    max-width: 900px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-    padding: 12px 20px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-  }
+/* ── TOPBAR ───────────────────────────────────────── */
+.topbar {
+  width:100%;
+  max-width:960px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:12px;
+}
 
-  .logo {
-    font-family: var(--font-mono);
-    font-size: 1.4rem;
-    letter-spacing: 0.1em;
-    color: var(--accent);
-    text-shadow: 0 0 12px rgba(79,195,247,0.5);
-  }
-  .logo span { color: var(--danger); }
+.game-title {
+  font-size:1.1rem;
+  font-weight:700;
+  letter-spacing:0.04em;
+  color:var(--text);
+  flex-shrink:0;
+}
+.game-title em { color:var(--accent); font-style:normal; }
 
-  .hud {
-    display: flex;
-    gap: 24px;
-    align-items: center;
-  }
+.spacer { flex:1; }
 
-  .hud-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-  }
+.icon-btn {
+  width:36px;height:36px;
+  border-radius:var(--radius);
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--text-muted);
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;
+  transition:background 0.12s, color 0.12s, border-color 0.12s;
+}
+.icon-btn:hover { background:var(--surface2); color:var(--text); border-color:var(--accent); }
+.icon-btn.active { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
 
-  .hud-label {
-    font-size: 0.6rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
+/* ── HUD ──────────────────────────────────────────── */
+.hud {
+  width:100%;
+  max-width:960px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:10px 14px;
+}
 
-  .hud-value {
-    font-family: var(--font-mono);
-    font-size: 1.3rem;
-    color: var(--accent);
-    text-shadow: 0 0 8px rgba(79,195,247,0.4);
-    min-width: 3ch;
-    text-align: center;
-  }
+.hud-stat {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+}
+.hud-icon { font-size:0.9rem; opacity:0.7; }
+.hud-val {
+  font-family:var(--font-mono);
+  font-size:1rem;
+  font-weight:600;
+  color:var(--text);
+  min-width:3.5ch;
+}
+.hud-val.flag-color { color:var(--flag-c); }
+.hud-val.time-color { color:var(--accent); }
+.hud-val.best-color { color:var(--safe); }
+.hud-divider { width:1px; height:20px; background:var(--border); margin:0 4px; }
 
-  .hud-value.danger { color: var(--danger); text-shadow: 0 0 8px rgba(255,82,82,0.4); }
-  .hud-value.safe { color: var(--safe); text-shadow: 0 0 8px rgba(0,230,118,0.4); }
+.hud-diff {
+  margin-left:auto;
+  font-size:0.72rem;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:0.08em;
+  color:var(--text-muted);
+  background:var(--surface2);
+  padding:3px 8px;
+  border-radius:4px;
+}
 
-  /* DIFFICULTY */
-  .difficulty-row {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-bottom: 16px;
-    width: 100%;
-    max-width: 900px;
-  }
+/* ── DIFFICULTY TABS ─────────────────────────────── */
+.diff-row {
+  width:100%;
+  max-width:960px;
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
 
-  .diff-btn {
-    padding: 8px 18px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--muted);
-    font-family: var(--font-display);
-    font-weight: 500;
-    font-size: 0.85rem;
-    letter-spacing: 0.05em;
-    cursor: pointer;
-    transition: all 0.15s;
-    text-transform: uppercase;
-  }
+.diff-btn {
+  flex:1;
+  min-width:70px;
+  padding:7px 10px;
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  background:var(--surface);
+  color:var(--text-muted);
+  font-family:var(--font);
+  font-size:0.8rem;
+  font-weight:600;
+  letter-spacing:0.04em;
+  cursor:pointer;
+  transition:all 0.12s;
+  text-align:center;
+}
+.diff-btn:hover { color:var(--text); border-color:var(--accent); }
+.diff-btn.active {
+  background:var(--accent-soft);
+  border-color:var(--accent);
+  color:var(--accent);
+}
 
-  .diff-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .diff-btn.active {
-    background: rgba(79,195,247,0.1);
-    border-color: var(--accent);
-    color: var(--accent);
-    box-shadow: 0 0 12px rgba(79,195,247,0.2);
-  }
-  .diff-btn.extreme.active {
-    background: rgba(255,82,82,0.1);
-    border-color: var(--danger);
-    color: var(--danger);
-    box-shadow: 0 0 12px rgba(255,82,82,0.2);
-  }
-  .diff-btn.extreme:hover { border-color: var(--danger); color: var(--danger); }
+/* ── CUSTOM PANEL ─────────────────────────────────── */
+.custom-panel {
+  display:none;
+  width:100%;
+  max-width:960px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:10px 14px;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
+.custom-panel.open { display:flex; }
 
-  /* CUSTOM PANEL */
-  #custom-panel {
-    display: none;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-bottom: 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 20px;
-    width: 100%;
-    max-width: 900px;
-  }
+.custom-field {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-size:0.8rem;
+  color:var(--text-muted);
+}
+.custom-field input {
+  width:58px;
+  padding:5px 8px;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:4px;
+  color:var(--text);
+  font-family:var(--font-mono);
+  font-size:0.9rem;
+  text-align:center;
+}
+.custom-field input:focus { outline:none; border-color:var(--accent); }
 
-  #custom-panel.visible { display: flex; }
+.apply-btn {
+  padding:6px 16px;
+  background:var(--accent);
+  border:none;
+  border-radius:4px;
+  color:#fff;
+  font-weight:700;
+  font-size:0.8rem;
+  cursor:pointer;
+  transition:opacity 0.12s;
+}
+.apply-btn:hover { opacity:0.85; }
 
-  .custom-label {
-    font-size: 0.75rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
+/* ── BOARD ────────────────────────────────────────── */
+.board-wrap {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:12px;
+  overflow:auto;
+  max-width:100%;
+}
 
-  .custom-input {
-    width: 64px;
-    padding: 6px 10px;
-    background: var(--cell-un);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 1rem;
-    text-align: center;
-  }
-  .custom-input:focus { outline: none; border-color: var(--accent); }
+#board {
+  display:grid;
+  gap:2px;
+  user-select:none;
+  -webkit-user-select:none;
+}
 
-  .apply-btn {
-    padding: 7px 20px;
-    background: var(--accent2);
-    border: none;
-    border-radius: 7px;
-    color: #fff;
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 0.85rem;
-    cursor: pointer;
-    letter-spacing: 0.05em;
-    transition: opacity 0.15s;
-  }
-  .apply-btn:hover { opacity: 0.85; }
+/* ── CELL ─────────────────────────────────────────── */
+.cell {
+  width:var(--cell-size);
+  height:var(--cell-size);
+  border-radius:4px;
+  border:1px solid var(--cell-border);
+  background:var(--cell-un);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:var(--font-mono);
+  font-size:0.8rem;
+  font-weight:700;
+  cursor:pointer;
+  transition:background 0.08s, border-color 0.08s;
+  -webkit-tap-highlight-color:transparent;
+  position:relative;
+  overflow:hidden;
+}
 
-  /* RESET BTN */
-  .reset-btn {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px 14px;
-    color: var(--muted);
-    font-family: var(--font-display);
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: all 0.15s;
-    letter-spacing: 0.05em;
-  }
-  .reset-btn:hover { border-color: var(--safe); color: var(--safe); }
+.cell:hover:not(.revealed):not(.game-over-cell) {
+  background:var(--cell-hover);
+  border-color:var(--accent);
+}
+.cell:active:not(.revealed) { transform:scale(0.9); }
 
-  /* BOARD WRAPPER */
-  #board-wrap {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-    overflow: auto;
-    max-width: 100%;
-    box-shadow: 0 4px 40px rgba(0,0,0,0.4);
-  }
+.cell.revealed {
+  background:var(--cell-rev);
+  border-color:var(--cell-rev-border);
+  cursor:default;
+}
 
-  /* GRID */
-  #board {
-    display: grid;
-    gap: 2px;
-    user-select: none;
-    -webkit-user-select: none;
-  }
+/* number colors */
+.cell[data-n="1"] { color:var(--n1); }
+.cell[data-n="2"] { color:var(--n2); }
+.cell[data-n="3"] { color:var(--n3); }
+.cell[data-n="4"] { color:var(--n4); }
+.cell[data-n="5"] { color:var(--n5); }
+.cell[data-n="6"] { color:var(--n6); }
+.cell[data-n="7"] { color:var(--n7); }
+.cell[data-n="8"] { color:var(--n8); }
 
-  .cell {
-    width: 32px;
-    height: 32px;
-    border-radius: 5px;
-    border: 1px solid var(--border);
-    background: var(--cell-un);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background 0.08s, transform 0.05s;
-    -webkit-tap-highlight-color: transparent;
-    position: relative;
-  }
+/* states */
+.cell.flagged { background:rgba(249,115,22,0.12); border-color:var(--flag-c); }
+.cell.question { background:rgba(168,85,247,0.1); border-color:#a855f7; }
+.cell.mine-exp { background:rgba(239,68,68,0.25); border-color:var(--danger); animation:boom 0.3s ease; }
+.cell.mine-show { background:var(--danger-soft); border-color:var(--danger); }
+.cell.mine-wrong { background:var(--danger-soft); border-color:var(--danger); }
+.cell.mine-safe { background:var(--safe-soft); border-color:var(--safe); }
 
-  .cell:hover:not(.revealed):not(.flagged) {
-    background: var(--cell-hover);
-    border-color: rgba(79,195,247,0.3);
-  }
+/* ASSIST HIGHLIGHTS */
+.cell.assist-neighbor {
+  background:rgba(99,102,241,0.22) !important;
+  border-color:var(--accent) !important;
+}
+.cell.assist-safe {
+  background:rgba(34,197,94,0.22) !important;
+  border-color:var(--safe) !important;
+}
+.cell.assist-danger {
+  background:rgba(239,68,68,0.22) !important;
+  border-color:var(--danger) !important;
+}
 
-  .cell:active:not(.revealed) { transform: scale(0.92); }
+@keyframes boom { 0%{transform:scale(1.2)}100%{transform:scale(1)} }
 
-  .cell.revealed {
-    background: var(--cell-rev);
-    border-color: rgba(255,255,255,0.05);
-    cursor: default;
-  }
+/* ── SETTINGS PANEL ───────────────────────────────── */
+.settings-overlay {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.6);
+  backdrop-filter:blur(4px);
+  z-index:200;
+  align-items:flex-start;
+  justify-content:flex-end;
+  padding:16px;
+}
+.settings-overlay.open { display:flex; }
 
-  .cell.flagged { background: rgba(255,109,0,0.12); border-color: var(--flag); }
-  .cell.flagged::after { content: '🚩'; font-size: 0.9rem; }
+.settings-panel {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  width:320px;
+  max-height:calc(100vh - 32px);
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+}
 
-  .cell.question { background: rgba(124,77,255,0.1); border-color: var(--accent2); }
-  .cell.question::after { content: '?'; color: var(--accent2); font-size: 1rem; font-family: var(--font-mono); }
+.settings-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 18px 12px;
+  border-bottom:1px solid var(--border);
+  position:sticky;
+  top:0;
+  background:var(--surface);
+}
+.settings-header h2 { font-size:0.95rem; font-weight:700; }
 
-  .cell.mine { background: rgba(255,82,82,0.15); border-color: var(--danger); }
-  .cell.mine::after { content: '💣'; font-size: 0.85rem; }
+.close-btn {
+  width:28px;height:28px;
+  border-radius:4px;
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--text-muted);
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;
+}
+.close-btn:hover { background:var(--surface2); color:var(--text); }
 
-  .cell.mine-hit { background: rgba(255,82,82,0.4); border-color: var(--danger); box-shadow: 0 0 12px rgba(255,82,82,0.5); }
-  .cell.mine-hit::after { content: '💥'; font-size: 0.9rem; }
+/* SETTINGS SECTIONS */
+.settings-section {
+  padding:14px 18px;
+  border-bottom:1px solid var(--border);
+}
+.settings-section:last-child { border-bottom:none; }
 
-  .cell.mine-correct { background: rgba(0,230,118,0.1); border-color: var(--safe); }
-  .cell.mine-correct::after { content: '✓'; color: var(--safe); font-size: 0.9rem; }
+.section-title {
+  font-size:0.68rem;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.12em;
+  color:var(--text-muted);
+  margin-bottom:10px;
+}
 
-  /* Number colors */
-  .n1 { color: #4fc3f7; }
-  .n2 { color: #00e676; }
-  .n3 { color: #ff5252; }
-  .n4 { color: #7c4dff; }
-  .n5 { color: #ff6d00; }
-  .n6 { color: #00bcd4; }
-  .n7 { color: #f48fb1; }
-  .n8 { color: #cfd8dc; }
+/* THEME CHIPS */
+.theme-grid {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:6px;
+}
 
-  /* OVERLAY */
-  #overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(6px);
-    z-index: 100;
-    align-items: center;
-    justify-content: center;
-  }
-  #overlay.visible { display: flex; }
+.theme-chip {
+  padding:7px 4px;
+  border-radius:6px;
+  border:2px solid var(--border);
+  background:var(--surface2);
+  color:var(--text-muted);
+  font-size:0.75rem;
+  font-weight:600;
+  cursor:pointer;
+  text-align:center;
+  transition:all 0.12s;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+}
+.theme-chip:hover { border-color:var(--accent); color:var(--text); }
+.theme-chip.active { border-color:var(--accent); background:var(--accent-soft); color:var(--accent); }
+.theme-swatch {
+  width:28px;height:14px;
+  border-radius:3px;
+  display:block;
+}
 
-  .overlay-box {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 36px 48px;
-    text-align: center;
-    box-shadow: 0 0 60px rgba(0,0,0,0.6);
-    max-width: 340px;
-    width: 90%;
-  }
+/* COLOR PICKERS */
+.color-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:6px 0;
+}
+.color-label { font-size:0.82rem; color:var(--text-muted); }
+.color-pick-wrap {
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.color-pick-wrap input[type=color] {
+  width:32px;height:28px;
+  border:1px solid var(--border);
+  border-radius:4px;
+  background:var(--surface2);
+  cursor:pointer;
+  padding:2px;
+}
+.color-reset {
+  font-size:0.7rem;
+  color:var(--text-muted);
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:3px;
+  padding:2px 6px;
+  cursor:pointer;
+}
+.color-reset:hover { color:var(--text); }
 
-  .overlay-icon { font-size: 3rem; margin-bottom: 12px; }
-  .overlay-title {
-    font-size: 1.8rem;
-    font-weight: 900;
-    margin-bottom: 6px;
-    letter-spacing: 0.05em;
-  }
-  .win .overlay-title { color: var(--safe); text-shadow: 0 0 20px rgba(0,230,118,0.4); }
-  .lose .overlay-title { color: var(--danger); text-shadow: 0 0 20px rgba(255,82,82,0.4); }
+/* CELL SIZE */
+.slider-row {
+  display:flex;align-items:center;gap:8px;
+}
+.slider-row input[type=range] {
+  flex:1;
+  accent-color:var(--accent);
+}
+.slider-val {
+  font-family:var(--font-mono);
+  font-size:0.8rem;
+  color:var(--text-muted);
+  min-width:2.5ch;
+  text-align:right;
+}
 
-  .overlay-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 6px; }
-  .overlay-time { font-family: var(--font-mono); font-size: 1.1rem; color: var(--accent); margin-bottom: 24px; }
+/* ASSIST TOGGLES */
+.assist-item {
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  padding:8px 0;
+  border-bottom:1px solid var(--border);
+}
+.assist-item:last-child { border-bottom:none; }
 
-  .overlay-btn {
-    padding: 12px 32px;
-    border: none;
-    border-radius: 10px;
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 1rem;
-    cursor: pointer;
-    letter-spacing: 0.05em;
-    transition: opacity 0.15s, transform 0.1s;
-  }
-  .overlay-btn:hover { opacity: 0.85; transform: scale(1.02); }
-  .win .overlay-btn { background: var(--safe); color: #0d0d1a; }
-  .lose .overlay-btn { background: var(--danger); color: #fff; }
+.assist-top {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.assist-name { font-size:0.85rem; font-weight:600; }
+.assist-desc { font-size:0.72rem; color:var(--text-muted); line-height:1.4; }
 
-  /* BEST TIMES */
-  .best-row {
-    font-size: 0.75rem;
-    color: var(--muted);
-    margin-bottom: 16px;
-  }
-  .best-row span { color: var(--accent); font-family: var(--font-mono); }
+/* TOGGLE SWITCH */
+.toggle {
+  position:relative;
+  width:40px;height:22px;
+  flex-shrink:0;
+}
+.toggle input { opacity:0; width:0;height:0; }
+.toggle-track {
+  position:absolute;inset:0;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:11px;
+  cursor:pointer;
+  transition:background 0.2s, border-color 0.2s;
+}
+.toggle-track::after {
+  content:'';
+  position:absolute;
+  top:2px;left:2px;
+  width:16px;height:16px;
+  background:var(--text-muted);
+  border-radius:50%;
+  transition:transform 0.2s, background 0.2s;
+}
+.toggle input:checked + .toggle-track { background:var(--accent-soft); border-color:var(--accent); }
+.toggle input:checked + .toggle-track::after { transform:translateX(18px); background:var(--accent); }
 
-  /* INSTALL BANNER */
-  #install-banner {
-    display: none;
-    align-items: center;
-    gap: 12px;
-    margin-top: 16px;
-    padding: 10px 18px;
-    background: rgba(124,77,255,0.1);
-    border: 1px solid var(--accent2);
-    border-radius: 10px;
-    width: 100%;
-    max-width: 900px;
-    font-size: 0.85rem;
-    color: var(--muted);
-  }
-  #install-banner.visible { display: flex; }
-  #install-btn {
-    margin-left: auto;
-    padding: 7px 18px;
-    background: var(--accent2);
-    border: none;
-    border-radius: 7px;
-    color: #fff;
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 0.8rem;
-    cursor: pointer;
-  }
+/* CHEAT badge */
+.cheat-badge {
+  font-size:0.6rem;
+  padding:1px 5px;
+  border-radius:3px;
+  background:rgba(249,115,22,0.2);
+  color:var(--flag-c);
+  border:1px solid rgba(249,115,22,0.4);
+  font-weight:700;
+  letter-spacing:0.05em;
+  margin-left:6px;
+}
 
-  /* TIPS */
-  #tips {
-    margin-top: 14px;
-    font-size: 0.72rem;
-    color: var(--muted);
-    text-align: center;
-    letter-spacing: 0.04em;
-    opacity: 0.7;
-  }
+/* ── END OVERLAY ─────────────────────────────────── */
+.end-overlay {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.65);
+  backdrop-filter:blur(5px);
+  z-index:150;
+  align-items:center;
+  justify-content:center;
+}
+.end-overlay.open { display:flex; }
 
-  /* RESPONSIVE */
-  @media (max-width: 500px) {
-    .cell { width: 28px; height: 28px; font-size: 0.75rem; }
-    .logo { font-size: 1.1rem; }
-    .hud-value { font-size: 1.1rem; }
-    header { padding: 10px 14px; }
-  }
+.end-box {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:32px 40px;
+  text-align:center;
+  max-width:300px;
+  width:90%;
+}
 
-  /* CHORDING glow */
-  .chord-glow { animation: chordpulse 0.3s ease; }
-  @keyframes chordpulse {
-    0% { background: rgba(79,195,247,0.25); }
-    100% { background: var(--cell-rev); }
-  }
+.end-icon { font-size:2.5rem; margin-bottom:10px; }
+.end-title { font-size:1.6rem; font-weight:800; margin-bottom:4px; }
+.end-win .end-title { color:var(--safe); }
+.end-lose .end-title { color:var(--danger); }
+.end-stat { font-size:0.85rem; color:var(--text-muted); margin-bottom:2px; }
+.end-best { font-size:0.8rem; color:var(--safe); margin-bottom:20px; margin-top:4px; }
+
+.end-actions { display:flex; gap:8px; justify-content:center; }
+.end-btn {
+  padding:9px 22px;
+  border:none;
+  border-radius:6px;
+  font-weight:700;
+  font-size:0.88rem;
+  cursor:pointer;
+  transition:opacity 0.12s;
+}
+.end-btn:hover { opacity:0.85; }
+.end-btn.primary { background:var(--accent); color:#fff; }
+.end-btn.secondary { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+
+/* ── TOAST ────────────────────────────────────────── */
+.toast {
+  position:fixed;
+  bottom:24px;left:50%;
+  transform:translateX(-50%) translateY(80px);
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:8px 16px;
+  font-size:0.82rem;
+  color:var(--text);
+  pointer-events:none;
+  transition:transform 0.25s ease;
+  z-index:300;
+  white-space:nowrap;
+}
+.toast.show { transform:translateX(-50%) translateY(0); }
+
+/* ── INSTALL BANNER ──────────────────────────────── */
+.install-bar {
+  display:none;
+  width:100%;max-width:960px;
+  margin-top:10px;
+  background:var(--surface);
+  border:1px solid var(--accent);
+  border-radius:var(--radius);
+  padding:8px 14px;
+  font-size:0.8rem;
+  color:var(--text-muted);
+  align-items:center;
+  gap:8px;
+}
+.install-bar.visible { display:flex; }
+.install-bar span { flex:1; }
+.install-btn {
+  padding:5px 14px;
+  background:var(--accent);
+  border:none;
+  border-radius:4px;
+  color:#fff;
+  font-size:0.78rem;
+  font-weight:700;
+  cursor:pointer;
+}
+.dismiss-btn {
+  background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;
+}
+
+/* ── RESPONSIVE ────────────────────────────────────── */
+@media(max-width:520px){
+  .settings-panel { width:100%; max-height:80vh; border-radius:12px 12px 0 0; }
+  .settings-overlay { align-items:flex-end; padding:0; }
+  :root { --cell-size:28px; }
+  .end-box { padding:24px 24px; }
+}
 </style>
 </head>
-<body>
+<body data-theme="dark">
 
-<header>
-  <div class="logo">MINE<span>☢</span>SWEEPER</div>
-  <div class="hud">
-    <div class="hud-item">
-      <span class="hud-label">Mines</span>
-      <span class="hud-value danger" id="mine-count">0</span>
-    </div>
-    <div class="hud-item">
-      <span class="hud-label">Time</span>
-      <span class="hud-value" id="timer">0:00</span>
-    </div>
-    <div class="hud-item">
-      <span class="hud-label">Best</span>
-      <span class="hud-value safe" id="best-time">—</span>
-    </div>
-    <button class="reset-btn" id="reset-btn">↺ Reset</button>
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="game-title">Mine<em>sweeper</em></div>
+  <div class="spacer"></div>
+  <button class="icon-btn" id="reset-btn" title="New game">↺</button>
+  <button class="icon-btn" id="settings-btn" title="Settings">⚙</button>
+</div>
+
+<!-- HUD -->
+<div class="hud">
+  <div class="hud-stat">
+    <span class="hud-icon">🚩</span>
+    <span class="hud-val flag-color" id="mine-count">0</span>
   </div>
-</header>
+  <div class="hud-divider"></div>
+  <div class="hud-stat">
+    <span class="hud-icon">⏱</span>
+    <span class="hud-val time-color" id="timer">0:00</span>
+  </div>
+  <div class="hud-divider"></div>
+  <div class="hud-stat">
+    <span class="hud-icon">🏆</span>
+    <span class="hud-val best-color" id="best-time">—</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="hud-diff" id="hud-diff">Easy</div>
+</div>
 
-<div class="difficulty-row">
+<!-- DIFFICULTY TABS -->
+<div class="diff-row">
   <button class="diff-btn active" data-diff="easy">Easy</button>
   <button class="diff-btn" data-diff="medium">Medium</button>
   <button class="diff-btn" data-diff="hard">Hard</button>
-  <button class="diff-btn extreme" data-diff="extreme">Extreme</button>
+  <button class="diff-btn" data-diff="extreme">Extreme</button>
   <button class="diff-btn" data-diff="custom">Custom</button>
 </div>
 
-<div id="custom-panel">
-  <span class="custom-label">Cols</span>
-  <input class="custom-input" id="c-cols" type="number" value="16" min="5" max="40">
-  <span class="custom-label">Rows</span>
-  <input class="custom-input" id="c-rows" type="number" value="16" min="5" max="30">
-  <span class="custom-label">Mines</span>
-  <input class="custom-input" id="c-mines" type="number" value="40" min="1" max="500">
+<!-- CUSTOM PANEL -->
+<div class="custom-panel" id="custom-panel">
+  <div class="custom-field">
+    Cols <input type="number" id="c-cols" value="16" min="5" max="50">
+  </div>
+  <div class="custom-field">
+    Rows <input type="number" id="c-rows" value="16" min="5" max="30">
+  </div>
+  <div class="custom-field">
+    Mines <input type="number" id="c-mines" value="40" min="1" max="999">
+  </div>
   <button class="apply-btn" id="apply-custom">Apply</button>
 </div>
 
-<div id="board-wrap">
+<!-- BOARD -->
+<div class="board-wrap" id="board-wrap">
   <div id="board"></div>
 </div>
 
-<div id="install-banner">
-  📲 Install Minesweeper as an app for offline play
-  <button id="install-btn">Install</button>
+<!-- INSTALL BAR -->
+<div class="install-bar" id="install-bar">
+  <span>📲 Install Minesweeper as an app for offline play</span>
+  <button class="install-btn" id="install-btn">Install</button>
+  <button class="dismiss-btn" id="dismiss-install">✕</button>
 </div>
 
-<div id="tips">Left click: reveal &nbsp;|&nbsp; Right click: flag &nbsp;|&nbsp; Middle click / double-tap: chord</div>
+<!-- SETTINGS -->
+<div class="settings-overlay" id="settings-overlay">
+  <div class="settings-panel">
+    <div class="settings-header">
+      <h2>Settings</h2>
+      <button class="close-btn" id="close-settings">✕</button>
+    </div>
 
-<!-- OVERLAY -->
-<div id="overlay">
-  <div class="overlay-box" id="overlay-box">
-    <div class="overlay-icon" id="ov-icon"></div>
-    <div class="overlay-title" id="ov-title"></div>
-    <div class="overlay-sub" id="ov-sub"></div>
-    <div class="overlay-time" id="ov-time"></div>
-    <div class="best-row" id="ov-best"></div>
-    <button class="overlay-btn" id="ov-play-again">Play Again</button>
+    <!-- THEME -->
+    <div class="settings-section">
+      <div class="section-title">Theme</div>
+      <div class="theme-grid">
+        <button class="theme-chip active" data-theme-set="dark">
+          <span class="theme-swatch" style="background:linear-gradient(90deg,#27272a,#6366f1)"></span>
+          Dark
+        </button>
+        <button class="theme-chip" data-theme-set="light">
+          <span class="theme-swatch" style="background:linear-gradient(90deg,#f4f4f5,#6366f1)"></span>
+          Light
+        </button>
+        <button class="theme-chip" data-theme-set="forest">
+          <span class="theme-swatch" style="background:linear-gradient(90deg,#162216,#4ade80)"></span>
+          Forest
+        </button>
+        <button class="theme-chip" data-theme-set="ocean">
+          <span class="theme-swatch" style="background:linear-gradient(90deg,#0a1628,#38bdf8)"></span>
+          Ocean
+        </button>
+        <button class="theme-chip" data-theme-set="retro">
+          <span class="theme-swatch" style="background:linear-gradient(90deg,#1a1a0a,#d4d428)"></span>
+          Retro
+        </button>
+        <button class="theme-chip" data-theme-set="rose">
+          <span class="theme-swatch" style="background:linear-gradient(90deg,#1a0f12,#fb7185)"></span>
+          Rose
+        </button>
+      </div>
+    </div>
+
+    <!-- COLORS -->
+    <div class="settings-section">
+      <div class="section-title">Custom Colors</div>
+      <div class="color-row">
+        <span class="color-label">Accent / highlight</span>
+        <div class="color-pick-wrap">
+          <input type="color" id="col-accent" value="#6366f1">
+          <button class="color-reset" data-target="col-accent" data-default="#6366f1">↺</button>
+        </div>
+      </div>
+      <div class="color-row">
+        <span class="color-label">Flag color</span>
+        <div class="color-pick-wrap">
+          <input type="color" id="col-flag" value="#f97316">
+          <button class="color-reset" data-target="col-flag" data-default="#f97316">↺</button>
+        </div>
+      </div>
+      <div class="color-row">
+        <span class="color-label">Unrevealed cell</span>
+        <div class="color-pick-wrap">
+          <input type="color" id="col-cell-un" value="#3f3f46">
+          <button class="color-reset" data-target="col-cell-un" data-default="#3f3f46">↺</button>
+        </div>
+      </div>
+      <div class="color-row">
+        <span class="color-label">Revealed cell</span>
+        <div class="color-pick-wrap">
+          <input type="color" id="col-cell-rev" value="#27272a">
+          <button class="color-reset" data-target="col-cell-rev" data-default="#27272a">↺</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CELL SIZE -->
+    <div class="settings-section">
+      <div class="section-title">Cell Size</div>
+      <div class="slider-row">
+        <input type="range" id="cell-size-slider" min="20" max="48" value="32">
+        <span class="slider-val" id="cell-size-label">32px</span>
+      </div>
+    </div>
+
+    <!-- ASSISTS -->
+    <div class="settings-section">
+      <div class="section-title">Assists & Helpers</div>
+
+      <div class="assist-item">
+        <div class="assist-top">
+          <span class="assist-name">Neighbor Highlight</span>
+          <label class="toggle">
+            <input type="checkbox" id="a-highlight">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="assist-desc">Hover a number to glow its unrevealed neighbors — shows which cells it could be counting.</div>
+      </div>
+
+      <div class="assist-item">
+        <div class="assist-top">
+          <span class="assist-name">Safe Cell Hint <span class="cheat-badge">CHEAT</span></span>
+          <label class="toggle">
+            <input type="checkbox" id="a-safe">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="assist-desc">Hover a satisfied number (flags = count) to show its remaining neighbors in green — they're safe to click.</div>
+      </div>
+
+      <div class="assist-item">
+        <div class="assist-top">
+          <span class="assist-name">Danger Hint <span class="cheat-badge">CHEAT</span></span>
+          <label class="toggle">
+            <input type="checkbox" id="a-danger">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="assist-desc">If unflagged neighbors = remaining mines, hover highlights them red — they're all mines.</div>
+      </div>
+
+      <div class="assist-item">
+        <div class="assist-top">
+          <span class="assist-name">Auto-chord on Hover</span>
+          <label class="toggle">
+            <input type="checkbox" id="a-autochord">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="assist-desc">Middle-click (or double-tap) a revealed number whose flag count matches to clear its safe neighbors automatically.</div>
+      </div>
+
+      <div class="assist-item">
+        <div class="assist-top">
+          <span class="assist-name">Flag Counter Badge</span>
+          <label class="toggle">
+            <input type="checkbox" id="a-badge" checked>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="assist-desc">Show a small badge on revealed numbers indicating how many more flags are needed around them.</div>
+      </div>
+
+      <div class="assist-item">
+        <div class="assist-top">
+          <span class="assist-name">First-click Safety</span>
+          <label class="toggle">
+            <input type="checkbox" id="a-firstsafe" checked>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="assist-desc">Your first click is always safe — mines are placed after you click.</div>
+      </div>
+
+      <div class="assist-item">
+        <div class="assist-top">
+          <span class="assist-name">Question Mark Cycle</span>
+          <label class="toggle">
+            <input type="checkbox" id="a-question" checked>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="assist-desc">Right-click cycles: unflagged → 🚩 flag → ❓ question → unflagged. Useful for marking uncertain cells.</div>
+      </div>
+
+    </div>
   </div>
 </div>
 
+<!-- END OVERLAY -->
+<div class="end-overlay" id="end-overlay">
+  <div class="end-box" id="end-box">
+    <div class="end-icon" id="end-icon"></div>
+    <div class="end-title" id="end-title"></div>
+    <div class="end-stat" id="end-stat"></div>
+    <div class="end-best" id="end-best"></div>
+    <div class="end-actions">
+      <button class="end-btn primary" id="end-again">Play Again</button>
+      <button class="end-btn secondary" id="end-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
 <script>
-// ──────────────────────────────────────────────
-//  CONFIG
-// ──────────────────────────────────────────────
-const DIFFICULTIES = {
-  easy:    { cols: 9,  rows: 9,  mines: 10 },
-  medium:  { cols: 16, rows: 16, mines: 40 },
-  hard:    { cols: 30, rows: 16, mines: 99 },
-  extreme: { cols: 30, rows: 20, mines: 180 },
+// ══════════════════════════════════════════════════
+//  DIFFICULTY CONFIG
+// ══════════════════════════════════════════════════
+const DIFFS = {
+  easy:    { cols:9,  rows:9,  mines:10,  label:'Easy' },
+  medium:  { cols:16, rows:16, mines:40,  label:'Medium' },
+  hard:    { cols:30, rows:16, mines:99,  label:'Hard' },
+  extreme: { cols:30, rows:20, mines:180, label:'Extreme' },
 };
 
-// ──────────────────────────────────────────────
+// ══════════════════════════════════════════════════
 //  STATE
-// ──────────────────────────────────────────────
-let cfg   = { ...DIFFICULTIES.easy };
-let diff  = 'easy';
-let board = [];   // { mine, flagged, revealed, question, adj, el }
-let minesLeft, timerEl, timerInterval, timerSec, gameOver, firstClick;
-let deferredInstallPrompt = null;
+// ══════════════════════════════════════════════════
+let cfg = { ...DIFFS.easy };
+let diff = 'easy';
+let board = [];   // 2D array of cell objects
+let minesLeft, timerSec, timerInterval, gameOver, firstClick;
 
-// ──────────────────────────────────────────────
-//  ELEMENT REFS
-// ──────────────────────────────────────────────
-const boardEl    = document.getElementById('board');
-const mineEl     = document.getElementById('mine-count');
-const bestEl     = document.getElementById('best-time');
-const timerElRef = document.getElementById('timer');
-const resetBtn   = document.getElementById('reset-btn');
-const overlay    = document.getElementById('overlay');
-const ovBox      = document.getElementById('overlay-box');
-const ovIcon     = document.getElementById('ov-icon');
-const ovTitle    = document.getElementById('ov-title');
-const ovSub      = document.getElementById('ov-sub');
-const ovTime     = document.getElementById('ov-time');
-const ovBest     = document.getElementById('ov-best');
-const ovPlay     = document.getElementById('ov-play-again');
-const installBanner = document.getElementById('install-banner');
-const installBtn = document.getElementById('install-btn');
+// assists (loaded from settings)
+const A = {
+  highlight: () => document.getElementById('a-highlight').checked,
+  safe:      () => document.getElementById('a-safe').checked,
+  danger:    () => document.getElementById('a-danger').checked,
+  autochord: () => document.getElementById('a-autochord').checked,
+  badge:     () => document.getElementById('a-badge').checked,
+  firstsafe: () => document.getElementById('a-firstsafe').checked,
+  question:  () => document.getElementById('a-question').checked,
+};
 
-// ──────────────────────────────────────────────
-//  BEST TIMES
-// ──────────────────────────────────────────────
+// ══════════════════════════════════════════════════
+//  ELEMENTS
+// ══════════════════════════════════════════════════
+const boardEl     = document.getElementById('board');
+const mineCountEl = document.getElementById('mine-count');
+const timerEl     = document.getElementById('timer');
+const bestEl      = document.getElementById('best-time');
+const hudDiff     = document.getElementById('hud-diff');
+const endOverlay  = document.getElementById('end-overlay');
+const endBox      = document.getElementById('end-box');
+const toast       = document.getElementById('toast');
+
+// ══════════════════════════════════════════════════
+//  PERSISTENCE
+// ══════════════════════════════════════════════════
 function bestKey() { return `ms_best_${diff}_${cfg.cols}x${cfg.rows}_${cfg.mines}`; }
-function getBest() {
-  const v = localStorage.getItem(bestKey());
-  return v ? parseInt(v) : null;
-}
-function saveBest(secs) {
-  const cur = getBest();
-  if (cur === null || secs < cur) localStorage.setItem(bestKey(), secs);
-}
-function fmtTime(s) {
-  const m = Math.floor(s / 60);
-  return `${m}:${String(s % 60).padStart(2,'0')}`;
-}
-function updateBestDisplay() {
-  const b = getBest();
-  bestEl.textContent = b !== null ? fmtTime(b) : '—';
+function getBest() { const v=localStorage.getItem(bestKey()); return v?parseInt(v):null; }
+function saveBest(s) { const b=getBest(); if(b===null||s<b) localStorage.setItem(bestKey(),s); }
+
+function saveSettings() {
+  const s = {
+    theme: document.body.dataset.theme,
+    cellSize: document.getElementById('cell-size-slider').value,
+    accent: document.getElementById('col-accent').value,
+    flag: document.getElementById('col-flag').value,
+    cellUn: document.getElementById('col-cell-un').value,
+    cellRev: document.getElementById('col-cell-rev').value,
+    aHighlight: document.getElementById('a-highlight').checked,
+    aSafe: document.getElementById('a-safe').checked,
+    aDanger: document.getElementById('a-danger').checked,
+    aAutochord: document.getElementById('a-autochord').checked,
+    aBadge: document.getElementById('a-badge').checked,
+    aFirstsafe: document.getElementById('a-firstsafe').checked,
+    aQuestion: document.getElementById('a-question').checked,
+  };
+  localStorage.setItem('ms_settings', JSON.stringify(s));
 }
 
-// ──────────────────────────────────────────────
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('ms_settings') || 'null');
+    if (!s) return;
+    if (s.theme) applyTheme(s.theme, false);
+    if (s.cellSize) { document.getElementById('cell-size-slider').value = s.cellSize; applyCellSize(s.cellSize); }
+    if (s.accent) applyCustomColor('--accent', s.accent);
+    if (s.flag) applyCustomColor('--flag-c', s.flag);
+    if (s.cellUn) applyCustomColor('--cell-un', s.cellUn);
+    if (s.cellRev) applyCustomColor('--cell-rev', s.cellRev);
+    document.getElementById('col-accent').value = s.accent || '#6366f1';
+    document.getElementById('col-flag').value = s.flag || '#f97316';
+    document.getElementById('col-cell-un').value = s.cellUn || '#3f3f46';
+    document.getElementById('col-cell-rev').value = s.cellRev || '#27272a';
+    if (s.aHighlight !== undefined) document.getElementById('a-highlight').checked = s.aHighlight;
+    if (s.aSafe !== undefined) document.getElementById('a-safe').checked = s.aSafe;
+    if (s.aDanger !== undefined) document.getElementById('a-danger').checked = s.aDanger;
+    if (s.aAutochord !== undefined) document.getElementById('a-autochord').checked = s.aAutochord;
+    if (s.aBadge !== undefined) document.getElementById('a-badge').checked = s.aBadge;
+    if (s.aFirstsafe !== undefined) document.getElementById('a-firstsafe').checked = s.aFirstsafe;
+    if (s.aQuestion !== undefined) document.getElementById('a-question').checked = s.aQuestion;
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════
 //  TIMER
-// ──────────────────────────────────────────────
+// ══════════════════════════════════════════════════
+function fmt(s) { return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
 function startTimer() {
   stopTimer();
   timerSec = 0;
-  timerElRef.textContent = '0:00';
-  timerInterval = setInterval(() => {
-    timerSec++;
-    timerElRef.textContent = fmtTime(timerSec);
-  }, 1000);
+  timerEl.textContent = '0:00';
+  timerInterval = setInterval(() => { timerSec++; timerEl.textContent = fmt(timerSec); }, 1000);
 }
 function stopTimer() { clearInterval(timerInterval); }
 
-// ──────────────────────────────────────────────
-//  BOARD INIT
-// ──────────────────────────────────────────────
+// ══════════════════════════════════════════════════
+//  GAME INIT
+// ══════════════════════════════════════════════════
 function initGame() {
   stopTimer();
-  gameOver   = false;
+  gameOver = false;
   firstClick = true;
-  minesLeft  = cfg.mines;
-  timerSec   = 0;
-  timerElRef.textContent = '0:00';
-  mineEl.textContent = cfg.mines;
-  updateBestDisplay();
-  overlay.classList.remove('visible');
-  buildGrid();
+  minesLeft = cfg.mines;
+  timerSec = 0;
+  timerEl.textContent = '0:00';
+  mineCountEl.textContent = cfg.mines;
+  hudDiff.textContent = diff === 'custom' ? `Custom` : DIFFS[diff]?.label || 'Custom';
+  updateBest();
+  endOverlay.classList.remove('open');
+  buildBoard();
 }
 
-function buildGrid() {
-  boardEl.style.gridTemplateColumns = `repeat(${cfg.cols}, 1fr)`;
+function updateBest() {
+  const b = getBest();
+  bestEl.textContent = b !== null ? fmt(b) : '—';
+}
+
+function buildBoard() {
+  boardEl.style.gridTemplateColumns = `repeat(${cfg.cols},1fr)`;
   boardEl.innerHTML = '';
   board = [];
 
   for (let r = 0; r < cfg.rows; r++) {
     board[r] = [];
     for (let c = 0; c < cfg.cols; c++) {
-      const cell = { mine: false, flagged: false, revealed: false, question: false, adj: 0, el: null };
       const el = document.createElement('div');
       el.className = 'cell';
       el.dataset.r = r;
       el.dataset.c = c;
-      cell.el = el;
-      board[r][c] = cell;
+      board[r][c] = { mine:false, flagged:false, question:false, revealed:false, adj:0, el };
       boardEl.appendChild(el);
     }
   }
-
-  boardEl.addEventListener('click',       onLeftClick,   { capture: false });
-  boardEl.addEventListener('contextmenu', onRightClick,  { capture: false });
-  boardEl.addEventListener('mousedown',   onMiddleClick, { capture: false });
-
-  // Touch: double-tap to chord
-  let lastTap = 0, lastTapEl = null;
-  boardEl.addEventListener('touchend', e => {
-    const el = e.target.closest('.cell'); if (!el) return;
-    const now = Date.now();
-    if (now - lastTap < 300 && lastTapEl === el) {
-      e.preventDefault();
-      chord(+el.dataset.r, +el.dataset.c);
-    }
-    lastTap = now; lastTapEl = el;
-  });
 }
 
-function placeMines(safeR, safeC) {
+// ══════════════════════════════════════════════════
+//  MINE PLACEMENT
+// ══════════════════════════════════════════════════
+function placeMines(sr, sc) {
   const safe = new Set();
-  for (let dr = -1; dr <= 1; dr++)
-    for (let dc = -1; dc <= 1; dc++) {
-      const nr = safeR + dr, nc = safeC + dc;
-      if (nr >= 0 && nr < cfg.rows && nc >= 0 && nc < cfg.cols)
-        safe.add(nr * cfg.cols + nc);
-    }
-
-  let placed = 0;
-  const maxMines = Math.min(cfg.mines, cfg.rows * cfg.cols - safe.size);
-  while (placed < maxMines) {
-    const r = Math.floor(Math.random() * cfg.rows);
-    const c = Math.floor(Math.random() * cfg.cols);
-    const cell = board[r][c];
-    if (!cell.mine && !safe.has(r * cfg.cols + c)) {
-      cell.mine = true;
-      placed++;
+  if (A.firstsafe()) {
+    for (let dr=-1;dr<=1;dr++) for (let dc=-1;dc<=1;dc++) {
+      const nr=sr+dr, nc=sc+dc;
+      if (inBounds(nr,nc)) safe.add(nr*cfg.cols+nc);
     }
   }
-
-  // Calc adjacency
-  for (let r = 0; r < cfg.rows; r++)
-    for (let c = 0; c < cfg.cols; c++)
-      if (!board[r][c].mine)
-        board[r][c].adj = countAdj(r, c, cell => cell.mine);
+  const max = Math.min(cfg.mines, cfg.rows*cfg.cols - safe.size);
+  let placed = 0;
+  while (placed < max) {
+    const r = Math.floor(Math.random()*cfg.rows);
+    const c = Math.floor(Math.random()*cfg.cols);
+    const cell = board[r][c];
+    if (!cell.mine && !safe.has(r*cfg.cols+c)) { cell.mine=true; placed++; }
+  }
+  for (let r=0;r<cfg.rows;r++)
+    for (let c=0;c<cfg.cols;c++)
+      if (!board[r][c].mine) board[r][c].adj = neighbors(r,c).filter(([nr,nc])=>board[nr][nc].mine).length;
 }
 
-function neighbors(r, c) {
-  const res = [];
-  for (let dr = -1; dr <= 1; dr++)
-    for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue;
-      const nr = r + dr, nc = c + dc;
-      if (nr >= 0 && nr < cfg.rows && nc >= 0 && nc < cfg.cols)
-        res.push([nr, nc]);
-    }
+// ══════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════
+function inBounds(r,c){ return r>=0&&r<cfg.rows&&c>=0&&c<cfg.cols; }
+function neighbors(r,c){
+  const res=[];
+  for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+    if(dr===0&&dc===0) continue;
+    const nr=r+dr,nc=c+dc;
+    if(inBounds(nr,nc)) res.push([nr,nc]);
+  }
   return res;
 }
 
-function countAdj(r, c, pred) {
-  return neighbors(r, c).filter(([nr, nc]) => pred(board[nr][nc])).length;
-}
-
-// ──────────────────────────────────────────────
-//  CLICK HANDLERS
-// ──────────────────────────────────────────────
-function getCellFromEvent(e) {
-  const el = e.target.closest('.cell');
-  if (!el) return null;
-  return { r: +el.dataset.r, c: +el.dataset.c, el };
-}
-
-function onLeftClick(e) {
-  const t = getCellFromEvent(e); if (!t) return;
-  e.preventDefault();
-  if (gameOver) return;
-  const cell = board[t.r][t.c];
-  if (cell.flagged || cell.question || cell.revealed) return;
-
-  if (firstClick) {
-    firstClick = false;
-    placeMines(t.r, t.c);
-    startTimer();
-  }
-  reveal(t.r, t.c);
-}
-
-function onRightClick(e) {
-  e.preventDefault();
-  const t = getCellFromEvent(e); if (!t) return;
-  if (gameOver) return;
-  const cell = board[t.r][t.c];
-  if (cell.revealed) return;
-  cycleFlag(cell, t.r, t.c);
-}
-
-function onMiddleClick(e) {
-  if (e.button !== 1) return;
-  e.preventDefault();
-  const t = getCellFromEvent(e); if (!t) return;
-  if (gameOver) return;
-  chord(t.r, t.c);
-}
-
-function cycleFlag(cell) {
-  if (!cell.flagged && !cell.question) {
-    cell.flagged = true;
-    cell.el.className = 'cell flagged';
-    minesLeft--;
-  } else if (cell.flagged) {
-    cell.flagged = false;
-    cell.question = true;
-    cell.el.className = 'cell question';
-    minesLeft++;
-  } else {
-    cell.question = false;
-    cell.el.className = 'cell';
-  }
-  mineEl.textContent = minesLeft;
-}
-
-// ──────────────────────────────────────────────
-//  REVEAL LOGIC
-// ──────────────────────────────────────────────
-function reveal(r, c) {
+// ══════════════════════════════════════════════════
+//  REVEAL
+// ══════════════════════════════════════════════════
+function reveal(r,c){
   const cell = board[r][c];
-  if (cell.revealed || cell.flagged) return;
-
+  if(cell.revealed||cell.flagged||cell.question) return;
   cell.revealed = true;
-  cell.question = false;
-
-  if (cell.mine) {
-    cell.el.className = 'cell mine-hit';
-    endGame(false, r, c);
-    return;
-  }
-
-  renderRevealed(cell, r, c);
-  if (cell.adj === 0) neighbors(r, c).forEach(([nr, nc]) => reveal(nr, nc));
+  if(cell.mine){ triggerMine(r,c); return; }
+  renderCell(r,c);
+  if(cell.adj===0) neighbors(r,c).forEach(([nr,nc])=>reveal(nr,nc));
   checkWin();
 }
 
-function renderRevealed(cell, r, c) {
-  cell.el.className = 'cell revealed';
-  if (cell.adj > 0) {
-    cell.el.textContent = cell.adj;
-    cell.el.classList.add(`n${cell.adj}`);
+function renderCell(r,c){
+  const cell=board[r][c];
+  const el=cell.el;
+  el.className='cell revealed';
+  el.textContent='';
+  el.removeAttribute('data-n');
+  if(cell.adj>0){
+    el.dataset.n=cell.adj;
+    el.textContent=cell.adj;
+    if(A.badge()) updateBadge(r,c);
   }
 }
 
-function chord(r, c) {
-  const cell = board[r][c];
-  if (!cell.revealed || cell.adj === 0) return;
-  const flagCount = countAdj(r, c, cl => cl.flagged);
-  if (flagCount !== cell.adj) return;
-  cell.el.classList.add('chord-glow');
-  neighbors(r, c).forEach(([nr, nc]) => {
-    if (!board[nr][nc].flagged) reveal(nr, nc);
-  });
+function updateBadge(r,c){
+  const cell=board[r][c];
+  if(!cell.revealed||cell.adj===0) return;
+  const flagged=neighbors(r,c).filter(([nr,nc])=>board[nr][nc].flagged).length;
+  const need=cell.adj-flagged;
+  cell.el.textContent = need>0 ? cell.adj : cell.adj;
 }
 
-// ──────────────────────────────────────────────
-//  WIN / LOSE
-// ──────────────────────────────────────────────
-function checkWin() {
-  const total = cfg.rows * cfg.cols;
-  const revealed = board.flat().filter(c => c.revealed).length;
-  if (revealed === total - cfg.mines) endGame(true);
-}
-
-function endGame(won, hitR, hitC) {
+function triggerMine(r,c){
   stopTimer();
-  gameOver = true;
-
-  board.flat().forEach(cell => {
-    if (won) {
-      // Flag all un-flagged mines
-      if (cell.mine && !cell.flagged) {
-        cell.flagged = true;
-        cell.el.className = 'cell flagged';
+  gameOver=true;
+  board[r][c].el.className='cell mine-exp';
+  board[r][c].el.textContent='💥';
+  // reveal all mines
+  setTimeout(()=>{
+    board.flat().forEach(cell=>{
+      if(cell.mine && !cell.flagged && cell.el.className!=='cell mine-exp'){
+        cell.el.className='cell mine-show';
+        cell.el.textContent='💣';
       }
-    } else {
-      if (cell.mine && !cell.flagged && !cell.el.classList.contains('mine-hit'))
-        cell.el.className = 'cell mine';
-      if (!cell.mine && cell.flagged)
-        cell.el.className = 'cell mine-correct';
-    }
-  });
-
-  if (won) saveBest(timerSec);
-
-  setTimeout(() => showOverlay(won), won ? 400 : 700);
+      if(!cell.mine && cell.flagged){
+        cell.el.className='cell mine-wrong';
+        cell.el.textContent='❌';
+      }
+    });
+    showEnd(false);
+  },400);
 }
 
-function showOverlay(won) {
-  ovBox.className = `overlay-box ${won ? 'win' : 'lose'}`;
-  ovIcon.textContent  = won ? '🎉' : '💥';
-  ovTitle.textContent = won ? 'You Won!' : 'Game Over';
-  ovSub.textContent   = won
-    ? `Cleared in ${fmtTime(timerSec)}`
-    : `Better luck next time.`;
-  ovTime.textContent = '';
-
-  const b = getBest();
-  if (won && b !== null) {
-    const isNew = b === timerSec;
-    ovBest.innerHTML = isNew
-      ? `🏆 New best time: <span>${fmtTime(b)}</span>`
-      : `Best: <span>${fmtTime(b)}</span>`;
-  } else {
-    ovBest.textContent = '';
+function checkWin(){
+  const total=cfg.rows*cfg.cols;
+  const rev=board.flat().filter(c=>c.revealed).length;
+  if(rev===total-cfg.mines){
+    stopTimer();
+    gameOver=true;
+    board.flat().forEach(cell=>{ if(cell.mine&&!cell.flagged){ cell.flagged=true; cell.el.className='cell flagged'; cell.el.textContent='🚩'; }});
+    mineCountEl.textContent='0';
+    saveBest(timerSec);
+    setTimeout(()=>showEnd(true),300);
   }
-
-  overlay.classList.add('visible');
-  updateBestDisplay();
 }
 
-// ──────────────────────────────────────────────
-//  UI CONTROLS
-// ──────────────────────────────────────────────
-document.querySelectorAll('.diff-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    diff = btn.dataset.diff;
+// ══════════════════════════════════════════════════
+//  CHORD
+// ══════════════════════════════════════════════════
+function chord(r,c){
+  const cell=board[r][c];
+  if(!cell.revealed||cell.adj===0) return;
+  const flagged=neighbors(r,c).filter(([nr,nc])=>board[nr][nc].flagged).length;
+  if(flagged!==cell.adj) return;
+  neighbors(r,c).forEach(([nr,nc])=>{ if(!board[nr][nc].flagged) reveal(nr,nc); });
+}
 
-    const cp = document.getElementById('custom-panel');
-    if (diff === 'custom') {
-      cp.classList.add('visible');
-      const rows = parseInt(document.getElementById('c-rows').value);
-      const cols = parseInt(document.getElementById('c-cols').value);
-      const mines = parseInt(document.getElementById('c-mines').value);
-      cfg = { rows, cols, mines: Math.min(mines, rows * cols - 9) };
+// ══════════════════════════════════════════════════
+//  FLAG CYCLE
+// ══════════════════════════════════════════════════
+function cycleFlag(r,c){
+  const cell=board[r][c];
+  if(cell.revealed) return;
+  if(!cell.flagged&&!cell.question){
+    cell.flagged=true;
+    cell.el.className='cell flagged';
+    cell.el.textContent='🚩';
+    minesLeft--;
+  } else if(cell.flagged){
+    cell.flagged=false;
+    if(A.question()){
+      cell.question=true;
+      cell.el.className='cell question';
+      cell.el.textContent='❓';
+      minesLeft++;
     } else {
-      cp.classList.remove('visible');
-      cfg = { ...DIFFICULTIES[diff] };
+      cell.el.className='cell';
+      cell.el.textContent='';
+      minesLeft++;
+    }
+  } else {
+    cell.question=false;
+    cell.el.className='cell';
+    cell.el.textContent='';
+  }
+  mineCountEl.textContent=minesLeft;
+}
+
+// ══════════════════════════════════════════════════
+//  ASSIST HIGHLIGHTS
+// ══════════════════════════════════════════════════
+let lastHighlighted = [];
+function clearHighlights(){
+  lastHighlighted.forEach(([r,c])=>{
+    const cell=board[r][c];
+    if(!cell.revealed&&!cell.flagged&&!cell.question)
+      cell.el.classList.remove('assist-neighbor','assist-safe','assist-danger');
+  });
+  lastHighlighted=[];
+}
+
+function applyHighlight(r,c){
+  if(gameOver) return;
+  const cell=board[r][c];
+  if(!cell.revealed||cell.adj===0) return;
+
+  const nbrs=neighbors(r,c);
+  const flagged=nbrs.filter(([nr,nc])=>board[nr][nc].flagged).length;
+  const unrevealed=nbrs.filter(([nr,nc])=>!board[nr][nc].revealed&&!board[nr][nc].flagged&&!board[nr][nc].question);
+  const need=cell.adj-flagged;
+
+  unrevealed.forEach(([nr,nc])=>{
+    const el=board[nr][nc].el;
+    if(A.danger()&&need>0&&unrevealed.length===need){
+      el.classList.add('assist-danger');
+    } else if(A.safe()&&need===0){
+      el.classList.add('assist-safe');
+    } else if(A.highlight()){
+      el.classList.add('assist-neighbor');
+    }
+    lastHighlighted.push([nr,nc]);
+  });
+}
+
+// ══════════════════════════════════════════════════
+//  EVENT HANDLERS
+// ══════════════════════════════════════════════════
+boardEl.addEventListener('click', e=>{
+  const el=e.target.closest('.cell'); if(!el) return;
+  if(gameOver) return;
+  const r=+el.dataset.r, c=+el.dataset.c;
+  const cell=board[r][c];
+  if(cell.flagged||cell.question||cell.revealed) return;
+  if(firstClick){ firstClick=false; placeMines(r,c); startTimer(); }
+  reveal(r,c);
+});
+
+boardEl.addEventListener('contextmenu', e=>{
+  e.preventDefault();
+  const el=e.target.closest('.cell'); if(!el) return;
+  if(gameOver) return;
+  cycleFlag(+el.dataset.r, +el.dataset.c);
+});
+
+boardEl.addEventListener('mousedown', e=>{
+  if(e.button!==1) return;
+  e.preventDefault();
+  const el=e.target.closest('.cell'); if(!el) return;
+  if(gameOver) return;
+  chord(+el.dataset.r, +el.dataset.c);
+});
+
+boardEl.addEventListener('mouseover', e=>{
+  const el=e.target.closest('.cell');
+  clearHighlights();
+  if(!el) return;
+  applyHighlight(+el.dataset.r, +el.dataset.c);
+});
+
+boardEl.addEventListener('mouseleave', ()=>clearHighlights());
+
+// Double-tap to chord on mobile
+let lastTap=0, lastTapEl=null;
+boardEl.addEventListener('touchend', e=>{
+  const el=e.target.closest('.cell'); if(!el) return;
+  const now=Date.now();
+  if(now-lastTap<300&&lastTapEl===el){
+    e.preventDefault();
+    chord(+el.dataset.r, +el.dataset.c);
+  }
+  lastTap=now; lastTapEl=el;
+});
+
+// ══════════════════════════════════════════════════
+//  END SCREEN
+// ══════════════════════════════════════════════════
+function showEnd(won){
+  const box=endBox;
+  box.className='end-box '+(won?'end-win':'end-lose');
+  document.getElementById('end-icon').textContent=won?'🎉':'💥';
+  document.getElementById('end-title').textContent=won?'You won!':'Game over';
+  document.getElementById('end-stat').textContent=won?`Cleared in ${fmt(timerSec)}`:`Hit a mine after ${fmt(timerSec)}`;
+  const b=getBest();
+  const bestEl2=document.getElementById('end-best');
+  if(won&&b!==null){
+    bestEl2.textContent = b===timerSec ? `🏆 New best: ${fmt(b)}` : `Best time: ${fmt(b)}`;
+  } else { bestEl2.textContent=''; }
+  endOverlay.classList.add('open');
+  updateBest();
+}
+
+document.getElementById('end-again').onclick=()=>{ endOverlay.classList.remove('open'); initGame(); };
+document.getElementById('end-close').onclick=()=>endOverlay.classList.remove('open');
+document.getElementById('reset-btn').onclick=initGame;
+
+// ══════════════════════════════════════════════════
+//  DIFFICULTY BUTTONS
+// ══════════════════════════════════════════════════
+document.querySelectorAll('.diff-btn').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    diff=btn.dataset.diff;
+    const cp=document.getElementById('custom-panel');
+    if(diff==='custom'){
+      cp.classList.add('open');
+      cfg={
+        rows:+document.getElementById('c-rows').value||16,
+        cols:+document.getElementById('c-cols').value||16,
+        mines:+document.getElementById('c-mines').value||40
+      };
+    } else {
+      cp.classList.remove('open');
+      cfg={...DIFFS[diff]};
     }
     initGame();
-  });
+  };
 });
 
-document.getElementById('apply-custom').addEventListener('click', () => {
-  let rows  = Math.max(5, Math.min(30, parseInt(document.getElementById('c-rows').value) || 9));
-  let cols  = Math.max(5, Math.min(40, parseInt(document.getElementById('c-cols').value) || 9));
-  let mines = parseInt(document.getElementById('c-mines').value) || 10;
-  mines = Math.max(1, Math.min(mines, rows * cols - 9));
-  document.getElementById('c-rows').value  = rows;
-  document.getElementById('c-cols').value  = cols;
-  document.getElementById('c-mines').value = mines;
-  cfg = { rows, cols, mines };
+document.getElementById('apply-custom').onclick=()=>{
+  let rows=Math.max(5,Math.min(30,+document.getElementById('c-rows').value||9));
+  let cols=Math.max(5,Math.min(50,+document.getElementById('c-cols').value||9));
+  let mines=Math.max(1,Math.min(+document.getElementById('c-mines').value||10,rows*cols-9));
+  document.getElementById('c-rows').value=rows;
+  document.getElementById('c-cols').value=cols;
+  document.getElementById('c-mines').value=mines;
+  cfg={rows,cols,mines};
   initGame();
-});
+};
 
-resetBtn.addEventListener('click', initGame);
-ovPlay.addEventListener('click', () => { overlay.classList.remove('visible'); initGame(); });
+// ══════════════════════════════════════════════════
+//  SETTINGS PANEL
+// ══════════════════════════════════════════════════
+const settingsOverlay=document.getElementById('settings-overlay');
+document.getElementById('settings-btn').onclick=()=>settingsOverlay.classList.add('open');
+document.getElementById('close-settings').onclick=()=>{ settingsOverlay.classList.remove('open'); saveSettings(); };
+settingsOverlay.addEventListener('click',e=>{ if(e.target===settingsOverlay){ settingsOverlay.classList.remove('open'); saveSettings(); }});
 
-// ──────────────────────────────────────────────
-//  PWA / INSTALL
-// ──────────────────────────────────────────────
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredInstallPrompt = e;
-  installBanner.classList.add('visible');
-});
+// ── THEMES ──
+const THEME_DEFAULTS = {
+  dark:   { accent:'#6366f1', flag:'#f97316', cellUn:'#3f3f46', cellRev:'#27272a' },
+  light:  { accent:'#6366f1', flag:'#f97316', cellUn:'#e4e4e7', cellRev:'#f4f4f5' },
+  forest: { accent:'#4ade80', flag:'#f97316', cellUn:'#1e321e', cellRev:'#0f1f0f' },
+  ocean:  { accent:'#38bdf8', flag:'#f97316', cellUn:'#162c54', cellRev:'#0a1628' },
+  retro:  { accent:'#d4d428', flag:'#f97316', cellUn:'#3a3a18', cellRev:'#1a1a0a' },
+  rose:   { accent:'#fb7185', flag:'#f97316', cellUn:'#3d2030', cellRev:'#1a0f12' },
+};
 
-installBtn.addEventListener('click', async () => {
-  if (!deferredInstallPrompt) return;
-  deferredInstallPrompt.prompt();
-  const { outcome } = await deferredInstallPrompt.userChoice;
-  if (outcome === 'accepted') installBanner.classList.remove('visible');
-  deferredInstallPrompt = null;
-});
-
-window.addEventListener('appinstalled', () => {
-  installBanner.classList.remove('visible');
-});
-
-// ──────────────────────────────────────────────
-//  SERVICE WORKER (inline)
-// ──────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-  const swCode = `
-const CACHE = 'minesweeper-v1';
-const ASSETS = [location.href];
-self.addEventListener('install', e => e.waitUntil(
-  caches.open(CACHE).then(c => c.addAll(ASSETS))
-));
-self.addEventListener('fetch', e => e.respondWith(
-  caches.match(e.request).then(r => r || fetch(e.request))
-));
-`;
-  const blob = new Blob([swCode], { type: 'application/javascript' });
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl).catch(() => {});
+function applyTheme(name, updateChips=true){
+  document.body.dataset.theme = name;
+  if(updateChips){
+    document.querySelectorAll('.theme-chip').forEach(c=>c.classList.toggle('active',c.dataset.themeSet===name));
+  }
+  // reset color pickers to theme defaults
+  const def=THEME_DEFAULTS[name]||THEME_DEFAULTS.dark;
+  document.getElementById('col-accent').value=def.accent;
+  document.getElementById('col-flag').value=def.flag;
+  document.getElementById('col-cell-un').value=def.cellUn;
+  document.getElementById('col-cell-rev').value=def.cellRev;
+  // clear any inline overrides
+  document.documentElement.style.removeProperty('--accent');
+  document.documentElement.style.removeProperty('--flag-c');
+  document.documentElement.style.removeProperty('--cell-un');
+  document.documentElement.style.removeProperty('--cell-rev');
 }
 
-// ──────────────────────────────────────────────
-//  START
-// ──────────────────────────────────────────────
+document.querySelectorAll('.theme-chip').forEach(chip=>{
+  chip.onclick=()=>{ applyTheme(chip.dataset.themeSet); saveSettings(); };
+});
+
+// ── CUSTOM COLORS ──
+function applyCustomColor(varName, val){
+  document.documentElement.style.setProperty(varName, val);
+}
+
+document.getElementById('col-accent').oninput=e=>{ applyCustomColor('--accent',e.target.value); saveSettings(); };
+document.getElementById('col-flag').oninput=e=>{ applyCustomColor('--flag-c',e.target.value); saveSettings(); };
+document.getElementById('col-cell-un').oninput=e=>{ applyCustomColor('--cell-un',e.target.value); saveSettings(); };
+document.getElementById('col-cell-rev').oninput=e=>{ applyCustomColor('--cell-rev',e.target.value); saveSettings(); };
+
+document.querySelectorAll('.color-reset').forEach(btn=>{
+  btn.onclick=()=>{
+    const input=document.getElementById(btn.dataset.target);
+    const def=btn.dataset.default;
+    input.value=def;
+    input.dispatchEvent(new Event('input'));
+  };
+});
+
+// ── CELL SIZE ──
+function applyCellSize(val){
+  document.documentElement.style.setProperty('--cell-size', val+'px');
+  document.getElementById('cell-size-label').textContent=val+'px';
+}
+document.getElementById('cell-size-slider').oninput=e=>{ applyCellSize(e.target.value); saveSettings(); };
+
+// ── ASSIST TOGGLES ──
+document.querySelectorAll('.assist-item input[type=checkbox]').forEach(cb=>{
+  cb.onchange=saveSettings;
+});
+
+// Badge toggle: re-render all revealed cells
+document.getElementById('a-badge').onchange=()=>{
+  board.flat().forEach(cell=>{ if(cell.revealed&&cell.adj>0) renderCell(board.findIndex(row=>row.includes(cell)),board.find(row=>row.includes(cell)).indexOf(cell)); });
+  saveSettings();
+};
+
+// ══════════════════════════════════════════════════
+//  INSTALL
+// ══════════════════════════════════════════════════
+let deferredInstall=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();
+  deferredInstall=e;
+  document.getElementById('install-bar').classList.add('visible');
+});
+document.getElementById('install-btn').onclick=async()=>{
+  if(!deferredInstall) return;
+  deferredInstall.prompt();
+  const {outcome}=await deferredInstall.userChoice;
+  if(outcome==='accepted') document.getElementById('install-bar').classList.remove('visible');
+  deferredInstall=null;
+};
+document.getElementById('dismiss-install').onclick=()=>document.getElementById('install-bar').classList.remove('visible');
+window.addEventListener('appinstalled',()=>document.getElementById('install-bar').classList.remove('visible'));
+
+// ══════════════════════════════════════════════════
+//  SERVICE WORKER (inline blob for offline)
+// ══════════════════════════════════════════════════
+if('serviceWorker' in navigator){
+  const sw=`
+const CACHE='ms-v2';
+self.addEventListener('install',e=>e.waitUntil(
+  caches.open(CACHE).then(c=>c.add(self.registration.scope))
+));
+self.addEventListener('activate',e=>e.waitUntil(
+  caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))
+));
+self.addEventListener('fetch',e=>e.respondWith(
+  caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{
+    if(res.ok){const c=res.clone();caches.open(CACHE).then(cache=>cache.put(e.request,c));}
+    return res;
+  }))
+));
+`;
+  const blob=new Blob([sw],{type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+
+// ══════════════════════════════════════════════════
+//  MANIFEST (injected)
+// ══════════════════════════════════════════════════
+(function(){
+  const m={
+    name:'Minesweeper',short_name:'Mines',
+    start_url:'./',display:'standalone',
+    background_color:'#18181b',theme_color:'#18181b',
+    icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💣</text></svg>",sizes:'any',type:'image/svg+xml'}]
+  };
+  const link=document.createElement('link');
+  link.rel='manifest';
+  link.href='data:application/manifest+json,'+encodeURIComponent(JSON.stringify(m));
+  document.head.appendChild(link);
+})();
+
+// ══════════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════════
+function showToast(msg){
+  toast.textContent=msg;
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'),2000);
+}
+
+// ══════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════
+loadSettings();
 initGame();
 </script>
 </body>
