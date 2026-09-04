@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>R6 HTML Game</title>
+<style>
+    html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #111;
+        font-family: Arial, sans-serif;
+    }
+
+    #game {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+    }
+
+    #crosshair {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: 8px;
+        height: 8px;
+        transform: translate(-50%, -50%);
+        border: 1px solid white;
+        border-radius: 50%;
+        pointer-events: none;
+        box-sizing: border-box;
+    }
+
+    #info {
+        position: fixed;
+        left: 15px;
+        top: 15px;
+        color: white;
+        background: rgba(0,0,0,.55);
+        padding: 10px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        line-height: 1.5;
+        pointer-events: none;
+    }
+
+    #start {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,.72);
+        color: white;
+        cursor: pointer;
+        z-index: 10;
+    }
+
+    #start div {
+        text-align: center;
+        background: rgba(20,20,20,.9);
+        padding: 28px 38px;
+        border-radius: 10px;
+    }
+
+    #start h1 {
+        margin: 0 0 8px;
+        font-size: 26px;
+    }
+
+    #start p {
+        margin: 5px 0;
+        opacity: .8;
+    }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="crosshair"></div>
+
+<div id="info">
+    WASD — Move<br>
+    Space — Jump<br>
+    Right Mouse — Orbit<br>
+    Scroll — Zoom<br>
+    Esc — Release mouse
+</div>
+
+<div id="start">
+    <div>
+        <h1>R6 Game</h1>
+        <p>Click to start</p>
+        <p>WASD to move · Space to jump · Scroll to zoom</p>
+    </div>
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.1/examples/jsm/",
+        "rapier": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.12.0/rapier.es.min.js"
+    }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import RAPIER from "rapier";
+
+// ─── Rapier init (async WASM) ─────────────────────────────────────────────────
+await RAPIER.init();
+const gravity = { x: 0, y: -50, z: 0 };
+const world   = new RAPIER.World(gravity);
+
+// Sync list: { body, mesh } pairs updated every frame
+const physObjects = [];
+
+const canvas = document.getElementById("game");
+const startScreen = document.getElementById("start");
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87a9c4); // fallback until skybox loads
+scene.fog = new THREE.Fog(0x9ab3c8, 80, 320);
+
+// ── Skybox — inverted box, 6 MeshBasicMaterial faces, always works ────────────
+// ── Skybox — manually selected pixel region ─────────────────────────────────
+function makeSkyFaceMat(
+    img,
+    point1,
+    point2,
+    point3,
+    point4,
+    rotation = 0
+) {
+    // Calculate crop bounds from the four points
+    const left   = Math.min(point1.x, point2.x, point3.x, point4.x);
+    const right  = Math.max(point1.x, point2.x, point3.x, point4.x);
+    const top    = Math.min(point1.y, point2.y, point3.y, point4.y);
+    const bottom = Math.max(point1.y, point2.y, point3.y, point4.y);
+
+    const width = right - left;
+    const height = bottom - top;
+
+    const c = document.createElement("canvas");
+
+    // Swap canvas dimensions for 90 / 270 rotations
+    if (rotation === 90 || rotation === 270) {
+        c.width = height;
+        c.height = width;
+    } else {
+        c.width = width;
+        c.height = height;
+    }
+
+    const ctx = c.getContext("2d");
+
+    ctx.save();
+
+    // Move origin to center
+    ctx.translate(c.width / 2, c.height / 2);
+
+    // Rotation
+    ctx.rotate(THREE.MathUtils.degToRad(rotation));
+
+    // Draw selected region
+    ctx.drawImage(
+        img,
+
+        // Source rectangle
+        left,
+        top,
+        width,
+        height,
+
+        // Destination rectangle
+        -width / 2,
+        -height / 2,
+        width,
+        height
+    );
+
+    ctx.restore();
+
+    const tex = new THREE.CanvasTexture(c);
+
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+
+    return new THREE.MeshBasicMaterial({
+        map: tex,
+        side: THREE.BackSide,
+        depthWrite: false,
+        depthTest: false,
+        fog: false
+    });
+}
+
+const skyImg = new Image();
+skyImg.onload = () => {
+    // Spritesheet: 2 cols × 4 rows. row0=R/L, row1=T/B, row2=F/Ba, row3=preview
+    const skyBox = new THREE.Mesh(
+        new THREE.BoxGeometry(100000, 100000, 100000),
+        [
+            // +X
+            makeSkyFaceMat(
+                skyImg,
+                { x: 5,   y: 5 },    // point1 - top left
+                { x: 260, y: 5 },    // point2 - top right
+                { x: 5,   y: 260 },  // point3 - bottom left
+                { x: 260, y: 260 }, // point4 - bottom right
+                0
+            ),
+
+            // -X
+            makeSkyFaceMat(
+                skyImg,
+                { x: 5, y: 266 },
+                { x: 260, y: 266 },
+                { x: 5, y: 521 },
+                { x: 260, y: 521 },
+                0
+            ),
+
+            // +Y
+            makeSkyFaceMat(
+                skyImg,
+                { x: 266, y: 527 },
+                { x: 521, y: 527 },
+                { x: 266, y: 782 },
+                { x: 521, y: 782 },
+                180
+            ),
+
+            // -Y
+            makeSkyFaceMat(
+                skyImg,
+                { x: 266, y: 5 },
+                { x: 521, y: 5 },
+                { x: 266, y: 260 },
+                { x: 521, y: 260 },
+                180
+            ),
+
+            // +Z
+            makeSkyFaceMat(
+                skyImg,
+                { x: 266, y: 266 },
+                { x: 521, y: 266 },
+                { x: 266, y: 521 },
+                { x: 521, y: 521 },
+                0
+            ),
+
+            // -Z
+            makeSkyFaceMat(
+                skyImg,
+                { x: 5, y: 527 },
+                { x: 260, y: 527 },
+                { x: 5, y: 782 },
+                { x: 260, y: 782 },
+                0
+            ),
+        ]
+    );
+    skyBox.renderOrder = -1;
+    skyBox.frustumCulled = false;
+    skyBox.material.forEach(m => m.fog = false);
+    scene.add(skyBox);
+    scene.background = null; // remove flat colour once box is ready
+};
+skyImg.onerror = () => console.error("Skybox failed: Textures/Skybox.png");
+skyImg.src = "Textures/Skybox.png";
+
+const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.05,
+    100000
+);
+
+// Lighting
+const hemi = new THREE.HemisphereLight(0xffffff, 0x556677, 2.0);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xffffff, 3.0);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -150;
+sun.shadow.camera.right = 150;
+sun.shadow.camera.top = 150;
+sun.shadow.camera.bottom = -150;
+scene.add(sun);
+
+// Editable sun angles — change these then call applySunAngles()
+const sunConfig = {
+    azimuth:   45,  // degrees, horizontal (0=+Z, 90=+X, 180=-Z, 270=-X)
+    elevation: 50,  // degrees above horizon (0=horizon, 90=overhead)
+};
+function applySunAngles() {
+    const az = THREE.MathUtils.degToRad(sunConfig.azimuth);
+    const el = THREE.MathUtils.degToRad(sunConfig.elevation);
+    const r  = 150;
+    sun.position.set(
+        r * Math.cos(el) * Math.sin(az),
+        r * Math.sin(el),
+        r * Math.cos(el) * Math.cos(az)
+    );
+}
+applySunAngles();
+
+// Baseplate
+const BASE_SIZE = 200;
+const STUD_H = 1.2;
+
+// ─── Texture loader helper ────────────────────────────────────────────────────
+const texLoader = new THREE.TextureLoader();
+function loadTex(path, repeatX, repeatY) {
+    const t = texLoader.load(path);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = THREE.RepeatWrapping;
+    t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(repeatX, repeatY);
+    return t;
+}
+
+/**
+ * createPart(w, h, d, x, y, z, color, dynamic)
+ *   w, h, d — full dimensions
+ *   x, y, z   — world centre
+ *   options   — property object (see defaults below)
+ *
+ * Options:
+ *   color        hex        0x4d7845   base colour
+ *   anchored     bool       true       anchored = never moves (like Roblox Anchored)
+ *   canCollide   bool       true       whether other bodies collide with it
+ *   friction     number     0.7
+ *   restitution  number     0.1        bounciness
+ *   mass         number     1.0        only used when anchored=false
+ *   castShadow   bool       true
+ *   visible      bool       true
+ */
+function createPart(w, h, d, x, y, z, options = {}) {
+    const {
+        color       = 0xc8a97a,
+        anchored    = true,
+        canCollide  = true,
+        friction    = 0.7,
+        restitution = 0.1,
+        mass        = 1.0,
+        castShadow  = true,
+        visible     = true,
+    } = options;
+
+    const sideMat = new THREE.MeshStandardMaterial({ color, roughness: 0.8 });
+    const topMat  = new THREE.MeshStandardMaterial({
+        map: loadTex("Textures/top-stud.jpg", w, d),
+        color, roughness: 0.7, transparent: false, alphaTest: 0,
+    });
+    const botMat  = new THREE.MeshStandardMaterial({
+        map: loadTex("Textures/bottom-stud.jpeg", w, d),
+        color, roughness: 0.8, transparent: false, alphaTest: 0,
+    });
+
+    const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, d),
+        [sideMat, sideMat, topMat, botMat, sideMat, sideMat]
+    );
+    mesh.position.set(x, y, z);
+    mesh.castShadow  = castShadow;
+    mesh.receiveShadow = true;
+    mesh.visible     = visible;
+    scene.add(mesh);
+
+    // Rapier rigid body
+    const bodyDesc = anchored
+    ? RAPIER.RigidBodyDesc.fixed()
+    : RAPIER.RigidBodyDesc.dynamic();
+bodyDesc.setTranslation(x, y, z);
+    const body = world.createRigidBody(bodyDesc);
+
+    const colDesc = RAPIER.ColliderDesc.cuboid(w / 2, h / 2, d / 2)
+    .setMass(mass) // <-- Change this line
+    .setFriction(friction)
+    .setRestitution(restitution)
+    .setSensor(!canCollide);
+    world.createCollider(colDesc, body);
+
+    const part = { mesh, body, w, h, d, anchored, canCollide };
+    if (!anchored) physObjects.push(part);
+    return part;
+}
+
+/**
+ * editPart(part, options)
+ *   part     — the object returned by createPart
+ *   options  — any subset of the properties you want to change:
+ *     color, anchored, canCollide, friction, restitution, visible, castShadow
+ *
+ * Example:
+ *   const brick = createPart(4,4,4, 10,2,0, { anchored: false, color: 0xff0000 });
+ *   editPart(brick, { anchored: true, color: 0x00ff00, canCollide: false });
+ */
+function editPart(part, options = {}) {
+    const { mesh, body, w, h, d } = part;
+
+    // Color
+    if (options.color !== undefined) {
+        mesh.material.forEach(m => {
+            if (m.color) m.color.setHex(options.color);
+        });
+    }
+
+    // Visible
+    if (options.visible !== undefined) mesh.visible = options.visible;
+
+    // Cast shadow
+    if (options.castShadow !== undefined) mesh.castShadow = options.castShadow;
+
+    // Anchored — swap body type
+    if (options.anchored !== undefined && options.anchored !== part.anchored) {
+        const pos = body.translation();
+        const newDesc = options.anchored
+            ? RAPIER.RigidBodyDesc.fixed()
+            : RAPIER.RigidBodyDesc.dynamic().setAdditionalMass(1.0);
+        newDesc.setTranslation(pos.x, pos.y, pos.z);
+        if (!options.anchored) newDesc.lockRotations();
+
+        // Remove old body and recreate
+        const oldColliders = [];
+        for (let i = 0; i < body.numColliders(); i++) oldColliders.push(body.collider(i));
+        world.removeRigidBody(body);
+
+        part.body = world.createRigidBody(newDesc);
+
+        // Re-add collider with existing or new settings
+        const colDesc = RAPIER.ColliderDesc.cuboid(w / 2, h / 2, d / 2)
+            .setFriction(options.friction  ?? 0.7)
+            .setRestitution(options.restitution ?? 0.1)
+            .setSensor(options.canCollide !== undefined ? !options.canCollide : !part.canCollide);
+        world.createCollider(colDesc, part.body);
+
+        part.anchored = options.anchored;
+
+        // Add to / remove from sync list
+        const idx = physObjects.indexOf(part);
+        if (!options.anchored && idx === -1) physObjects.push(part);
+        if (options.anchored  && idx !== -1) physObjects.splice(idx, 1);
+    }
+
+    // CanCollide (sensor toggle) — only if body wasn't just recreated
+    if (options.canCollide !== undefined && options.canCollide !== part.canCollide
+        && options.anchored === undefined) {
+        for (let i = 0; i < part.body.numColliders(); i++) {
+            part.body.collider(i).setSensor(!options.canCollide);
+        }
+        part.canCollide = options.canCollide;
+    }
+
+    // Friction / restitution on existing colliders
+    if ((options.friction !== undefined || options.restitution !== undefined)
+        && options.anchored === undefined) {
+        for (let i = 0; i < part.body.numColliders(); i++) {
+            const c = part.body.collider(i);
+            if (options.friction    !== undefined) c.setFriction(options.friction);
+            if (options.restitution !== undefined) c.setRestitution(options.restitution);
+        }
+    }
+
+    return part;
+}
+
+// ── Baseplate visual (single mesh) ───────────────────────────────────────────
+const plateSideMat = new THREE.MeshStandardMaterial({ color: 0x4d7845, roughness: 0.8 });
+const plateTopMat  = new THREE.MeshStandardMaterial({
+    map: loadTex("Textures/top-stud.jpg", BASE_SIZE, BASE_SIZE),
+    color: 0x4d7845, roughness: 0.7, transparent: false, alphaTest: 0,
+});
+const plateBotMat  = new THREE.MeshStandardMaterial({
+    map: loadTex("Textures/bottom-stud.jpeg", BASE_SIZE, BASE_SIZE),
+    color: 0x4d7845, roughness: 0.8, transparent: false, alphaTest: 0,
+});
+const plateMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(BASE_SIZE, STUD_H, BASE_SIZE),
+    [plateSideMat, plateSideMat, plateTopMat, plateBotMat, plateSideMat, plateSideMat]
+);
+plateMesh.position.set(0, -STUD_H / 2, 0);
+plateMesh.receiveShadow = true;
+scene.add(plateMesh);
+
+// Rapier static collider for baseplate
+{
+    const bd = RAPIER.RigidBodyDesc.fixed().setTranslation(0, -STUD_H / 2, 0);
+    const bb = world.createRigidBody(bd);
+    world.createCollider(
+        RAPIER.ColliderDesc.cuboid(BASE_SIZE / 2, STUD_H / 2, BASE_SIZE / 2).setFriction(0.7),
+        bb
+    );
+}
+
+
+// ── Example parts ─────────────────────────────────────────────────────────────
+const exampleBrick = createPart(5, 5, 5, 10, 2.5, 0, { color: 0x8b5c2a, anchored: false });
+
+// Example: unanchored brick that falls and bounces
+// const fallingBrick = createPart(2, 2, 2, 0, 20, 0, { anchored: false, restitution: 0.6, color: 0xff4444 });
+// editPart(fallingBrick, { color: 0x0000ff, canCollide: false });
+
+// Player
+let player = null;
+let playerRoot = new THREE.Group();
+scene.add(playerRoot);
+
+// Rapier capsule rigid body for the player
+const PLAYER_RADIUS = 0.6;
+const PLAYER_HALF_H = 1.9; // half height of cylinder portion
+const playerBodyDesc = RAPIER.RigidBodyDesc.dynamic()
+    .setTranslation(0, 4, 0)
+    .lockRotations()          // no tipping over
+    .setLinearDamping(0.0);
+const playerBody = world.createRigidBody(playerBodyDesc);
+world.createCollider(
+    RAPIER.ColliderDesc.capsule(PLAYER_HALF_H, PLAYER_RADIUS)
+        .setFriction(0.4)
+        .setRestitution(0.0),
+    playerBody
+);
+
+const playerState = {
+     grounded: false,
+    height: 5,
+    moveSpeed: 16/3,
+    jumpPower: 23,
+};
+
+// ─── Roblox 2006-style camera ───────────────────────────────────────────────
+// Zoom levels: 0 = max zoom in (head level), 1 = max zoom out
+const CAM = {
+    // Orbit angles
+    yaw:   -Math.PI / 6,
+    pitch:  0.42,          // radians, clamped below
+
+    // Zoom
+    zoomIndex: 4,          // current step index
+    zoomSteps: [2, 5, 9, 14, 20, 28, 38],   // distances like classic Roblox
+    zoomCurrent: 20,       // smoothly interpolated distance
+
+    // At max zoom-in the look target is near head, at max zoom-out it rises
+    targetOffset: new THREE.Vector3(),       // smoothed look-at offset
+    currentPos:   new THREE.Vector3(),       // smoothed camera position
+
+    // Whether RMB is held for orbiting
+    orbiting: false,
+};
+
+// Precompute per-step vertical offsets (head-level at 0, higher when far)
+function zoomVerticalOffset(dist) {
+    // map [2, 38] → [0, 4]
+    const minD = 2, maxD = 60;
+    const t = (dist - minD) / (maxD - minD);
+    return THREE.MathUtils.lerp(0, 4, t);
+}
+
+// ─── Zoom sound ──────────────────────────────────────────────────────────────
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let zoomSoundBuffer = null;
+
+fetch("Sounds/SWITCH3.wav")
+    .then(r => r.arrayBuffer())
+    .then(buf => audioCtx.decodeAudioData(buf))
+    .then(decoded => { zoomSoundBuffer = decoded; })
+    .catch(() => { /* sound file not present — silently skip */ });
+
+function playZoomSound() {
+    if (!zoomSoundBuffer) return;
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const src = audioCtx.createBufferSource();
+    src.buffer = zoomSoundBuffer;
+    src.connect(audioCtx.destination);
+    src.start(0);
+}
+
+// ─── Input ───────────────────────────────────────────────────────────────────
+const keys = { w: false, a: false, s: false, d: false, space: false };
+
+window.addEventListener("keydown", e => {
+    switch (e.code) {
+        case "KeyW":   keys.w     = true;  break;
+        case "KeyA":   keys.a     = true;  break;
+        case "KeyS":   keys.s     = true;  break;
+        case "KeyD":   keys.d     = true;  break;
+        case "Space":  keys.space = true;  e.preventDefault(); break;
+    }
+});
+window.addEventListener("keyup", e => {
+    switch (e.code) {
+        case "KeyW":   keys.w     = false; break;
+        case "KeyA":   keys.a     = false; break;
+        case "KeyS":   keys.s     = false; break;
+        case "KeyD":   keys.d     = false; break;
+        case "Space":  keys.space = false; break;
+    }
+});
+
+// Right-mouse to orbit (classic Roblox behaviour)
+canvas.addEventListener("mousedown", e => {
+    if (e.button === 2) {
+        CAM.orbiting = true;
+        canvas.requestPointerLock();
+        e.preventDefault();
+    }
+});
+canvas.addEventListener("mouseup", e => {
+    if (e.button === 2) {
+        CAM.orbiting = false;
+        document.exitPointerLock();
+    }
+});
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+document.addEventListener("mousemove", e => {
+    if (!CAM.orbiting) return;
+    if (document.pointerLockElement !== canvas) return;
+
+    const sensitivity = 0.0025;
+    CAM.yaw   += e.movementX * sensitivity;
+    CAM.pitch  -= e.movementY * sensitivity;
+
+    // Classic Roblox pitch limits
+    const maxPitch = Math.PI / 2 - 0.08;
+    const minPitch = -1;   // can't go far below the horizon
+    CAM.pitch = THREE.MathUtils.clamp(CAM.pitch, minPitch, maxPitch);
+});
+
+// Scroll to zoom
+window.addEventListener("wheel", e => {
+    const dir = e.deltaY > 0 ? 5 : -5;
+    const prev = CAM.zoomCurrent;
+    CAM.zoomCurrent = THREE.MathUtils.clamp(CAM.zoomCurrent + dir, 2, 60);
+    if (CAM.zoomCurrent !== prev) playZoomSound();
+    e.preventDefault();
+}, { passive: false });
+
+// Start-screen click (no pointer lock — orbiting uses RMB)
+startScreen.addEventListener("click", () => {
+    startScreen.style.display = "none";
+    if (audioCtx.state === "suspended") audioCtx.resume();
+});
+
+// ─── Player setup ────────────────────────────────────────────────────────────
+function normalizeR6Model(object) {
+    object.traverse(child => {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (child.material) child.material.needsUpdate = true;
+        }
+    });
+    const headTex = new THREE.TextureLoader().load("Textures/Head.png");
+    headTex.colorSpace = THREE.SRGBColorSpace;
+    const headMat = new THREE.MeshStandardMaterial({ map: headTex });
+
+    object.traverse(child => {
+        if (child.isMesh && Array.isArray(child.material)) {
+            child.material[1] = headMat;
+            child.material[1].needsUpdate = true;
+        }
+    });
+    const box  = new THREE.Box3().setFromObject(object);
+    const size = box.getSize(new THREE.Vector3());
+
+    if (size.y > 0) {
+        const scale = 5 / size.y;
+        object.scale.multiplyScalar(scale);
+        const scaledBox = new THREE.Box3().setFromObject(object);
+        object.position.y -= scaledBox.min.y;
+    }
+    return object;
+}
+
+const limbs = {};
+
+const loader = new FBXLoader();
+loader.load(
+    "Rig/r6_rigged.fbx",
+    loaded => {
+        player = normalizeR6Model(loaded);
+        player.rotation.set(0, 0, 0);
+        playerRoot.add(player);
+        playerRoot.position.set(0, 0, 0);
+
+        const bounds = new THREE.Box3().setFromObject(player);
+        playerState.height = bounds.max.y - bounds.min.y;
+
+        // Initialise camera behind player
+        CAM.currentPos.set(0, playerState.height * 0.6, CAM.zoomSteps[CAM.zoomIndex]);
+        player.traverse(child => {
+            if (!child.isBone) return;
+
+            console.log("BONE:", child.name);
+
+            const name = child.name.toLowerCase();
+
+            if (name.includes("left arm") || name.includes("left_arm")) {
+                limbs.leftArm = child;
+            }
+
+            if (name.includes("right arm") || name.includes("right_arm")) {
+                limbs.rightArm = child;
+            }
+
+            if (name.includes("left leg") || name.includes("left_leg")) {
+                limbs.leftLeg = child;
+            }
+
+            if (name.includes("right leg") || name.includes("right_leg")) {
+                limbs.rightLeg = child;
+            }
+        });
+        const colliders = [];
+
+    function createCollider(name, w, h, d, offsetX, offsetY, offsetZ, visible = false) {
+        const geo = new THREE.BoxGeometry(w, h, d);
+        const mat = new THREE.MeshBasicMaterial({ 
+            color: 0x00ff00, 
+            wireframe: false,
+            visible: visible
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(offsetX, offsetY, offsetZ);
+        mesh.name = name;
+        playerRoot.add(mesh);
+        colliders.push({ mesh, w, h, d });
+        return mesh;
+    }
+
+    // Adjust these values to fit your model
+    const bodyCollider = createCollider("body", 2, 2, 1,  0, 2.95, 0);
+    const headCollider = createCollider("head", 1, 1, 1,  0, 4.45, 0);
+
+        console.log("R6 FBX loaded. Height:", playerState.height);
+    },
+    xhr => {
+        if (xhr.total) console.log("FBX:", Math.round(xhr.loaded / xhr.total * 100) + "%");
+    },
+    () => {
+        // Fallback box
+        const fallback = new THREE.Mesh(
+            new THREE.BoxGeometry(2, 5, 1),
+            new THREE.MeshStandardMaterial({ color: 0xff3333 })
+        );
+        fallback.position.y = 2.5;
+        fallback.castShadow = true;
+        playerRoot.add(fallback);
+        player = fallback;
+        playerState.height = 5;
+    }
+);
+
+// ─── Update ──────────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+// Ground check via ray cast downward from player centre
+// Ground check via a short ray starting just below the player's feet
+// Ground check — ignores the player's own capsule
+function checkGrounded() {
+    const pos = playerBody.translation();
+
+    // Bottom of the player's capsule
+    const feetY = pos.y - PLAYER_HALF_H - PLAYER_RADIUS;
+
+    const ray = new RAPIER.Ray(
+        {
+            x: pos.x,
+            y: feetY + 0.05,
+            z: pos.z
+        },
+        {
+            x: 0,
+            y: -1,
+            z: 0
+        }
+    );
+
+    // Check only slightly below the feet.
+    // The final argument excludes the player's rigid body.
+    const hit = world.castRay(
+        ray,
+        0.15,
+        true,
+        undefined,   // filterFlags
+        undefined,   // filterGroups
+        undefined,   // excludeCollider
+        playerBody   // excludeRigidBody
+    );
+
+    return hit !== null;
+}
+
+function updatePlayer() {
+    if (!player) return;
+
+    playerState.grounded = checkGrounded();
+
+    const forward = new THREE.Vector3(-Math.sin(CAM.yaw), 0, -Math.cos(CAM.yaw));
+    const right   = new THREE.Vector3( Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
+
+    const dir = new THREE.Vector3();
+    if (keys.w) dir.add(forward);
+    if (keys.s) dir.sub(forward);
+    if (keys.d) dir.add(right);
+    if (keys.a) dir.sub(right);
+
+    const curVel = playerBody.linvel();
+
+    let vx = 0, vz = 0;
+    if (dir.lengthSq() > 0) {
+        dir.normalize();
+        vx = dir.x * playerState.moveSpeed;
+        vz = dir.z * playerState.moveSpeed;
+
+        // Face movement direction
+        // Face movement direction using the shortest rotation path
+const targetRot = Math.atan2(dir.x, dir.z);
+
+let angleDifference = targetRot - player.rotation.y;
+
+// Normalize angle difference to [-PI, PI]
+angleDifference = Math.atan2(
+    Math.sin(angleDifference),
+    Math.cos(angleDifference)
+);
+
+// Smoothly rotate toward target
+player.rotation.y += angleDifference * 0.18;
+    }
+
+    // Apply horizontal velocity, preserve vertical (gravity handled by Rapier)
+    playerBody.setLinvel({ x: vx, y: curVel.y, z: vz }, true);
+
+    // Jump
+    if (keys.space && playerState.grounded) {
+        playerBody.setLinvel({ x: vx, y: playerState.jumpPower, z: vz }, true);
+        keys.space = false; // consume so it doesn't multi-jump
+    }
+
+    // Sync Three.js root to Rapier body
+    const t = playerBody.translation();
+    // Body centre is at capsule centre; player feet = centre - PLAYER_HALF_H - PLAYER_RADIUS
+    playerRoot.position.set(t.x, t.y - PLAYER_HALF_H - PLAYER_RADIUS, t.z);
+}
+
+// Sync dynamic parts (non-player physics objects) to Three.js
+function syncPhysObjects() {
+    for (const { body, mesh } of physObjects) {
+        const t = body.translation();
+        const r = body.rotation();
+        mesh.position.set(t.x, t.y, t.z);
+        mesh.quaternion.set(r.x, r.y, r.z, r.w);
+    }
+}
+
+function updateCamera(delta) {
+    if (!player) return;
+
+    const vOffset = zoomVerticalOffset(CAM.zoomCurrent);
+
+    const headCollider = playerRoot.getObjectByName("head");
+    const trackY = headCollider
+        ? playerRoot.position.y + headCollider.position.y
+        : playerRoot.position.y + playerState.height * 0.55;
+
+    const lookTarget = new THREE.Vector3(
+        playerRoot.position.x,
+        trackY + vOffset,
+        playerRoot.position.z
+    );
+
+    CAM.targetOffset.lerp(lookTarget, 1 - Math.pow(0.001, delta));
+
+    const dist = CAM.zoomCurrent;
+    const camX = CAM.targetOffset.x + dist * Math.sin(CAM.yaw);
+    const camY = CAM.targetOffset.y + dist * Math.sin(CAM.pitch);
+    const camZ = CAM.targetOffset.z + dist * Math.cos(CAM.yaw);
+
+    CAM.currentPos.lerp(new THREE.Vector3(camX, camY, camZ), 1 - Math.pow(0.0001, delta));
+    camera.position.copy(CAM.currentPos);
+    camera.lookAt(CAM.targetOffset);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    const delta = Math.min(clock.getDelta(), 0.05);
+
+    // Step Rapier physics
+    world.step();
+
+    updatePlayer();
+    syncPhysObjects();
+    updateCamera(delta);
+    renderer.render(scene, camera);
+}
+
+window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+</script>
+</body>
+</html>
