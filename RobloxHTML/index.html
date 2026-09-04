@@ -33,19 +33,6 @@
         box-sizing: border-box;
     }
 
-    #info {
-        position: fixed;
-        left: 15px;
-        top: 15px;
-        color: white;
-        background: rgba(0,0,0,.55);
-        padding: 10px 12px;
-        border-radius: 6px;
-        font-size: 13px;
-        line-height: 1.5;
-        pointer-events: none;
-    }
-
     #start {
         position: fixed;
         inset: 0;
@@ -80,14 +67,6 @@
 <canvas id="game"></canvas>
 
 <div id="crosshair"></div>
-
-<div id="info">
-    WASD — Move<br>
-    Space — Jump<br>
-    Right Mouse — Orbit<br>
-    Scroll — Zoom<br>
-    Esc — Release mouse
-</div>
 
 <div id="start">
     <div>
@@ -483,38 +462,12 @@ function editPart(part, options = {}) {
     return part;
 }
 
-// ── Baseplate visual (single mesh) ───────────────────────────────────────────
-const plateSideMat = new THREE.MeshStandardMaterial({ color: 0x4d7845, roughness: 0.8 });
-const plateTopMat  = new THREE.MeshStandardMaterial({
-    map: loadTex("Textures/top-stud.jpg", BASE_SIZE, BASE_SIZE),
-    color: 0x4d7845, roughness: 0.7, transparent: false, alphaTest: 0,
-});
-const plateBotMat  = new THREE.MeshStandardMaterial({
-    map: loadTex("Textures/bottom-stud.jpeg", BASE_SIZE, BASE_SIZE),
-    color: 0x4d7845, roughness: 0.8, transparent: false, alphaTest: 0,
-});
-const plateMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(BASE_SIZE, STUD_H, BASE_SIZE),
-    [plateSideMat, plateSideMat, plateTopMat, plateBotMat, plateSideMat, plateSideMat]
-);
-plateMesh.position.set(0, -STUD_H / 2, 0);
-plateMesh.receiveShadow = true;
-scene.add(plateMesh);
 
-// Rapier static collider for baseplate
-{
-    const bd = RAPIER.RigidBodyDesc.fixed().setTranslation(0, -STUD_H / 2, 0);
-    const bb = world.createRigidBody(bd);
-    world.createCollider(
-        RAPIER.ColliderDesc.cuboid(BASE_SIZE / 2, STUD_H / 2, BASE_SIZE / 2).setFriction(0.7),
-        bb
-    );
-}
-
+const baseplate = createPart(500, 1, 500, 0, -1, 0, { color: 0x808080, anchored: true });
 
 // ── Example parts ─────────────────────────────────────────────────────────────
-const exampleBrick = createPart(5, 5, 5, 10, 2.5, 0, { color: 0x8b5c2a, anchored: false });
-
+const exampleBrick = createPart(5, 5, 5, 10, 2.5, 0, { color: 0x3d3d3d, anchored: false });
+const exampleBrick2 = createPart(5, 5, 5, 10, 7, 0, { color: 0x3d3d3d, anchored: false });
 // Example: unanchored brick that falls and bounces
 // const fallingBrick = createPart(2, 2, 2, 0, 20, 0, { anchored: false, restitution: 0.6, color: 0xff4444 });
 // editPart(fallingBrick, { color: 0x0000ff, canCollide: false });
@@ -592,7 +545,22 @@ function playZoomSound() {
     src.connect(audioCtx.destination);
     src.start(0);
 }
+let jumpSoundBuffer = null;
 
+fetch("Sounds/jump.wav")
+    .then(r => r.arrayBuffer())
+    .then(buf => audioCtx.decodeAudioData(buf))
+    .then(decoded => { jumpSoundBuffer = decoded; })
+    .catch(() => { /* sound file not present — silently skip */ });
+
+function playJumpSound() {
+    if (!jumpSoundBuffer) return;
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const src = audioCtx.createBufferSource();
+    src.buffer = jumpSoundBuffer;
+    src.connect(audioCtx.destination);
+    src.start(0);
+}
 // ─── Input ───────────────────────────────────────────────────────────────────
 const keys = { w: false, a: false, s: false, d: false, space: false };
 
@@ -815,12 +783,12 @@ function updatePlayer() {
 
     playerState.grounded = checkGrounded();
 
-    const forward = new THREE.Vector3(-Math.sin(CAM.yaw), 0, -Math.cos(CAM.yaw));
-    const right   = new THREE.Vector3( Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
+    const forward = new THREE.Vector3(-Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw));
+    const right   = new THREE.Vector3(Math.cos(CAM.yaw), 0, Math.sin(CAM.yaw));
 
     const dir = new THREE.Vector3();
-    if (keys.w) dir.add(forward);
-    if (keys.s) dir.sub(forward);
+    if (keys.w) dir.sub(forward);
+    if (keys.s) dir.add(forward);
     if (keys.d) dir.add(right);
     if (keys.a) dir.sub(right);
 
@@ -854,6 +822,7 @@ player.rotation.y += angleDifference * 0.18;
     // Jump
     if (keys.space && playerState.grounded) {
         playerBody.setLinvel({ x: vx, y: playerState.jumpPower, z: vz }, true);
+        playJumpSound();
         keys.space = false; // consume so it doesn't multi-jump
     }
 
@@ -892,39 +861,25 @@ function updateCamera(delta) {
     CAM.targetOffset.lerp(lookTarget, 1 - Math.pow(0.001, delta));
 
     const dist = CAM.zoomCurrent;
-    const camX = CAM.targetOffset.x + dist * Math.sin(CAM.yaw);
-    const camY = CAM.targetOffset.y + dist * Math.sin(CAM.pitch);
+    const camX = CAM.targetOffset.x - dist * Math.sin(CAM.yaw);
+    const camY = CAM.targetOffset.y - dist * Math.sin(CAM.pitch);
     const camZ = CAM.targetOffset.z + dist * Math.cos(CAM.yaw);
 
     CAM.currentPos.lerp(new THREE.Vector3(camX, camY, camZ), 1 - Math.pow(0.0001, delta));
     camera.position.copy(CAM.currentPos);
     camera.lookAt(CAM.targetOffset);
 }
-// ─── Fixed timestep physics ──────────────────────────────────────────────────
-const FIXED_TIMESTEP = 1 / 60;
-let physicsAccumulator = 0;
+
 function animate() {
     requestAnimationFrame(animate);
-
     const delta = Math.min(clock.getDelta(), 0.05);
 
-    // Accumulate real elapsed time
-    physicsAccumulator += delta;
+    // Step Rapier physics
+    world.step();
 
-    // Run physics at a fixed 60 Hz
-    while (physicsAccumulator >= FIXED_TIMESTEP) {
-        updatePlayer();
-
-        world.timestep = FIXED_TIMESTEP;
-        world.step();
-
-        physicsAccumulator -= FIXED_TIMESTEP;
-    }
-
-    // Render once per frame
+    updatePlayer();
     syncPhysObjects();
     updateCamera(delta);
-
     renderer.render(scene, camera);
 }
 
