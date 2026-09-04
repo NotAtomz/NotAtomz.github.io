@@ -900,17 +900,31 @@ function updateCamera(delta) {
     camera.position.copy(CAM.currentPos);
     camera.lookAt(CAM.targetOffset);
 }
-
+// ─── Fixed timestep physics ──────────────────────────────────────────────────
+const FIXED_TIMESTEP = 1 / 60;
+let physicsAccumulator = 0;
 function animate() {
     requestAnimationFrame(animate);
+
     const delta = Math.min(clock.getDelta(), 0.05);
 
-    // Step Rapier physics
-    world.step();
+    // Accumulate real elapsed time
+    physicsAccumulator += delta;
 
-    updatePlayer();
+    // Run physics at a fixed 60 Hz
+    while (physicsAccumulator >= FIXED_TIMESTEP) {
+        updatePlayer();
+
+        world.timestep = FIXED_TIMESTEP;
+        world.step();
+
+        physicsAccumulator -= FIXED_TIMESTEP;
+    }
+
+    // Render once per frame
     syncPhysObjects();
     updateCamera(delta);
+
     renderer.render(scene, camera);
 }
 
