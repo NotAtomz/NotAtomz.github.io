@@ -1,0 +1,3015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blox Emulation - Emulator</title>
+<style>
+    html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #111;
+        font-family: Arial, sans-serif;
+    }
+
+    #game {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+    }
+
+    #start {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,.72);
+        z-index: 10;
+        font-family: Verdana, Arial, Helvetica, sans-serif;
+        color: #333333;
+    }
+
+    .start-window {
+        width: 430px;
+        background: #eeeeee;
+        border: 1px solid #777777;
+        border-radius: 3px;
+        box-shadow:
+            0 0 0 1px #ffffff inset,
+            0 2px 6px rgba(0,0,0,0.45);
+        overflow: hidden;
+    }
+
+    .start-header {
+        height: 28px;
+        display: flex;
+        align-items: center;
+        padding: 0 9px;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: bold;
+        text-shadow: 0 -1px 0 rgba(0,0,0,0.7);
+        background:
+            linear-gradient(
+                to bottom,
+                #8798aa 0%,
+                #6d7f91 48%,
+                #596b7d 52%,
+                #687a8c 100%
+            );
+        border-bottom: 1px solid #3f4d5a;
+    }
+
+    .start-body {
+        padding: 25px 30px 30px;
+        text-align: center;
+        background:
+            linear-gradient(
+                to bottom,
+                #f5f5f5,
+                #dddddd
+            );
+    }
+
+    .start-titleimg {
+        width: 300px;
+        max-width: 100%;
+        margin-bottom: 18px;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .start-desc {
+        margin: 0 0 18px 0;
+        color: #222222;
+        font-size: 11px;
+    }
+
+    .start-panel {
+        background: #ffffff;
+        border: 1px solid #aaaaaa;
+        padding: 13px;
+        text-align: left;
+        box-shadow:
+            0 1px 0 #ffffff,
+            inset 0 1px 2px rgba(0,0,0,0.08);
+    }
+
+    .start-label {
+        display: block;
+        margin-bottom: 8px;
+        color: #444444;
+        font-size: 11px;
+        font-weight: bold;
+    }
+
+    .start-button {
+        width: 100%;
+        height: 30px;
+        font-family: Verdana, Arial, sans-serif;
+        font-size: 11px;
+        font-weight: bold;
+        color: #ffffff;
+        cursor: pointer;
+        border: 1px solid #35536d;
+        border-radius: 3px;
+        text-shadow: 0 -1px 0 rgba(0,0,0,0.8);
+        background:
+            linear-gradient(
+                to bottom,
+                #7fa6c7 0%,
+                #5f88ab 48%,
+                #416b8f 52%,
+                #5681a5 100%
+            );
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.45),
+            0 1px 1px rgba(0,0,0,0.25);
+    }
+
+    .start-button:hover {
+        background:
+            linear-gradient(
+                to bottom,
+                #91b6d4 0%,
+                #719abb 48%,
+                #507da0 52%,
+                #6994b5 100%
+            );
+    }
+
+    .start-button:active {
+        background:
+            linear-gradient(
+                to bottom,
+                #416b8f,
+                #6d97b8
+            );
+        box-shadow:
+            inset 0 1px 3px rgba(0,0,0,0.5);
+        padding-top: 1px;
+    }
+
+    .start-hint {
+        margin-top: 10px;
+        color: #777777;
+        font-size: 10px;
+        text-align: center;
+    }
+
+    @media (max-width: 500px) {
+        .start-window {
+            width: calc(100% - 30px);
+        }
+
+        .start-body {
+            padding-left: 18px;
+            padding-right: 18px;
+        }
+    }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="start">
+    <div class="start-window">
+
+        <div class="start-header">
+            Blox Emulation
+        </div>
+
+        <div class="start-body">
+
+            <img
+                class="start-titleimg"
+                src="Textures/UI/title.png"
+                alt="Blox Emulator"
+            >
+
+            <p class="start-desc">
+                Your classic Roblox world is ready.
+            </p>
+
+            <div class="start-panel">
+
+                <button
+                    type="button"
+                    class="start-button"
+                    id="startButton"
+                >
+                    Click to load in the game
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.1/examples/jsm/",
+        "rapier": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.12.0/rapier.es.min.js"
+    }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import RAPIER from "rapier";
+import {
+    LuauState,
+    Mutable
+} from "https://cdn.jsdelivr.net/gh/xNasuni/luau-web@main/dist/luauweb.min.js";
+// ─── Rapier init (async WASM) ─────────────────────────────────────────────────
+await RAPIER.init();
+const gravity = { x: 0, y: -50, z: 0 };
+const world   = new RAPIER.World(gravity);
+
+// Sync list: { body, mesh } pairs updated every frame
+const physObjects = [];
+
+const canvas = document.getElementById("game");
+const startScreen = document.getElementById("start");
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87a9c4); // fallback until skybox loads
+scene.fog = new THREE.Fog(0x9ab3c8, 80, 320);
+
+// ── Skybox — inverted box, 6 MeshBasicMaterial faces, always works ────────────
+// ── Skybox — manually selected pixel region ─────────────────────────────────
+function makeSkyFaceMat(
+    img,
+    point1,
+    point2,
+    point3,
+    point4,
+    rotation = 0
+) {
+    // Calculate crop bounds from the four points
+    const left   = Math.min(point1.x, point2.x, point3.x, point4.x);
+    const right  = Math.max(point1.x, point2.x, point3.x, point4.x);
+    const top    = Math.min(point1.y, point2.y, point3.y, point4.y);
+    const bottom = Math.max(point1.y, point2.y, point3.y, point4.y);
+
+    const width = right - left;
+    const height = bottom - top;
+
+    const c = document.createElement("canvas");
+
+    // Swap canvas dimensions for 90 / 270 rotations
+    if (rotation === 90 || rotation === 270) {
+        c.width = height;
+        c.height = width;
+    } else {
+        c.width = width;
+        c.height = height;
+    }
+
+    const ctx = c.getContext("2d");
+
+    ctx.save();
+
+    // Move origin to center
+    ctx.translate(c.width / 2, c.height / 2);
+
+    // Rotation
+    ctx.rotate(THREE.MathUtils.degToRad(rotation));
+
+    // Draw selected region
+    ctx.drawImage(
+        img,
+
+        // Source rectangle
+        left,
+        top,
+        width,
+        height,
+
+        // Destination rectangle
+        -width / 2,
+        -height / 2,
+        width,
+        height
+    );
+
+    ctx.restore();
+
+    const tex = new THREE.CanvasTexture(c);
+
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+
+    return new THREE.MeshBasicMaterial({
+        map: tex,
+        side: THREE.BackSide,
+        depthWrite: false,
+        depthTest: false,
+        fog: false
+    });
+}
+
+const skyImg = new Image();
+skyImg.onload = () => {
+    // Spritesheet: 2 cols × 4 rows. row0=R/L, row1=T/B, row2=F/Ba, row3=preview
+    const skyBox = new THREE.Mesh(
+        new THREE.BoxGeometry(100000, 100000, 100000),
+        [
+            // +X
+            makeSkyFaceMat(
+                skyImg,
+                { x: 5,   y: 5 },    // point1 - top left
+                { x: 260, y: 5 },    // point2 - top right
+                { x: 5,   y: 260 },  // point3 - bottom left
+                { x: 260, y: 260 }, // point4 - bottom right
+                0
+            ),
+
+            // -X
+            makeSkyFaceMat(
+                skyImg,
+                { x: 5, y: 266 },
+                { x: 260, y: 266 },
+                { x: 5, y: 521 },
+                { x: 260, y: 521 },
+                0
+            ),
+
+            // +Y
+            makeSkyFaceMat(
+                skyImg,
+                { x: 266, y: 527 },
+                { x: 521, y: 527 },
+                { x: 266, y: 782 },
+                { x: 521, y: 782 },
+                180
+            ),
+
+            // -Y
+            makeSkyFaceMat(
+                skyImg,
+                { x: 266, y: 5 },
+                { x: 521, y: 5 },
+                { x: 266, y: 260 },
+                { x: 521, y: 260 },
+                180
+            ),
+
+            // +Z
+            makeSkyFaceMat(
+                skyImg,
+                { x: 266, y: 266 },
+                { x: 521, y: 266 },
+                { x: 266, y: 521 },
+                { x: 521, y: 521 },
+                0
+            ),
+
+            // -Z
+            makeSkyFaceMat(
+                skyImg,
+                { x: 5, y: 527 },
+                { x: 260, y: 527 },
+                { x: 5, y: 782 },
+                { x: 260, y: 782 },
+                0
+            ),
+        ]
+    );
+    skyBox.renderOrder = -1;
+    skyBox.frustumCulled = false;
+    skyBox.material.forEach(m => m.fog = false);
+    scene.add(skyBox);
+    scene.background = null; // remove flat colour once box is ready
+};
+skyImg.onerror = () => console.error("Skybox failed: Textures/Skybox.png");
+skyImg.src = "Textures/Skybox.png";
+
+const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.05,
+    100000
+);
+
+// Lighting
+const hemi = new THREE.HemisphereLight(
+    0xffffff,
+    0x667788,
+    0.4
+);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xffffff, 3.0);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -150;
+sun.shadow.camera.right = 150;
+sun.shadow.camera.top = 150;
+sun.shadow.camera.bottom = -150;
+scene.add(sun);
+
+// Editable sun angles — change these then call applySunAngles()
+const sunConfig = {
+    azimuth:   45,  // degrees, horizontal (0=+Z, 90=+X, 180=-Z, 270=-X)
+    elevation: 50,  // degrees above horizon (0=horizon, 90=overhead)
+};
+function applySunAngles() {
+    const az = THREE.MathUtils.degToRad(sunConfig.azimuth);
+    const el = THREE.MathUtils.degToRad(sunConfig.elevation);
+    const r  = 150;
+    sun.position.set(
+        r * Math.cos(el) * Math.sin(az),
+        r * Math.sin(el),
+        r * Math.cos(el) * Math.cos(az)
+    );
+}
+applySunAngles();
+
+// Baseplate
+const BASE_SIZE = 200;
+const STUD_H = 1.2;
+
+// ─── Texture loader helper ────────────────────────────────────────────────────
+const texLoader = new THREE.TextureLoader();
+function loadTex(path, repeatX, repeatY) {
+    const t = texLoader.load(path);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = THREE.RepeatWrapping;
+    t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(repeatX, repeatY);
+    return t;
+}
+
+/**
+ * createPart(w, h, d, x, y, z, color, dynamic)
+ *   w, h, d — full dimensions
+ *   x, y, z   — world centre
+ *   options   — property object (see defaults below)
+ *
+ * Options:
+ *   color        hex        0x4d7845   base colour
+ *   anchored     bool       true       anchored = never moves (like Roblox Anchored)
+ *   canCollide   bool       true       whether other bodies collide with it
+ *   friction     number     0.7
+ *   restitution  number     0.1        bounciness
+ *   mass         number     1.0        only used when anchored=false
+ *   castShadow   bool       true
+ *   visible      bool       true
+ */
+function createPart(w, h, d, x, y, z, options = {}) {
+    const {
+        color       = 0xc8a97a,
+        anchored    = true,
+        canCollide  = true,
+        friction    = 0.7,
+        restitution = 0.1,
+        mass        = 1.0,
+        castShadow  = true,
+        visible     = true,
+    } = options;
+    const max = renderer.capabilities.getMaxAnisotropy();
+    const sideMat = new THREE.MeshStandardMaterial({ color, roughness: 0.3 });
+    const topMat  = new THREE.MeshStandardMaterial({
+        map: loadTex("Textures/top-stud.jpg", w, d),
+        color, roughness: 0.3, metalness: 0.0, transparent: false, alphaTest: 0,
+    });
+
+    if (topMat.map) {
+        topMat.map.anisotropy = max;
+    }
+    const botMat  = new THREE.MeshStandardMaterial({
+        map: loadTex("Textures/bottom-stud.jpeg", w, d),
+        color, roughness: 0.3, metalness: 0.0, transparent: false, alphaTest: 0,
+    });
+    if (botMat.map) {
+        botMat.map.anisotropy = max;
+    }
+    const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, d),
+        [sideMat, sideMat, topMat, botMat, sideMat, sideMat]
+    );
+    mesh.position.set(x, y, z);
+    mesh.castShadow  = castShadow;
+    mesh.receiveShadow = true;
+    mesh.visible     = visible;
+    scene.add(mesh);
+
+    // Rapier rigid body
+    const bodyDesc = anchored
+    ? RAPIER.RigidBodyDesc.fixed()
+    : RAPIER.RigidBodyDesc.dynamic();
+bodyDesc.setTranslation(x, y, z);
+    const body = world.createRigidBody(bodyDesc);
+
+    const colDesc = RAPIER.ColliderDesc.cuboid(w / 2, h / 2, d / 2)
+    .setMass(mass) // <-- Change this line
+    .setFriction(friction)
+    .setRestitution(restitution)
+    .setSensor(!canCollide);
+    world.createCollider(colDesc, body);
+
+    const part = { mesh, body, w, h, d, anchored, canCollide };
+    if (!anchored) physObjects.push(part);
+    return part;
+}
+
+/**
+ * editPart(part, options)
+ *   part     — the object returned by createPart
+ *   options  — any subset of the properties you want to change:
+ *     color, anchored, canCollide, friction, restitution, visible, castShadow
+ *
+ * Example:
+ *   const brick = createPart(4,4,4, 10,2,0, { anchored: false, color: 0xff0000 });
+ *   editPart(brick, { anchored: true, color: 0x00ff00, canCollide: false });
+ */
+function editPart(part, options = {}) {
+    const { mesh, body, w, h, d } = part;
+
+    // Color
+    if (options.color !== undefined) {
+        mesh.material.forEach(m => {
+            if (m.color) m.color.setHex(options.color);
+        });
+    }
+
+    // Visible
+    if (options.visible !== undefined) mesh.visible = options.visible;
+
+    // Cast shadow
+    if (options.castShadow !== undefined) mesh.castShadow = options.castShadow;
+
+    // Anchored — swap body type
+    if (options.anchored !== undefined && options.anchored !== part.anchored) {
+        const pos = body.translation();
+        const newDesc = options.anchored
+            ? RAPIER.RigidBodyDesc.fixed()
+            : RAPIER.RigidBodyDesc.dynamic().setAdditionalMass(1.0);
+        newDesc.setTranslation(pos.x, pos.y, pos.z);
+        if (!options.anchored) newDesc.lockRotations();
+
+        // Remove old body and recreate
+        const oldColliders = [];
+        for (let i = 0; i < body.numColliders(); i++) oldColliders.push(body.collider(i));
+        world.removeRigidBody(body);
+
+        part.body = world.createRigidBody(newDesc);
+
+        // Re-add collider with existing or new settings
+        const colDesc = RAPIER.ColliderDesc.cuboid(w / 2, h / 2, d / 2)
+            .setFriction(options.friction  ?? 0.7)
+            .setRestitution(options.restitution ?? 0.1)
+            .setSensor(options.canCollide !== undefined ? !options.canCollide : !part.canCollide);
+        world.createCollider(colDesc, part.body);
+
+        part.anchored = options.anchored;
+
+        // Add to / remove from sync list
+        const idx = physObjects.indexOf(part);
+        if (!options.anchored && idx === -1) physObjects.push(part);
+        if (options.anchored  && idx !== -1) physObjects.splice(idx, 1);
+    }
+
+    // CanCollide (sensor toggle) — only if body wasn't just recreated
+    if (options.canCollide !== undefined && options.canCollide !== part.canCollide
+        && options.anchored === undefined) {
+        for (let i = 0; i < part.body.numColliders(); i++) {
+            part.body.collider(i).setSensor(!options.canCollide);
+        }
+        part.canCollide = options.canCollide;
+    }
+
+    // Friction / restitution on existing colliders
+    if ((options.friction !== undefined || options.restitution !== undefined)
+        && options.anchored === undefined) {
+        for (let i = 0; i < part.body.numColliders(); i++) {
+            const c = part.body.collider(i);
+            if (options.friction    !== undefined) c.setFriction(options.friction);
+            if (options.restitution !== undefined) c.setRestitution(options.restitution);
+        }
+    }
+
+    return part;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Roblox Luau API
+// ─────────────────────────────────────────────────────────────────────────────
+
+
+const luaInstances = new Set();
+
+// ─── Classic Roblox signal/event system ─────────────────────────────────────
+const luaInstanceIds = new WeakMap();
+let nextLuaInstanceId = 1;
+
+function getLuaInstanceId(instance) {
+    if (!instance || (typeof instance !== "object" && typeof instance !== "function"))
+        return "unknown";
+
+    if (!luaInstanceIds.has(instance)) {
+        luaInstanceIds.set(instance, nextLuaInstanceId++);
+    }
+
+    return luaInstanceIds.get(instance);
+}
+
+const luaSignalInternals = new WeakMap();
+
+function getLastFunctionArgument(args) {
+    // Lua's ":" syntax passes the object itself as the first argument to a
+    // JavaScript host function. Search from the end so both of these work:
+    //
+    // part.Touched:connect(function(hit) end)
+    // part.Touched.connect(function(hit) end)
+    for (let i = args.length - 1; i >= 0; i--) {
+        if (typeof args[i] === "function") {
+            return args[i];
+        }
+    }
+
+    return null;
+}
+
+function createLuaSignal(name, owner = null) {
+    let signal = null;
+
+    const connectImpl = (...args) => {
+        const callback = getLastFunctionArgument(args);
+
+        if (!callback) {
+            throw new Error(name + ":connect expected a function");
+        }
+
+        const state = luaSignalInternals.get(signal);
+
+        if (!state) {
+            throw new Error(name + " signal is no longer valid");
+        }
+
+        const entry = {
+            callback,
+            connected: true
+        };
+
+        const disconnectImpl = () => {
+            if (!entry.connected)
+                return;
+
+            entry.connected = false;
+            state.listeners.delete(entry);
+        };
+
+        const connection = Mutable({
+            Connected: true,
+
+            Disconnect: (...disconnectArgs) => {
+                disconnectImpl();
+                connection.Connected = false;
+            },
+
+            disconnect: (...disconnectArgs) => {
+                disconnectImpl();
+                connection.Connected = false;
+            }
+        });
+
+        entry.connection = connection;
+        state.listeners.add(entry);
+
+        return connection;
+    };
+
+    signal = Mutable({
+        Connect: connectImpl,
+        connect: connectImpl
+    });
+
+    // IMPORTANT:
+    // Keep internal engine functions OUTSIDE Mutable().
+    //
+    // Mutable() is a Proxy around a Map. luau-web binds function properties
+    // returned through that Proxy. A non-configurable __fire function on the
+    // proxy therefore violates JavaScript Proxy invariants.
+    luaSignalInternals.set(signal, {
+        name,
+        owner,
+        listeners: new Set()
+    });
+
+    return signal;
+}
+
+function fireLuaSignal(signal, ...args) {
+    if (!signal)
+        return;
+
+    const state = luaSignalInternals.get(signal);
+
+    if (!state)
+        return;
+
+    for (const entry of [...state.listeners]) {
+        if (!entry.connected)
+            continue;
+
+        try {
+            const result = entry.callback(...args);
+
+            // Luau-web calls can be asynchronous depending on the selected
+            // WASM backend, so catch rejected callbacks without killing the
+            // render loop.
+            if (result && typeof result.catch === "function") {
+                result.catch(error => {
+                    console.error(
+                        `[Lua] Error in ${state.name}:`,
+                        error
+                    );
+                });
+            }
+        } catch (error) {
+            console.error(
+                `[Lua] Error in ${state.name}:`,
+                error
+            );
+        }
+    }
+}
+
+function disconnectLuaSignal(signal) {
+    if (!signal)
+        return;
+
+    const state = luaSignalInternals.get(signal);
+
+    if (!state)
+        return;
+
+    for (const entry of state.listeners) {
+        entry.connected = false;
+
+        if (entry.connection) {
+            entry.connection.Connected = false;
+        }
+    }
+
+    state.listeners.clear();
+}
+
+function addInstanceSignals(instance) {
+    if (!instance.Changed)
+        instance.Changed = createLuaSignal("Changed", instance);
+
+    if (!instance.ChildAdded)
+        instance.ChildAdded = createLuaSignal("ChildAdded", instance);
+
+    if (!instance.ChildRemoved)
+        instance.ChildRemoved = createLuaSignal("ChildRemoved", instance);
+
+    if (!instance.AncestryChanged)
+        instance.AncestryChanged = createLuaSignal("AncestryChanged", instance);
+
+    return instance;
+}
+
+function fireChanged(instance, propertyName) {
+    fireLuaSignal(instance?.Changed, propertyName);
+}
+
+function disconnectInstanceSignals(instance) {
+    disconnectLuaSignal(instance?.Changed);
+    disconnectLuaSignal(instance?.ChildAdded);
+    disconnectLuaSignal(instance?.ChildRemoved);
+    disconnectLuaSignal(instance?.AncestryChanged);
+    disconnectLuaSignal(instance?.Touched);
+    disconnectLuaSignal(instance?.TouchEnded);
+}
+
+const activeTouchPairs = new Set();
+
+
+function createVector3(x = 0, y = 0, z = 0) {
+    return Mutable({
+        X: Number(x) || 0,
+        Y: Number(y) || 0,
+        Z: Number(z) || 0
+    });
+}
+
+const Vector3Api = Mutable({
+
+    new(x = 0, y = 0, z = 0) {
+        return createVector3(x, y, z);
+    }
+
+});
+
+function createColor3(r = 0, g = 0, b = 0) {
+    return Mutable({
+        R: Number(r) || 0,
+        G: Number(g) || 0,
+        B: Number(b) || 0
+    });
+}
+
+const Color3Api = Mutable({
+
+    new(r = 0, g = 0, b = 0) {
+        return createColor3(r, g, b);
+    },
+
+    fromRGB(r = 0, g = 0, b = 0) {
+        return createColor3(
+            r / 255,
+            g / 255,
+            b / 255
+        );
+    }
+
+});
+
+function createCFrame(
+    x = 0,
+    y = 0,
+    z = 0,
+    rx = 0,
+    ry = 0,
+    rz = 0
+) {
+
+    return Mutable({
+
+        X: x,
+        Y: y,
+        Z: z,
+
+        _rx: rx,
+        _ry: ry,
+        _rz: rz,
+
+        Position: createVector3(x, y, z),
+
+        Orientation: createVector3(
+            THREE.MathUtils.radToDeg(rx),
+            THREE.MathUtils.radToDeg(ry),
+            THREE.MathUtils.radToDeg(rz)
+        )
+
+    });
+
+}
+
+const CFrameApi = Mutable({
+
+    new(x = 0, y = 0, z = 0) {
+
+        if (
+            typeof x === "object" &&
+            x !== null
+        ) {
+            return createCFrame(
+                x.X,
+                x.Y,
+                x.Z
+            );
+        }
+
+        return createCFrame(
+            x,
+            y,
+            z
+        );
+    },
+
+    Angles(rx = 0, ry = 0, rz = 0) {
+
+        return createCFrame(
+            0,
+            0,
+            0,
+            rx,
+            ry,
+            rz
+        );
+
+    }
+
+});
+
+// ─── 2010-era Instance / parenting / joint helpers ───────────────────────────
+const luaJoints = new Set();
+
+const CLASS_PARENTS = {
+    Part: ["BasePart", "PVInstance", "Instance"],
+    Model: ["PVInstance", "Instance"],
+    Weld: ["JointInstance", "Instance"],
+    ManualWeld: ["JointInstance", "Instance"],
+    Snap: ["JointInstance", "Instance"],
+    Glue: ["JointInstance", "Instance"],
+    Motor: ["JointInstance", "Instance"],
+    Rotate: ["JointInstance", "Instance"],
+    StringValue: ["ValueBase", "Instance"],
+    BoolValue: ["ValueBase", "Instance"],
+    IntValue: ["ValueBase", "Instance"],
+    NumberValue: ["ValueBase", "Instance"],
+    ObjectValue: ["ValueBase", "Instance"]
+};
+
+function getLuaChildren(parent) {
+    return Array.from(luaInstances).filter(x => x.Parent === parent);
+}
+
+function getLuaDescendants(parent) {
+    const out = [];
+    const visit = p => {
+        for (const child of getLuaChildren(p)) {
+            out.push(child);
+            visit(child);
+        }
+    };
+    visit(parent);
+    return out;
+}
+
+function isInWorkspace(instance) {
+    let p = instance;
+    while (p) {
+        if (p === workspaceApi) return true;
+        p = p.Parent;
+    }
+    return false;
+}
+
+function isA(instance, className) {
+    return instance.ClassName === className ||
+        (CLASS_PARENTS[instance.ClassName] || []).includes(className);
+}
+
+function addCommonInstanceApi(instance) {
+    addInstanceSignals(instance);
+
+    instance.GetChildren = function() {
+        return getLuaChildren(this);
+    };
+
+    instance.GetDescendants = function() {
+        return getLuaDescendants(this);
+    };
+
+    instance.FindFirstChild = function(name, recursive) {
+        const list = recursive ? getLuaDescendants(this) : getLuaChildren(this);
+        return list.find(x => x.Name === name) || null;
+    };
+
+    instance.IsA = function(className) {
+        return isA(this, className);
+    };
+
+    instance.Remove = function() {
+        this.Destroy();
+    };
+
+    instance.ClearAllChildren = function() {
+        for (const child of [...getLuaChildren(this)]) {
+            child.Destroy();
+        }
+    };
+
+    instance.Clone = function() {
+        return cloneLuaInstance(this);
+    };
+
+    if (!("__eventLastParent" in instance)) {
+        Object.defineProperty(instance, "__eventLastParent", {
+            value: instance.Parent ?? null,
+            writable: true,
+            enumerable: false
+        });
+    }
+
+    if (!("__eventLastName" in instance)) {
+        Object.defineProperty(instance, "__eventLastName", {
+            value: instance.Name,
+            writable: true,
+            enumerable: false
+        });
+    }
+
+    return instance;
+}
+
+function destroyLuaInstance(instance) {
+    if (!instance || instance.__destroyed) return;
+
+    // Destroy descendants first.
+    for (const child of [...getLuaChildren(instance)]) {
+        destroyLuaInstance(child);
+    }
+
+    // Destroy any JointInstance connected to this object.
+    for (const joint of [...luaJoints]) {
+        if (
+            joint !== instance &&
+            (joint.Part0 === instance || joint.Part1 === instance)
+        ) {
+            destroyLuaInstance(joint);
+        }
+    }
+
+    const oldParent = instance.Parent;
+
+    luaJoints.delete(instance);
+
+    const part = instance.__internal;
+
+    if (part) {
+        const i = physObjects.indexOf(part);
+
+        if (i !== -1)
+            physObjects.splice(i, 1);
+
+        if (part.mesh?.parent)
+            part.mesh.parent.remove(part.mesh);
+
+        if (part.body) {
+            world.removeRigidBody(part.body);
+            part.body = null;
+        }
+    }
+
+    instance.Parent = null;
+    instance.__destroyed = true;
+
+    if (oldParent) {
+        fireLuaSignal(oldParent.ChildRemoved, instance);
+    }
+
+    fireLuaSignal(instance.AncestryChanged, instance, null);
+
+    disconnectInstanceSignals(instance);
+    luaInstances.delete(instance);
+}
+
+function finalizeLuaInstance(instance, internal = null) {
+    addCommonInstanceApi(instance);
+    instance.Destroy = function() {
+        destroyLuaInstance(this);
+    };
+    Object.defineProperty(instance, "__destroyed", {
+        value: false, writable: true, enumerable: false
+    });
+    if (!("__internal" in instance)) {
+        Object.defineProperty(instance, "__internal", {
+            value: internal, writable: true, enumerable: false
+        });
+    }
+    luaInstances.add(instance);
+    return instance;
+}
+
+function createLuaModel() {
+    return finalizeLuaInstance(Mutable({
+        Name: "Model",
+        ClassName: "Model",
+        Parent: null,
+        Archivable: true,
+        PrimaryPart: null,
+        MoveTo(position) {
+            const parts = this.GetDescendants().filter(x => x.IsA("BasePart"));
+            if (!parts.length) return;
+            const root = (this.PrimaryPart && this.PrimaryPart.IsA("BasePart")) ? this.PrimaryPart : parts[0];
+            const dx = (Number(position?.X) || 0) - root.Position.X;
+            const dy = (Number(position?.Y) || 0) - root.Position.Y;
+            const dz = (Number(position?.Z) || 0) - root.Position.Z;
+            for (const p of parts) {
+                p.Position.X += dx; p.Position.Y += dy; p.Position.Z += dz;
+            }
+        }
+    }));
+}
+
+function createLuaValue(className) {
+    let value = null;
+    if (className === "StringValue") value = "";
+    if (className === "BoolValue") value = false;
+    if (className === "IntValue" || className === "NumberValue") value = 0;
+    return finalizeLuaInstance(Mutable({
+        Name: className, ClassName: className, Parent: null, Archivable: true, Value: value
+    }));
+}
+
+function createLuaJoint(className) {
+    const joint = finalizeLuaInstance(Mutable({
+        Name: className,
+        ClassName: className,
+        Parent: null,
+        Archivable: true,
+        Part0: null,
+        Part1: null,
+        C0: createCFrame(0,0,0),
+        C1: createCFrame(0,0,0),
+        CurrentAngle: 0,
+        DesiredAngle: 0,
+        MaxVelocity: className === "Motor" ? 0.1 : 0,
+        Velocity: className === "Rotate" ? 1 : 0,
+        SetDesiredAngle(v) { this.DesiredAngle = Number(v) || 0; }
+    }));
+    luaJoints.add(joint);
+    return joint;
+}
+
+function getBodyFrame(instance) {
+    const body = instance?.__internal?.body;
+    if (!body) return null;
+    const t = body.translation();
+    const r = body.rotation();
+    return {
+        p: new THREE.Vector3(t.x, t.y, t.z),
+        q: new THREE.Quaternion(r.x, r.y, r.z, r.w)
+    };
+}
+
+function cfFrame(cf) {
+    return {
+        p: new THREE.Vector3(Number(cf?.X)||0, Number(cf?.Y)||0, Number(cf?.Z)||0),
+        q: new THREE.Quaternion().setFromEuler(new THREE.Euler(
+            Number(cf?._rx)||0, Number(cf?._ry)||0, Number(cf?._rz)||0, "XYZ"
+        ))
+    };
+}
+
+function mulFrame(a,b) {
+    return { p: a.p.clone().add(b.p.clone().applyQuaternion(a.q)), q: a.q.clone().multiply(b.q) };
+}
+
+function invFrame(a) {
+    const q = a.q.clone().invert();
+    return { p: a.p.clone().multiplyScalar(-1).applyQuaternion(q), q };
+}
+
+function syncLuaJoints(delta) {
+    for (const joint of [...luaJoints]) {
+        if (!joint || joint.__destroyed || !joint.Parent) continue;
+        const a = joint.Part0, b = joint.Part1;
+        if (!a?.__internal?.body || !b?.__internal?.body) continue;
+
+        if (joint.ClassName === "Motor") {
+            const cur = Number(joint.CurrentAngle)||0;
+            const dst = Number(joint.DesiredAngle)||0;
+            const step = Math.abs(Number(joint.MaxVelocity)||0) * delta;
+            joint.CurrentAngle = step <= 0 ? cur :
+                (Math.abs(dst-cur) <= step ? dst : cur + Math.sign(dst-cur)*step);
+        } else if (joint.ClassName === "Rotate") {
+            joint.CurrentAngle = (Number(joint.CurrentAngle)||0) + (Number(joint.Velocity)||0) * delta;
+        }
+
+        let target = mulFrame(getBodyFrame(a), cfFrame(joint.C0));
+        if (joint.ClassName === "Motor" || joint.ClassName === "Rotate") {
+            target = mulFrame(target, {
+                p: new THREE.Vector3(),
+                q: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), Number(joint.CurrentAngle)||0)
+            });
+        }
+        target = mulFrame(target, invFrame(cfFrame(joint.C1)));
+
+        const part = b.__internal;
+        part.body.setTranslation({x:target.p.x,y:target.p.y,z:target.p.z}, true);
+        part.body.setRotation({x:target.q.x,y:target.q.y,z:target.q.z,w:target.q.w}, true);
+        part.mesh.position.copy(target.p);
+        part.mesh.quaternion.copy(target.q);
+        b.Position.X = target.p.x; b.Position.Y = target.p.y; b.Position.Z = target.p.z;
+        const e = new THREE.Euler().setFromQuaternion(target.q, "XYZ");
+        b.Orientation.X = THREE.MathUtils.radToDeg(e.x);
+        b.Orientation.Y = THREE.MathUtils.radToDeg(e.y);
+        b.Orientation.Z = THREE.MathUtils.radToDeg(e.z);
+        if (b.__last) {
+            b.__last.Position = [b.Position.X,b.Position.Y,b.Position.Z];
+            b.__last.Orientation = [b.Orientation.X,b.Orientation.Y,b.Orientation.Z];
+        }
+    }
+}
+
+function touchingFacePair(a, b, epsilon = 0.08) {
+    const ax=a.Position.X, ay=a.Position.Y, az=a.Position.Z;
+    const bx=b.Position.X, by=b.Position.Y, bz=b.Position.Z;
+    const ahx=a.Size.X/2, ahy=a.Size.Y/2, ahz=a.Size.Z/2;
+    const bhx=b.Size.X/2, bhy=b.Size.Y/2, bhz=b.Size.Z/2;
+    const overlapX = Math.abs(ax-bx) <= ahx+bhx+epsilon;
+    const overlapY = Math.abs(ay-by) <= ahy+bhy+epsilon;
+    const overlapZ = Math.abs(az-bz) <= ahz+bhz+epsilon;
+    if (!(overlapX && overlapY && overlapZ)) return null;
+
+    if (Math.abs((ay+ahy)-(by-bhy)) <= epsilon) return ["TopSurface","BottomSurface"];
+    if (Math.abs((ay-ahy)-(by+bhy)) <= epsilon) return ["BottomSurface","TopSurface"];
+    if (Math.abs((ax+ahx)-(bx-bhx)) <= epsilon) return ["RightSurface","LeftSurface"];
+    if (Math.abs((ax-ahx)-(bx+bhx)) <= epsilon) return ["LeftSurface","RightSurface"];
+    if (Math.abs((az+ahz)-(bz-bhz)) <= epsilon) return ["BackSurface","FrontSurface"];
+    if (Math.abs((az-ahz)-(bz+bhz)) <= epsilon) return ["FrontSurface","BackSurface"];
+    return null;
+}
+
+function makeSurfaceJoints(part) {
+    if (!part?.IsA?.("BasePart")) return;
+    for (const other of luaInstances) {
+        if (other === part || !other?.IsA?.("BasePart") || !isInWorkspace(other)) continue;
+        const faces = touchingFacePair(part, other);
+        if (!faces) continue;
+        const s0 = part[faces[0]] || "Smooth";
+        const s1 = other[faces[1]] || "Smooth";
+        let className = null;
+        if (s0 === "Glue" || s1 === "Glue") className = "Glue";
+        else if (s0 === "Weld" || s1 === "Weld") className = "Weld";
+        else if (["Studs","Inlet","Universal"].includes(s0) && ["Studs","Inlet","Universal"].includes(s1)) className = "Snap";
+        if (!className) continue;
+        const exists = [...luaJoints].some(j => !j.__destroyed && ((j.Part0===part && j.Part1===other)||(j.Part0===other && j.Part1===part)));
+        if (exists) continue;
+        const joint = createLuaJoint(className);
+        joint.Part0 = part;
+        joint.Part1 = other;
+        joint.Parent = part;
+    }
+}
+
+function cloneLuaInstance(source) {
+    if (!source || source.__destroyed || source.Archivable === false) return null;
+    const c = InstanceApi.new(source.ClassName);
+    c.Name = source.Name;
+    c.Archivable = source.Archivable;
+    if (source.IsA?.("BasePart")) {
+        c.Size = createVector3(source.Size.X,source.Size.Y,source.Size.Z);
+        c.Position = createVector3(source.Position.X,source.Position.Y,source.Position.Z);
+        c.Orientation = createVector3(source.Orientation.X,source.Orientation.Y,source.Orientation.Z);
+        c.Color = createColor3(source.Color.R,source.Color.G,source.Color.B);
+        c.BrickColor = BrickColorApi.new(source.BrickColor?.Name || "Medium stone grey");
+        c.Anchored = source.Anchored;
+        c.CanCollide = source.CanCollide;
+        c.Transparency = source.Transparency;
+        c.Reflectance = source.Reflectance || 0;
+        for (const key of ["TopSurface","BottomSurface","LeftSurface","RightSurface","FrontSurface","BackSurface"]) c[key]=source[key];
+    } else if ("Value" in source) c.Value = source.Value;
+    if (luaJoints.has(source)) {
+        c.Part0=source.Part0; c.Part1=source.Part1; c.C0=source.C0; c.C1=source.C1;
+        c.CurrentAngle=source.CurrentAngle; c.DesiredAngle=source.DesiredAngle; c.MaxVelocity=source.MaxVelocity; c.Velocity=source.Velocity;
+    }
+    for (const child of source.GetChildren?.() || []) {
+        const cc = cloneLuaInstance(child); if (cc) cc.Parent=c;
+    }
+    return c;
+}
+
+function createLuaPart() {
+
+    const internal = createPart(
+        4,
+        1,
+        2,
+        0,
+        0.5,
+        0,
+        {
+            color: 0xaaaaaa,
+            anchored: false,
+            canCollide: true
+        }
+    );
+
+    // Don't display it until Parent = workspace.
+    scene.remove(internal.mesh);
+
+    const instance = Mutable({
+
+        Name: "Part",
+        ClassName: "Part",
+        Archivable: true,
+
+        Parent: null,
+
+        Touched: createLuaSignal("Touched"),
+        TouchEnded: createLuaSignal("TouchEnded"),
+
+        Size: createVector3(
+            4,
+            1,
+            2
+        ),
+
+        Position: createVector3(
+            0,
+            0.5,
+            0
+        ),
+
+        Orientation: createVector3(
+            0,
+            0,
+            0
+        ),
+
+        CFrame: createCFrame(
+            0,
+            0.5,
+            0
+        ),
+
+        Color: createColor3(
+            170 / 255,
+            170 / 255,
+            170 / 255
+        ),
+
+        BrickColor: BrickColorApi.new("Medium stone grey"),
+
+        Anchored: false,
+
+        CanCollide: true,
+
+        Transparency: 0,
+
+        CastShadow: true,
+        Reflectance: 0,
+
+        // Classic 2010-style surfaces
+        TopSurface: "Studs",
+        BottomSurface: "Inlet",
+        LeftSurface: "Smooth",
+        RightSurface: "Smooth",
+        FrontSurface: "Smooth",
+        BackSurface: "Smooth",
+
+        MakeJoints() { makeSurfaceJoints(this); },
+        BreakJoints() {
+            for (const joint of [...luaJoints]) {
+                if (joint.Part0 === this || joint.Part1 === this) destroyLuaInstance(joint);
+            }
+        },
+
+        Destroy() {
+            destroyLuaInstance(this);
+        }
+
+    });
+
+    Object.defineProperty(
+        instance,
+        "__internal",
+        {
+            value: internal,
+            writable: true,
+            enumerable: false
+        }
+    );
+
+    Object.defineProperty(
+        instance,
+        "__last",
+        {
+            value: {
+                Size: [4, 1, 2],
+                Position: [0, 0.5, 0],
+                Orientation: [0, 0, 0],
+                Parent: null,
+                Color: 0xaaaaaa,
+                BrickColorName: "Medium stone grey",
+                Anchored: false,
+                CanCollide: true,
+                Transparency: 0,
+                Reflectance: 0,
+                CastShadow: true
+            },
+            writable: true,
+            enumerable: false
+        }
+    );
+
+    addCommonInstanceApi(instance);
+    Object.defineProperty(instance, "__destroyed", { value: false, writable: true, enumerable: false });
+
+    // IMPORTANT: Parts must be registered so syncLuaInstances(), parenting,
+    // Workspace:GetChildren(), joints, and the void system can see them.
+    luaInstances.add(instance);
+
+    return instance;
+}
+const InstanceApi = Mutable({
+    new(className, parent = null) {
+        let instance;
+        if (className === "Part") instance = createLuaPart();
+        else if (className === "Model") instance = createLuaModel();
+        else if (["Weld","Motor","Rotate","Snap","Glue","ManualWeld"].includes(className)) instance = createLuaJoint(className);
+        else if (["StringValue","BoolValue","IntValue","NumberValue","ObjectValue"].includes(className)) instance = createLuaValue(className);
+        else throw new Error(`Unsupported 2010 Instance class: ${className}`);
+
+        if (parent !== null && parent !== undefined) instance.Parent = parent;
+        return instance;
+    }
+});
+
+const workspaceApi = addCommonInstanceApi(Mutable({
+
+    Name: "Workspace",
+    ClassName: "Workspace",
+
+    GetChildren() {
+
+        return Array.from(luaInstances)
+            .filter(
+                instance =>
+                    instance.Parent === workspaceApi
+            );
+
+    },
+
+    FindFirstChild(name) {
+
+        return Array.from(luaInstances)
+            .find(
+                instance =>
+                    instance.Parent === workspaceApi &&
+                    instance.Name === name
+            ) || null;
+
+    }
+
+}));
+
+const localPlayerApi = Mutable({
+
+    Name: "Player",
+    ClassName: "Player",
+
+    Character: null,
+
+    LoadCharacter() {
+
+        console.log(
+            "[Luau] LocalPlayer:LoadCharacter()"
+        );
+
+        return this.Character;
+
+    }
+
+});
+
+const PlayersApi = Mutable({
+
+    LocalPlayer: localPlayerApi
+
+});
+
+const gameApi = Mutable({
+
+    Name: "game",
+
+    Players: PlayersApi,
+
+    GetService(name) {
+
+        if (name === "Players")
+            return PlayersApi;
+
+        if (name === "Workspace")
+            return workspaceApi;
+
+        return null;
+
+    }
+
+});
+
+const EnumApi = Mutable({
+    SurfaceType: Mutable({
+        Smooth: "Smooth", Studs: "Studs", Inlet: "Inlet", Universal: "Universal",
+        Glue: "Glue", Weld: "Weld", Hinge: "Hinge", Motor: "Motor", SteppingMotor: "SteppingMotor"
+    })
+});
+
+const CLASSIC_BRICK_COLORS = {
+    "White":[242,243,243], "Medium stone grey":[163,162,165], "Dark stone grey":[99,95,98],
+    "Black":[27,42,53], "Bright red":[196,40,28], "Bright blue":[13,105,172],
+    "Bright yellow":[245,205,48], "Bright green":[75,151,75], "Reddish brown":[105,64,40]
+};
+const BrickColorApi = Mutable({
+    new(name="Medium stone grey") {
+        const rgb = CLASSIC_BRICK_COLORS[name] || CLASSIC_BRICK_COLORS["Medium stone grey"];
+        return Mutable({ Name: CLASSIC_BRICK_COLORS[name] ? name : "Medium stone grey", Color: createColor3(rgb[0]/255,rgb[1]/255,rgb[2]/255) });
+    }
+});
+
+async function executeLuauScript() {
+
+    const source =
+        sessionStorage.getItem(
+            "bloxScriptSource"
+        );
+
+    const scriptName =
+        sessionStorage.getItem(
+            "bloxScriptName"
+        ) || "script.lua";
+
+    if (!source) {
+
+        console.warn(
+            "No Luau script was supplied."
+        );
+
+        return;
+
+    }
+
+    try {
+
+        const state =
+            await LuauState.createAsync({
+
+                game: gameApi,
+
+                workspace: workspaceApi,
+
+                Instance: InstanceApi,
+
+                Vector3: Vector3Api,
+
+                CFrame: CFrameApi,
+
+                Color3: Color3Api,
+                BrickColor: BrickColorApi,
+                Enum: EnumApi,
+
+                print(...messages) {
+                    console.log("[Lua]", ...messages);
+                },
+
+                warn(message) {
+
+                    console.warn(
+                        "[Luau]",
+                        message
+                    );
+
+                }
+
+            });
+
+        const chunk =
+            state.loadstring(
+                source,
+                scriptName,
+                true
+            );
+
+        await chunk();
+
+        console.log(
+            `[Luau] Executed ${scriptName}`
+        );
+
+    } catch (error) {
+
+        console.error(
+            `[Luau] Error in ${scriptName}:`,
+            error
+        );
+
+    }
+
+}
+function syncLuaInstances() {
+
+    for (const instance of luaInstances) {
+
+        const part =
+            instance.__internal;
+
+        const last =
+            instance.__last;
+
+        if (!part || !part.body)
+            continue;
+
+        // Position
+        const px = Number(instance.Position?.X) || 0;
+        const py = Number(instance.Position?.Y) || 0;
+        const pz = Number(instance.Position?.Z) || 0;
+
+        if (
+            px !== last.Position[0] ||
+            py !== last.Position[1] ||
+            pz !== last.Position[2]
+        ) {
+
+            // Move physics body
+            part.body.setTranslation(
+                {
+                    x: px,
+                    y: py,
+                    z: pz
+                },
+                true
+            );
+
+            // Also move visual mesh immediately.
+            // Anchored objects are not in physObjects, so otherwise
+            // syncPhysObjects() will never move their mesh.
+            part.mesh.position.set(
+                px,
+                py,
+                pz
+            );
+
+            last.Position = [
+                px,
+                py,
+                pz
+            ];
+
+            fireChanged(instance, "Position");
+        }
+
+        // Size
+        const sx = Math.max(1, Math.floor(Number(instance.Size?.X) || 4));
+        const sy = Math.max(1, Math.floor(Number(instance.Size?.Y) || 1));
+        const sz = Math.max(1, Math.floor(Number(instance.Size?.Z) || 2));
+
+if (
+    sx !== last.Size[0] ||
+    sy !== last.Size[1] ||
+    sz !== last.Size[2]
+) {
+
+    // ─────────────────────────────
+    // Visual geometry
+    // ─────────────────────────────
+
+    part.mesh.geometry.dispose();
+
+    part.mesh.geometry =
+        new THREE.BoxGeometry(
+            sx,
+            sy,
+            sz
+        );
+
+        // ─────────────────────────────
+        // Physics collider
+        // ─────────────────────────────
+
+        for (
+            let i = 0;
+            i < part.body.numColliders();
+            i++
+        ) {
+
+            const collider =
+                part.body.collider(i);
+
+            collider.setHalfExtents({
+                x: sx / 2,
+                y: sy / 2,
+                z: sz / 2
+            });
+        }
+
+        part.w = sx;
+        part.h = sy;
+        part.d = sz;
+
+        // ─────────────────────────────
+        // Stud texture tiling
+        // ─────────────────────────────
+
+        const materials =
+            part.mesh.material;
+
+        // Your createPart material order is:
+        //
+        // 0 = side
+        // 1 = side
+        // 2 = TOP
+        // 3 = BOTTOM
+        // 4 = side
+        // 5 = side
+
+        const topMaterial =
+            materials[2];
+
+        const bottomMaterial =
+            materials[3];
+
+        if (topMaterial?.map) {
+
+            topMaterial.map.repeat.set(
+                sx,
+                sz
+            );
+
+            if (topMaterial.map.image) {
+                topMaterial.map.needsUpdate = true;
+            }
+        }
+
+        if (bottomMaterial?.map) {
+
+            bottomMaterial.map.repeat.set(
+                sx,
+                sz
+            );
+
+            if (bottomMaterial.map.image) {
+                bottomMaterial.map.needsUpdate = true;
+            }
+        }
+
+        last.Size = [
+            sx,
+            sy,
+            sz
+        ];
+
+        fireChanged(instance, "Size");
+    }
+
+        // Orientation
+        const ox =
+            Number(instance.Orientation?.X) || 0;
+
+        const oy =
+            Number(instance.Orientation?.Y) || 0;
+
+        const oz =
+            Number(instance.Orientation?.Z) || 0;
+
+        if (
+            ox !== last.Orientation[0] ||
+            oy !== last.Orientation[1] ||
+            oz !== last.Orientation[2]
+        ) {
+
+            const rx =
+                THREE.MathUtils.degToRad(ox);
+
+            const ry =
+                THREE.MathUtils.degToRad(oy);
+
+            const rz =
+                THREE.MathUtils.degToRad(oz);
+
+            // Three.js
+            part.mesh.rotation.set(
+                rx,
+                ry,
+                rz
+            );
+
+            // Convert exact same Euler rotation
+            // to quaternion for Rapier.
+            const q =
+                new THREE.Quaternion()
+                    .setFromEuler(
+                        new THREE.Euler(
+                            rx,
+                            ry,
+                            rz,
+                            "XYZ"
+                        )
+                    );
+
+            part.body.setRotation(
+                {
+                    x: q.x,
+                    y: q.y,
+                    z: q.z,
+                    w: q.w
+                },
+                true
+            );
+
+            last.Orientation = [
+                ox,
+                oy,
+                oz
+            ];
+
+            fireChanged(instance, "Orientation");
+        }
+
+        // BrickColor
+        const brickName = instance.BrickColor?.Name || "Medium stone grey";
+
+        if (brickName !== last.BrickColorName) {
+            const brick = BrickColorApi.new(brickName);
+            instance.BrickColor = brick;
+            instance.Color = createColor3(
+                brick.Color.R,
+                brick.Color.G,
+                brick.Color.B
+            );
+            last.BrickColorName = brick.Name;
+            fireChanged(instance, "BrickColor");
+        }
+
+        // Color
+        const r =
+            THREE.MathUtils.clamp(
+                Number(instance.Color?.R) || 0,
+                0,
+                1
+            );
+
+        const g =
+            THREE.MathUtils.clamp(
+                Number(instance.Color?.G) || 0,
+                0,
+                1
+            );
+
+        const b =
+            THREE.MathUtils.clamp(
+                Number(instance.Color?.B) || 0,
+                0,
+                1
+            );
+
+        const hex =
+            new THREE.Color(
+                r,
+                g,
+                b
+            ).getHex();
+
+        if (hex !== last.Color) {
+
+            part.mesh.material.forEach(
+                material => {
+
+                    if (material.color) {
+                        material.color.setHex(hex);
+                    }
+
+                }
+            );
+
+            last.Color = hex;
+            fireChanged(instance, "Color");
+
+        }
+
+        // Anchored
+        const anchored =
+            Boolean(instance.Anchored);
+
+        if (anchored !== last.Anchored) {
+
+            editPart(part, {
+                anchored
+            });
+
+            last.Anchored =
+                anchored;
+
+            fireChanged(instance, "Anchored");
+        }
+
+        // Collision
+        const canCollide =
+            Boolean(instance.CanCollide);
+
+        if (canCollide !== last.CanCollide) {
+
+            editPart(part, {
+                canCollide
+            });
+
+            last.CanCollide =
+                canCollide;
+
+            fireChanged(instance, "CanCollide");
+        }
+
+        // Transparency
+        const transparency =
+            THREE.MathUtils.clamp(
+                Number(instance.Transparency) || 0,
+                0,
+                1
+            );
+
+        if (
+            transparency !==
+            last.Transparency
+        ) {
+
+            part.mesh.material.forEach(
+                material => {
+
+                    material.transparent =
+                        transparency > 0;
+
+                    material.opacity =
+                        1 - transparency;
+
+                    material.needsUpdate =
+                        true;
+
+                }
+            );
+
+            last.Transparency =
+                transparency;
+
+            fireChanged(instance, "Transparency");
+        }
+
+        // Reflectance
+        const reflectance =
+            THREE.MathUtils.clamp(
+                Number(instance.Reflectance) || 0,
+                0,
+                1
+            );
+
+        if (reflectance !== last.Reflectance) {
+            part.mesh.material.forEach(material => {
+                if ("roughness" in material) {
+                    material.roughness =
+                        THREE.MathUtils.lerp(0.8, 0.05, reflectance);
+                }
+
+                if ("metalness" in material) {
+                    material.metalness = reflectance * 0.25;
+                }
+
+                material.needsUpdate = true;
+            });
+
+            last.Reflectance = reflectance;
+            fireChanged(instance, "Reflectance");
+        }
+
+        // Parent
+        if (
+            instance.Parent !==
+            last.Parent
+        ) {
+
+            if (isInWorkspace(instance)) {
+
+                if (!part.mesh.parent) {
+                    scene.add(part.mesh);
+                }
+
+            } else {
+
+                if (part.mesh.parent) {
+                    part.mesh.parent.remove(
+                        part.mesh
+                    );
+                }
+
+            }
+
+            last.Parent =
+                instance.Parent;
+
+        }
+
+        // Keep parts inside Models visible when the Model is parented to Workspace.
+        if (isInWorkspace(instance)) {
+            if (!part.mesh.parent) scene.add(part.mesh);
+        } else {
+            if (part.mesh.parent) part.mesh.parent.remove(part.mesh);
+        }
+
+    }
+
+}
+
+// ─── Instance hierarchy events ───────────────────────────────────────────────
+
+function syncLuaHierarchyEvents() {
+    for (const instance of [...luaInstances]) {
+        if (!instance || instance.__destroyed)
+            continue;
+
+        // Name changes are cheap to detect and support classic Changed.
+        if (instance.Name !== instance.__eventLastName) {
+            instance.__eventLastName = instance.Name;
+            fireChanged(instance, "Name");
+        }
+
+        const oldParent = instance.__eventLastParent;
+        const newParent = instance.Parent ?? null;
+
+        if (oldParent !== newParent) {
+            if (oldParent) {
+                fireLuaSignal(oldParent.ChildRemoved, instance);
+            }
+
+            if (newParent) {
+                fireLuaSignal(newParent.ChildAdded, instance);
+            }
+
+            fireLuaSignal(instance.AncestryChanged, instance, newParent);
+            fireChanged(instance, "Parent");
+
+            instance.__eventLastParent = newParent;
+        }
+    }
+}
+
+// ─── Touched / TouchEnded ────────────────────────────────────────────────────
+// Uses the existing playerRoot "body" rectangle as the player touch hitbox.
+// Part-to-part touch uses the rendered part boxes, which follow the Rapier bodies.
+
+const playerTouchPart = addCommonInstanceApi(Mutable({
+    Name: "Torso",
+    ClassName: "Part",
+    Parent: null,
+    Archivable: false
+}));
+
+function getPlayerTouchBox() {
+    if (!playerBody)
+        return null;
+
+    const p = playerBody.translation();
+
+    // Full physical player bounds from the actual Rapier capsule.
+    //
+    // This reaches the player's feet, unlike the visible red "body"
+    // rectangle which only covers the torso. Floor touch pads therefore
+    // need this capsule-sized box or they never overlap the torso box.
+    const capsuleBox = new THREE.Box3(
+        new THREE.Vector3(
+            p.x - PLAYER_RADIUS,
+            p.y - PLAYER_HALF_H - PLAYER_RADIUS,
+            p.z - PLAYER_RADIUS
+        ),
+        new THREE.Vector3(
+            p.x + PLAYER_RADIUS,
+            p.y + PLAYER_HALF_H + PLAYER_RADIUS,
+            p.z + PLAYER_RADIUS
+        )
+    );
+
+    // Keep using your existing red body rectangle too. Unioning the two means
+    // torso/side touches use the visual body collider while floor/feet touches
+    // are still detected from the real player physics body.
+    const bodyHitbox = playerRoot?.getObjectByName?.("body");
+
+    if (bodyHitbox) {
+        bodyHitbox.updateWorldMatrix(true, false);
+
+        const bodyBox =
+            new THREE.Box3().setFromObject(bodyHitbox);
+
+        capsuleBox.union(bodyBox);
+    }
+
+    return capsuleBox;
+}
+
+function getLuaPartTouchBox(instance) {
+    const mesh = instance?.__internal?.mesh;
+
+    if (!mesh || !isInWorkspace(instance))
+        return null;
+
+    mesh.updateWorldMatrix(true, false);
+
+    const box =
+        new THREE.Box3().setFromObject(mesh);
+
+    // Rapier normally keeps colliders separated by a tiny contact offset.
+    // Expand touch detection slightly so "resting on" a brick counts as touch.
+    box.expandByScalar(0.06);
+
+    return box;
+}
+
+function makeTouchPairKey(a, b) {
+    const aId = a === playerTouchPart ? "player" : getLuaInstanceId(a);
+    const bId = b === playerTouchPart ? "player" : getLuaInstanceId(b);
+
+    return String(aId) < String(bId)
+        ? `${aId}:${bId}`
+        : `${bId}:${aId}`;
+}
+
+function updateTouchedEvents() {
+    const currentPairs = new Set();
+
+    const parts = [...luaInstances].filter(instance =>
+        instance &&
+        !instance.__destroyed &&
+        instance.IsA?.("BasePart") &&
+        isInWorkspace(instance) &&
+        instance.__internal?.body
+    );
+
+    // Player rectangle vs world Parts.
+    const playerBox = getPlayerTouchBox();
+
+    if (playerBox) {
+        for (const part of parts) {
+            const partBox = getLuaPartTouchBox(part);
+
+            if (!partBox || !playerBox.intersectsBox(partBox))
+                continue;
+
+            const key = makeTouchPairKey(part, playerTouchPart);
+            currentPairs.add(key);
+
+            if (!activeTouchPairs.has(key)) {
+                fireLuaSignal(part.Touched, playerTouchPart);
+            }
+        }
+    }
+
+    // Part vs Part.
+    for (let i = 0; i < parts.length; i++) {
+        const a = parts[i];
+        const boxA = getLuaPartTouchBox(a);
+
+        if (!boxA)
+            continue;
+
+        for (let j = i + 1; j < parts.length; j++) {
+            const b = parts[j];
+            const boxB = getLuaPartTouchBox(b);
+
+            if (!boxB || !boxA.intersectsBox(boxB))
+                continue;
+
+            const key = makeTouchPairKey(a, b);
+            currentPairs.add(key);
+
+            if (!activeTouchPairs.has(key)) {
+                fireLuaSignal(a.Touched, b);
+                fireLuaSignal(b.Touched, a);
+            }
+        }
+    }
+
+    // Fire TouchEnded for pairs that stopped overlapping.
+    for (const key of activeTouchPairs) {
+        if (currentPairs.has(key))
+            continue;
+
+        const [left, right] = key.split(":");
+
+        if (left === "player" || right === "player") {
+            const partId = left === "player" ? right : left;
+            const part = parts.find(x => String(getLuaInstanceId(x)) === partId);
+
+            if (part) {
+                fireLuaSignal(part.TouchEnded, playerTouchPart);
+            }
+
+            continue;
+        }
+
+        const a = parts.find(x => String(getLuaInstanceId(x)) === left);
+        const b = parts.find(x => String(getLuaInstanceId(x)) === right);
+
+        if (a && b) {
+            fireLuaSignal(a.TouchEnded, b);
+            fireLuaSignal(b.TouchEnded, a);
+        }
+    }
+
+    activeTouchPairs.clear();
+
+    for (const key of currentPairs) {
+        activeTouchPairs.add(key);
+    }
+}
+
+// Player
+let player = null;
+let playerRoot = new THREE.Group();
+scene.add(playerRoot);
+
+// Rapier capsule rigid body for the player
+const PLAYER_RADIUS = 0.6;
+const PLAYER_HALF_H = 1.9; // half height of cylinder portion
+const playerBodyDesc = RAPIER.RigidBodyDesc.dynamic()
+    .setTranslation(0, 4, 0)
+    .lockRotations()          // no tipping over
+    .setLinearDamping(0.0);
+const playerBody = world.createRigidBody(playerBodyDesc);
+world.createCollider(
+    RAPIER.ColliderDesc.capsule(PLAYER_HALF_H, PLAYER_RADIUS)
+        .setFriction(0.4)
+        .setRestitution(0.0),
+    playerBody
+);
+
+const playerState = {
+     grounded: false,
+    height: 5,
+    moveSpeed: 16/3,
+    jumpPower: 23,
+};
+
+// ─── Roblox 2006-style camera ───────────────────────────────────────────────
+// Zoom levels: 0 = max zoom in (head level), 1 = max zoom out
+const CAM = {
+    // Orbit angles
+    yaw:   -Math.PI / 6,
+    pitch:  0.42,          // radians, clamped below
+
+    // Zoom
+    zoomIndex: 4,          // current step index
+    zoomSteps: [2, 5, 9, 14, 20, 28, 38, 50, 65, 80, 100, 125, 155, 190, 230, 275, 330, 400], // distances like classic Roblox
+    zoomCurrent: 20,       // smoothly interpolated distance
+
+    // At max zoom-in the look target is near head, at max zoom-out it rises
+    targetOffset: new THREE.Vector3(),       // smoothed look-at offset
+    currentPos:   new THREE.Vector3(),       // smoothed camera position
+
+    // Whether RMB is held for orbiting
+    orbiting: false,
+};
+
+// Precompute per-step vertical offsets (head-level at 0, higher when far)
+function zoomVerticalOffset(dist) {
+    // map [2, 38] → [0, 4]
+    const minD = 2, maxD = 400;
+    const t = (dist - minD) / (maxD - minD);
+    return THREE.MathUtils.lerp(0, 4, t);
+}
+
+// ─── Zoom sound ──────────────────────────────────────────────────────────────
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let zoomSoundBuffer = null;
+
+fetch("Sounds/SWITCH3.wav")
+    .then(r => r.arrayBuffer())
+    .then(buf => audioCtx.decodeAudioData(buf))
+    .then(decoded => { zoomSoundBuffer = decoded; })
+    .catch(() => { /* sound file not present — silently skip */ });
+
+function playZoomSound() {
+    if (!zoomSoundBuffer) return;
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const src = audioCtx.createBufferSource();
+    src.buffer = zoomSoundBuffer;
+    src.connect(audioCtx.destination);
+    src.start(0);
+}
+let jumpSoundBuffer = null;
+
+fetch("Sounds/jump.wav")
+    .then(r => r.arrayBuffer())
+    .then(buf => audioCtx.decodeAudioData(buf))
+    .then(decoded => { jumpSoundBuffer = decoded; })
+    .catch(() => { /* sound file not present — silently skip */ });
+
+function playJumpSound() {
+    if (!jumpSoundBuffer) return;
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const src = audioCtx.createBufferSource();
+    src.buffer = jumpSoundBuffer;
+    src.connect(audioCtx.destination);
+    src.start(0);
+}
+let spawnSoundBuffer = null;
+fetch("Sounds/bass.wav")
+    .then(r => r.arrayBuffer())
+    .then(buf => audioCtx.decodeAudioData(buf))
+    .then(decoded => { spawnSoundBuffer = decoded; })
+    .catch(() => { /* sound file not present — silently skip */ });
+
+function playSpawnSound() {
+    if (!spawnSoundBuffer) return;
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const src = audioCtx.createBufferSource();
+    src.buffer = spawnSoundBuffer;
+    src.connect(audioCtx.destination);
+    src.start(0);
+}
+// ─── Walk sound ──────────────────────────────────────────────────────────────
+const walkSound = new Audio("Sounds/bfsl-minifigfoots1.mp3");
+walkSound.loop = true;
+// ─── Input ───────────────────────────────────────────────────────────────────
+const keys = { w: false, a: false, s: false, d: false, space: false };
+
+window.addEventListener("keydown", e => {
+    switch (e.code) {
+        case "KeyW":   keys.w     = true;  break;
+        case "KeyA":   keys.a     = true;  break;
+        case "KeyS":   keys.s     = true;  break;
+        case "KeyD":   keys.d     = true;  break;
+        case "Space":  keys.space = true;  e.preventDefault(); break;
+    }
+});
+window.addEventListener("keyup", e => {
+    switch (e.code) {
+        case "KeyW":   keys.w     = false; break;
+        case "KeyA":   keys.a     = false; break;
+        case "KeyS":   keys.s     = false; break;
+        case "KeyD":   keys.d     = false; break;
+        case "Space":  keys.space = false; break;
+    }
+});
+
+// Right-mouse to orbit (classic Roblox behaviour)
+canvas.addEventListener("mousedown", e => {
+    if (e.button === 2) {
+        CAM.orbiting = true;
+        canvas.requestPointerLock();
+        e.preventDefault();
+    }
+});
+canvas.addEventListener("mouseup", e => {
+    if (e.button === 2) {
+        CAM.orbiting = false;
+        document.exitPointerLock();
+    }
+});
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+document.addEventListener("mousemove", e => {
+    if (!CAM.orbiting) return;
+    if (document.pointerLockElement !== canvas) return;
+
+    const sensitivity = 0.0025;
+    CAM.yaw   += e.movementX * sensitivity;
+    CAM.pitch  -= e.movementY * sensitivity;
+
+    // Classic Roblox pitch limits
+    const maxPitch = Math.PI / 2 - 0.08;
+    const minPitch = -1;   // can't go far below the horizon
+    CAM.pitch = THREE.MathUtils.clamp(CAM.pitch, minPitch, maxPitch);
+});
+
+// Scroll to zoom
+window.addEventListener("wheel", e => {
+    const dir = e.deltaY > 0 ? 5 : -5;
+    const prev = CAM.zoomCurrent;
+    CAM.zoomCurrent = THREE.MathUtils.clamp(CAM.zoomCurrent + dir, 2, 60);
+    if (CAM.zoomCurrent !== prev) playZoomSound();
+    e.preventDefault();
+}, { passive: false });
+
+// Classic start-screen button
+const startButton = document.getElementById("startButton");
+
+startButton.addEventListener("click", () => {
+    startScreen.style.display = "none";
+    playSpawnSound();
+
+    if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+    }
+});
+
+// ─── Player setup ────────────────────────────────────────────────────────────
+function normalizeR6Model(object) {
+    object.traverse(child => {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (child.material) child.material.needsUpdate = true;
+        }
+    });
+    const headTex = new THREE.TextureLoader().load("Textures/Head.png");
+    headTex.colorSpace = THREE.SRGBColorSpace;
+    const headMat = new THREE.MeshStandardMaterial({ map: headTex });
+
+    object.traverse(child => {
+        if (child.isMesh && Array.isArray(child.material)) {
+            child.material[1] = headMat;
+            child.material[1].needsUpdate = true;
+        }
+    });
+    const box  = new THREE.Box3().setFromObject(object);
+    const size = box.getSize(new THREE.Vector3());
+
+    if (size.y > 0) {
+        const scale = 5 / size.y;
+        object.scale.multiplyScalar(scale);
+        const scaledBox = new THREE.Box3().setFromObject(object);
+        object.position.y -= scaledBox.min.y;
+    }
+    return object;
+}
+
+const limbs = {};
+
+const loader = new FBXLoader();
+loader.load(
+    "Rig/r6_rigged.fbx",
+    loaded => {
+        player = normalizeR6Model(loaded);
+        player.rotation.set(0, 0, 0);
+        playerRoot.add(player);
+        playerRoot.position.set(0, 0, 0);
+        
+        const bounds = new THREE.Box3().setFromObject(player);
+        playerState.height = bounds.max.y - bounds.min.y;
+
+        // Initialise camera behind player
+        CAM.currentPos.set(0, playerState.height * 0.6, CAM.zoomSteps[CAM.zoomIndex]);
+        // ── Get the actual deformation bones from the FBX skeleton ────────────────
+        let skinnedMesh = null;
+
+        player.traverse(child => {
+            if (child.isSkinnedMesh) {
+                skinnedMesh = child;
+            }
+        });
+
+        if (!skinnedMesh) {
+            console.error("No SkinnedMesh found in R6 FBX!");
+        } else {
+            console.log(
+                "Skeleton bones:",
+                skinnedMesh.skeleton.bones.map(b => b.name)
+            );
+
+            limbs.leftArm  = skinnedMesh.skeleton.bones.find(b => b.name === "Left_Arm");
+            limbs.rightArm = skinnedMesh.skeleton.bones.find(b => b.name === "Right_Arm");
+                        // Save original arm positions
+            limbs.leftArmBaseY = limbs.leftArm.position.y;
+            limbs.rightArmBaseY = limbs.rightArm.position.y;
+            limbs.leftLeg  = skinnedMesh.skeleton.bones.find(b => b.name === "Left_Leg");
+            limbs.rightLeg = skinnedMesh.skeleton.bones.find(b => b.name === "Right_Leg");
+        }
+            
+            const colliders = [];
+
+            function createCollider(name, w, h, d, offsetX, offsetY, offsetZ, visible = false) {
+                const geo = new THREE.BoxGeometry(w, h, d);
+                const mat = new THREE.MeshBasicMaterial({ 
+                    color: 0x00ff00, 
+                    wireframe: false,
+                    visible: visible
+                });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(offsetX, offsetY, offsetZ);
+                mesh.name = name;
+                playerRoot.add(mesh);
+                colliders.push({ mesh, w, h, d });
+                return mesh;
+            }
+
+            // Adjust these values to fit your model
+            const bodyCollider = createCollider("body", 2, 2, 1,  0, 2.95, 0);
+            const headCollider = createCollider("head", 1, 1, 1,  0, 4.45, 0);
+
+            console.log("R6 FBX loaded. Height:", playerState.height);
+        },
+        xhr => {
+            if (xhr.total) console.log("FBX:", Math.round(xhr.loaded / xhr.total * 100) + "%");
+        },
+        () => {
+            // Fallback box
+            const fallback = new THREE.Mesh(
+                new THREE.BoxGeometry(2, 5, 1),
+                new THREE.MeshStandardMaterial({ color: 0xff3333 })
+            );
+            fallback.position.y = 2.5;
+            fallback.castShadow = true;
+            playerRoot.add(fallback);
+            player = fallback;
+            playerState.height = 5;
+        }
+);
+
+// ─── Update ──────────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+// Ground check via ray cast downward from player centre
+// Ground check via a short ray starting just below the player's feet
+// Ground check — ignores the player's own capsule
+function checkGrounded() {
+    const pos = playerBody.translation();
+
+    // Bottom of the player's capsule
+    const feetY = pos.y - PLAYER_HALF_H - PLAYER_RADIUS;
+
+    const ray = new RAPIER.Ray(
+        {
+            x: pos.x,
+            y: feetY + 0.05,
+            z: pos.z
+        },
+        {
+            x: 0,
+            y: -1,
+            z: 0
+        }
+    );
+
+    // Check only slightly below the feet.
+    // The final argument excludes the player's rigid body.
+    const hit = world.castRay(
+        ray,
+        0.15,
+        true,
+        undefined,   // filterFlags
+        undefined,   // filterGroups
+        undefined,   // excludeCollider
+        playerBody   // excludeRigidBody
+    );
+
+    return hit !== null;
+}
+// ─── Void / respawn system ───────────────────────────────────────────────────
+
+const VOID_Y = -500;
+
+// Player spawn position
+const PLAYER_SPAWN = {
+    x: 0,
+    y: 4,
+    z: 0
+};
+
+function respawnPlayer() {
+
+    // Move player back to spawn
+    playerBody.setTranslation(
+        {
+            x: PLAYER_SPAWN.x,
+            y: PLAYER_SPAWN.y,
+            z: PLAYER_SPAWN.z
+        },
+        true
+    );
+
+    // Stop all existing movement
+    playerBody.setLinvel(
+        {
+            x: 0,
+            y: 0,
+            z: 0
+        },
+        true
+    );
+
+    playerBody.setAngvel(
+        {
+            x: 0,
+            y: 0,
+            z: 0
+        },
+        true
+    );
+
+    // Sync visual player immediately
+    playerRoot.position.set(
+        PLAYER_SPAWN.x,
+        PLAYER_SPAWN.y - PLAYER_HALF_H - PLAYER_RADIUS,
+        PLAYER_SPAWN.z
+    );
+    playSpawnSound();
+    console.log("[Void] Player respawned.");
+}
+function destroyPhysicsPart(part) {
+
+    if (!part)
+        return;
+
+    const index = physObjects.indexOf(part);
+
+    if (index !== -1) {
+        physObjects.splice(index, 1);
+    }
+
+    if (part.mesh?.parent) {
+        part.mesh.parent.remove(part.mesh);
+    }
+
+    if (part.body) {
+        world.removeRigidBody(part.body);
+        part.body = null;
+    }
+
+    console.log("[Void] Destroyed falling object.");
+}
+function updateVoid() {
+
+    // ─────────────────────────────
+    // Player
+    // ─────────────────────────────
+
+    const playerPos = playerBody.translation();
+
+    if (playerPos.y < VOID_Y) {
+        respawnPlayer();
+    }
+
+    // Create a set of all physics parts owned by Lua instances.
+    // This lets us avoid destroying them in the generic physObjects loop.
+    const luaPhysicsParts = new Set();
+
+    for (const instance of luaInstances) {
+        if (instance.__internal) {
+            luaPhysicsParts.add(instance.__internal);
+        }
+    }
+
+    // ─────────────────────────────
+    // Regular non-Lua physics parts
+    // ─────────────────────────────
+
+    for (let i = physObjects.length - 1; i >= 0; i--) {
+
+        const part = physObjects[i];
+
+        if (!part)
+            continue;
+
+        // Never treat player as normal part
+        if (part.body === playerBody)
+            continue;
+
+        // IMPORTANT:
+        // Lua-created parts are handled separately below.
+        if (luaPhysicsParts.has(part))
+            continue;
+
+        const pos = part.body.translation();
+
+        if (pos.y < VOID_Y) {
+            destroyPhysicsPart(part);
+        }
+    }
+
+    // ─────────────────────────────
+    // Lua-created parts
+    // ─────────────────────────────
+
+    for (const instance of [...luaInstances]) {
+
+        const part = instance.__internal;
+
+        if (!part || !part.body)
+            continue;
+
+        // Anchored objects do not get voided.
+        if (instance.Anchored)
+            continue;
+
+        const pos = part.body.translation();
+
+        if (pos.y < VOID_Y) {
+
+            // Remove from physics sync list
+            const index = physObjects.indexOf(part);
+
+            if (index !== -1) {
+                physObjects.splice(index, 1);
+            }
+
+            // Remove visual mesh
+            if (part.mesh?.parent) {
+                part.mesh.parent.remove(part.mesh);
+            }
+
+            // Remove Rapier rigid body
+            world.removeRigidBody(part.body);
+
+            // Remove Lua/Roblox instance
+            luaInstances.delete(instance);
+
+            // Mark internal body as gone so nothing can use it later
+            part.body = null;
+
+            console.log(
+                `[Void] Destroyed ${instance.Name || "Part"}`
+            );
+        }
+    }
+}
+
+function updatePlayer(delta) {
+    if (!player) return;
+
+    playerState.grounded = checkGrounded();
+
+    const forward = new THREE.Vector3(-Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw));
+    const right   = new THREE.Vector3(Math.cos(CAM.yaw), 0, Math.sin(CAM.yaw));
+
+    const dir = new THREE.Vector3();
+    if (keys.w) dir.sub(forward);
+    if (keys.s) dir.add(forward);
+    if (keys.d) dir.add(right);
+    if (keys.a) dir.sub(right);
+
+    const curVel = playerBody.linvel();
+
+    let vx = 0, vz = 0;
+    if (dir.lengthSq() > 0) {
+        dir.normalize();
+        vx = dir.x * playerState.moveSpeed;
+        vz = dir.z * playerState.moveSpeed;
+
+        // Face movement direction
+        // Face movement direction using the shortest rotation path
+const targetRot = Math.atan2(dir.x, dir.z);
+
+let angleDifference = targetRot - player.rotation.y;
+
+// Normalize angle difference to [-PI, PI]
+angleDifference = Math.atan2(
+    Math.sin(angleDifference),
+    Math.cos(angleDifference)
+);
+
+// Smoothly rotate toward target
+player.rotation.y += angleDifference * 0.18;
+    }
+    // --- Add this block for the walking sound ---
+    const isWalking = dir.lengthSq() > 0 && playerState.grounded;
+    if (isWalking) {
+        if (walkSound.paused) walkSound.play().catch(() => {}); // catch prevents autoplay errors before user interacts
+    } else {
+        if (!walkSound.paused) walkSound.pause();
+    }
+
+    // Apply horizontal velocity, preserve vertical (gravity handled by Rapier)
+    playerBody.setLinvel({ x: vx, y: curVel.y, z: vz }, true);
+
+    // Jump
+    if (keys.space && playerState.grounded) {
+        playerBody.setLinvel({ x: vx, y: playerState.jumpPower, z: vz }, true);
+        playJumpSound();
+        keys.space = false; // consume so it doesn't multi-jump
+    }
+
+    // Sync Three.js root to Rapier body
+    const t = playerBody.translation();
+    // Body centre is at capsule centre; player feet = centre - PLAYER_HALF_H - PLAYER_RADIUS
+    playerRoot.position.set(t.x, t.y - PLAYER_HALF_H - PLAYER_RADIUS, t.z);
+// --- 2008-style procedural character animation ---
+if (limbs.leftArm && limbs.rightArm && limbs.leftLeg && limbs.rightLeg) {
+
+    // Base rotations from the FBX rig.
+    const baseLA = THREE.MathUtils.degToRad(-225);
+    const baseRA = THREE.MathUtils.degToRad(-45);
+    const baseLL = THREE.MathUtils.degToRad(180);
+    const baseRL = THREE.MathUtils.degToRad(180);
+
+    // Old Roblox-style animation timing:
+    // targets update at a lower "animation tick" rate, while the motors keep
+    // moving smoothly toward those targets every render frame.
+    if (typeof window.rbx08Anim === "undefined") {
+        window.rbx08Anim = {
+            accumulator: 0,
+            tickRate: 1 / 20, // stepped target updates (~20 Hz)
+
+            // Continuous phase: never reset when changing states.
+            walkPhase: 0,
+            idlePhase: 0,
+
+            // State blends overlap instead of snapping.
+            walkBlend: 0,
+            idleBlend: 1,
+            jumpBlend: 0,
+
+            // Motor-like targets.
+            target: {
+                leftArm:  baseLA,
+                rightArm: baseRA,
+                leftLeg:  baseLL,
+                rightLeg: baseRL
+            },
+
+            // Motor angular velocities.
+            velocity: {
+                leftArm: 0,
+                rightArm: 0,
+                leftLeg: 0,
+                rightLeg: 0
+            }
+        };
+    }
+
+    const anim = window.rbx08Anim;
+
+    // Delta from the render loop is already clamped.
+    // Use it so animation speed stays consistent at different FPS.
+    const animDelta = Math.min(delta, 0.05);
+
+    // Keep phases running continuously.
+    anim.walkPhase += animDelta * 9.0;
+    anim.idlePhase += animDelta * 1.5;
+
+    // Smooth state weights. These are intentionally slower than modern
+    // animation blending so landing -> walking has the classic "arms fall
+    // back into the walk" look.
+    const walkTarget = (isWalking && playerState.grounded) ? 1 : 0;
+    const idleTarget = (!isWalking && playerState.grounded) ? 1 : 0;
+    const jumpTarget = playerState.grounded ? 0 : 1;
+
+    const approach = (current, target, speed) => {
+        const step = 1 - Math.exp(-speed * animDelta);
+        return THREE.MathUtils.lerp(current, target, step);
+    };
+
+    anim.walkBlend = approach(anim.walkBlend, walkTarget, 7.0);
+    anim.idleBlend = approach(anim.idleBlend, idleTarget, 4.0);
+    anim.jumpBlend = approach(anim.jumpBlend, jumpTarget, 8.0);
+
+    // Preserve your tiny downward arm offset during the raised jump pose.
+    const ARM_DOWN_STUDS = 0.01;
+    const armDownLocal = ARM_DOWN_STUDS / player.scale.y;
+
+    limbs.leftArm.position.y =
+        limbs.leftArmBaseY - (armDownLocal * anim.jumpBlend);
+
+    limbs.rightArm.position.y =
+        limbs.rightArmBaseY - (armDownLocal * anim.jumpBlend);
+
+    // Only refresh the desired angles on the lower-rate animation tick.
+    // This is what gives the motion a slightly stepped 2008 look while the
+    // motors themselves remain smooth between target changes.
+    anim.accumulator += animDelta;
+
+    while (anim.accumulator >= anim.tickRate) {
+        anim.accumulator -= anim.tickRate;
+
+        const walkAngle = THREE.MathUtils.degToRad(25);
+        const idleAngle = THREE.MathUtils.degToRad(3);
+
+        const walkSwing =
+            Math.sin(anim.walkPhase) * walkAngle;
+
+        const idleSwing =
+            Math.sin(anim.idlePhase) * idleAngle;
+
+        // Jump arms use a fixed raised target. The jump weight overlaps with
+        // the walk/idle weights instead of replacing them instantly.
+        const jumpArm =
+            THREE.MathUtils.degToRad(-180) * anim.jumpBlend;
+
+        const groundArmSwing =
+            (walkSwing * anim.walkBlend) +
+            (idleSwing * anim.idleBlend);
+
+        const groundLegSwing =
+            (walkSwing * anim.walkBlend) +
+            (idleSwing * anim.idleBlend);
+
+        anim.target.leftArm =
+            baseLA +
+            groundArmSwing +
+            jumpArm;
+
+        anim.target.rightArm =
+            baseRA -
+            groundArmSwing +
+            jumpArm;
+
+        anim.target.leftLeg =
+            baseLL -
+            groundLegSwing;
+
+        anim.target.rightLeg =
+            baseRL +
+            groundLegSwing;
+    }
+
+    // ---------------------------------------------------------------------
+    // Classic motor response
+    // ---------------------------------------------------------------------
+    // Instead of directly lerping rotations, each limb has angular velocity.
+    // A spring-like pull moves it toward DesiredAngle and damping removes
+    // energy. This allows jump -> walk and walk -> idle to overlap naturally.
+    const MOTOR_STIFFNESS = 52.0;
+    const MOTOR_DAMPING = 10.0;
+    const MAX_ANGULAR_SPEED = THREE.MathUtils.degToRad(520);
+
+    function stepMotor(limb, key) {
+        let current = limb.rotation.x;
+        const target = anim.target[key];
+
+        // Shortest angular path.
+        let error = target - current;
+        error = Math.atan2(Math.sin(error), Math.cos(error));
+
+        let velocity = anim.velocity[key];
+
+        velocity +=
+            (error * MOTOR_STIFFNESS -
+             velocity * MOTOR_DAMPING) * animDelta;
+
+        velocity = THREE.MathUtils.clamp(
+            velocity,
+            -MAX_ANGULAR_SPEED,
+            MAX_ANGULAR_SPEED
+        );
+
+        current += velocity * animDelta;
+
+        anim.velocity[key] = velocity;
+        limb.rotation.x = current;
+    }
+
+    stepMotor(limbs.leftArm,  "leftArm");
+    stepMotor(limbs.rightArm, "rightArm");
+    stepMotor(limbs.leftLeg,  "leftLeg");
+    stepMotor(limbs.rightLeg, "rightLeg");
+}
+}
+
+// Sync dynamic parts (non-player physics objects) to Three.js
+function syncPhysObjects() {
+    for (const { body, mesh } of physObjects) {
+        if (!body) continue;
+        const t = body.translation();
+        const r = body.rotation();
+        mesh.position.set(t.x, t.y, t.z);
+        mesh.quaternion.set(r.x, r.y, r.z, r.w);
+    }
+}
+
+function updateCamera(delta) {
+    if (!player) return;
+
+    const vOffset = zoomVerticalOffset(CAM.zoomCurrent);
+
+    const headCollider = playerRoot.getObjectByName("head");
+    const trackY = headCollider
+        ? playerRoot.position.y + headCollider.position.y
+        : playerRoot.position.y + playerState.height * 0.55;
+
+    const lookTarget = new THREE.Vector3(
+        playerRoot.position.x,
+        trackY + vOffset,
+        playerRoot.position.z
+    );
+
+    CAM.targetOffset.lerp(lookTarget, 1 - Math.pow(0.001, delta));
+
+    const dist = CAM.zoomCurrent;
+    const camX = CAM.targetOffset.x - dist * Math.sin(CAM.yaw);
+    const camY = CAM.targetOffset.y - dist * Math.sin(CAM.pitch);
+    const camZ = CAM.targetOffset.z + dist * Math.cos(CAM.yaw);
+
+    CAM.currentPos.lerp(new THREE.Vector3(camX, camY, camZ), 1 - Math.pow(0.0001, delta));
+    camera.position.copy(CAM.currentPos);
+    camera.lookAt(CAM.targetOffset);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    const delta =
+        Math.min(
+            clock.getDelta(),
+            0.05
+        );
+    world.step();
+    updateVoid();
+    updatePlayer(delta);
+    syncLuaInstances();
+    syncLuaHierarchyEvents();
+    syncLuaJoints(delta);
+    syncPhysObjects();
+    updateTouchedEvents();
+    updateCamera(delta);
+    renderer.render(
+        scene,
+        camera
+    );
+
+}
+
+window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+
+executeLuauScript();
+</script>
+</body>
+</html>
