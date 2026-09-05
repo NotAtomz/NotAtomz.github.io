@@ -6,18 +6,26 @@ You can load a script, spawn into the emulator, and test basic classic Roblox-st
 
 ## How to Use
 
-1. Open the emulator in your browser. (https://notatomz.github.io/RobloxHTML/)
+1. Open the emulator in your browser:  
+   https://notatomz.github.io/RobloxHTML/
+
 2. Upload or provide a compatible Luau script.
+
 3. Click the load/start button.
+
 4. Play inside the generated Roblox-style world.
 
-## Performance Note
+## Luau Logs and Debugging
 
-If the emulator feels slow, make sure **graphics acceleration** is enabled in your browser settings.
+Luau `print()` and `warn()` messages are shown in your browser's Developer Console.
 
-For Chrome/Edge:
+To open the console:
 
-1. Open browser settings.
-2. Search for `graphics acceleration` or `hardware acceleration`.
-3. Enable it.
-4. Restart the browser.
+- **Chrome / Edge:** press `F12` or `Ctrl + Shift + J`
+- **Firefox:** press `F12` or `Ctrl + Shift + K`
+
+Example Luau code:
+
+```lua
+print("Hello from Luau!")
+warn("This is a warning")
