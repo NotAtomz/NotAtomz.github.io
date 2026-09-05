@@ -7,7 +7,7 @@ You can load a script, spawn into the emulator, and test basic classic Roblox-st
 ## How to Use
 
 1. Open the emulator in your browser:  
-   https://notatomz.github.io/RobloxHTML/
+   [https://notatomz.github.io/RobloxHTML/](https://notatomz.github.io/RobloxHTML/)
 
 2. Upload or provide a compatible Luau script.
 
@@ -15,17 +15,53 @@ You can load a script, spawn into the emulator, and test basic classic Roblox-st
 
 4. Play inside the generated Roblox-style world.
 
-## Luau Logs and Debugging
+## Making Your Own Maps
 
-Luau `print()` and `warn()` messages are shown in your browser's Developer Console.
+You can make your own maps in Roblox Studio and export them into code that Blox Emulation can load.
 
-To open the console:
+To do this, use the **Blox Emulation Workspace Exporter** plugin:
 
-- **Chrome / Edge:** press `F12` or `Ctrl + Shift + J`
-- **Firefox:** press `F12` or `Ctrl + Shift + K`
+[Download the Workspace Exporter Plugin](https://github.com/NotAtomz/NotAtomz.github.io/blob/main/RobloxHTML/Blox%20Emulation%20Workspace%20Exporter.rbxmx)
 
-Example Luau code:
+### How to Export a Map
+
+1. Open Roblox Studio.
+
+2. Build your map inside `Workspace`.
+
+3. Insert or install the **Blox Emulation Workspace Exporter** plugin.
+
+4. Click the plugin button to export your Workspace.
+
+5. The plugin will generate a script containing your map data.
+
+6. Copy the generated code.
+
+7. Open Blox Emulation in your browser.
+
+8. Upload or paste the generated Luau code into the emulator.
+
+9. Click the load/start button to play your exported map.
+
+### Exporter Notes
+
+The exporter is made to convert Roblox Studio maps into code that works better with the Blox Emulation Luau VM.
+
+It can export common objects such as:
+
+- Parts
+- Models
+- Folders
+- Seats
+- Humanoids
+- Value objects
+- Welds and basic joints
+- BodyMovers
+- Scripts inside parts and models
+
+Scripts are placed at the bottom of the generated code so the map loads first before the scripts start running.
+
+The exporter also tries to convert some newer Roblox code into older-style code that works better with the emulator. For example:
 
 ```lua
-print("Hello from Luau!")
-warn("This is a warning")
+task.wait(1)
