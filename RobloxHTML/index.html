@@ -508,7 +508,7 @@ const CAM = {
 
     // Zoom
     zoomIndex: 4,          // current step index
-    zoomSteps: [2, 5, 9, 14, 20, 28, 38],   // distances like classic Roblox
+    zoomSteps: [2, 5, 9, 14, 20, 28, 38, 50, 65, 80, 100, 125, 155, 190, 230, 275, 330, 400], // distances like classic Roblox
     zoomCurrent: 20,       // smoothly interpolated distance
 
     // At max zoom-in the look target is near head, at max zoom-out it rises
@@ -522,7 +522,7 @@ const CAM = {
 // Precompute per-step vertical offsets (head-level at 0, higher when far)
 function zoomVerticalOffset(dist) {
     // map [2, 38] → [0, 4]
-    const minD = 2, maxD = 60;
+    const minD = 2, maxD = 400;
     const t = (dist - minD) / (maxD - minD);
     return THREE.MathUtils.lerp(0, 4, t);
 }
@@ -561,6 +561,24 @@ function playJumpSound() {
     src.connect(audioCtx.destination);
     src.start(0);
 }
+let spawnSoundBuffer = null;
+fetch("Sounds/bass.wav")
+    .then(r => r.arrayBuffer())
+    .then(buf => audioCtx.decodeAudioData(buf))
+    .then(decoded => { spawnSoundBuffer = decoded; })
+    .catch(() => { /* sound file not present — silently skip */ });
+
+function playSpawnSound() {
+    if (!spawnSoundBuffer) return;
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const src = audioCtx.createBufferSource();
+    src.buffer = spawnSoundBuffer;
+    src.connect(audioCtx.destination);
+    src.start(0);
+}
+// ─── Walk sound ──────────────────────────────────────────────────────────────
+const walkSound = new Audio("Sounds/bfsl-minifigfoots1.mp3");
+walkSound.loop = true;
 // ─── Input ───────────────────────────────────────────────────────────────────
 const keys = { w: false, a: false, s: false, d: false, space: false };
 
@@ -625,6 +643,7 @@ window.addEventListener("wheel", e => {
 // Start-screen click (no pointer lock — orbiting uses RMB)
 startScreen.addEventListener("click", () => {
     startScreen.style.display = "none";
+    playSpawnSound();
     if (audioCtx.state === "suspended") audioCtx.resume();
 });
 
@@ -669,73 +688,73 @@ loader.load(
         player.rotation.set(0, 0, 0);
         playerRoot.add(player);
         playerRoot.position.set(0, 0, 0);
-
+        
         const bounds = new THREE.Box3().setFromObject(player);
         playerState.height = bounds.max.y - bounds.min.y;
 
         // Initialise camera behind player
         CAM.currentPos.set(0, playerState.height * 0.6, CAM.zoomSteps[CAM.zoomIndex]);
+        // ── Get the actual deformation bones from the FBX skeleton ────────────────
+        let skinnedMesh = null;
+
         player.traverse(child => {
-            if (!child.isBone) return;
-
-            console.log("BONE:", child.name);
-
-            const name = child.name.toLowerCase();
-
-            if (name.includes("left arm") || name.includes("left_arm")) {
-                limbs.leftArm = child;
-            }
-
-            if (name.includes("right arm") || name.includes("right_arm")) {
-                limbs.rightArm = child;
-            }
-
-            if (name.includes("left leg") || name.includes("left_leg")) {
-                limbs.leftLeg = child;
-            }
-
-            if (name.includes("right leg") || name.includes("right_leg")) {
-                limbs.rightLeg = child;
+            if (child.isSkinnedMesh) {
+                skinnedMesh = child;
             }
         });
-        const colliders = [];
 
-    function createCollider(name, w, h, d, offsetX, offsetY, offsetZ, visible = false) {
-        const geo = new THREE.BoxGeometry(w, h, d);
-        const mat = new THREE.MeshBasicMaterial({ 
-            color: 0x00ff00, 
-            wireframe: false,
-            visible: visible
-        });
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(offsetX, offsetY, offsetZ);
-        mesh.name = name;
-        playerRoot.add(mesh);
-        colliders.push({ mesh, w, h, d });
-        return mesh;
-    }
+        if (!skinnedMesh) {
+            console.error("No SkinnedMesh found in R6 FBX!");
+        } else {
+            console.log(
+                "Skeleton bones:",
+                skinnedMesh.skeleton.bones.map(b => b.name)
+            );
 
-    // Adjust these values to fit your model
-    const bodyCollider = createCollider("body", 2, 2, 1,  0, 2.95, 0);
-    const headCollider = createCollider("head", 1, 1, 1,  0, 4.45, 0);
+            limbs.leftArm  = skinnedMesh.skeleton.bones.find(b => b.name === "Left_Arm");
+            limbs.rightArm = skinnedMesh.skeleton.bones.find(b => b.name === "Right_Arm");
+            limbs.leftLeg  = skinnedMesh.skeleton.bones.find(b => b.name === "Left_Leg");
+            limbs.rightLeg = skinnedMesh.skeleton.bones.find(b => b.name === "Right_Leg");
+        }
+            
+            const colliders = [];
 
-        console.log("R6 FBX loaded. Height:", playerState.height);
-    },
-    xhr => {
-        if (xhr.total) console.log("FBX:", Math.round(xhr.loaded / xhr.total * 100) + "%");
-    },
-    () => {
-        // Fallback box
-        const fallback = new THREE.Mesh(
-            new THREE.BoxGeometry(2, 5, 1),
-            new THREE.MeshStandardMaterial({ color: 0xff3333 })
-        );
-        fallback.position.y = 2.5;
-        fallback.castShadow = true;
-        playerRoot.add(fallback);
-        player = fallback;
-        playerState.height = 5;
-    }
+            function createCollider(name, w, h, d, offsetX, offsetY, offsetZ, visible = false) {
+                const geo = new THREE.BoxGeometry(w, h, d);
+                const mat = new THREE.MeshBasicMaterial({ 
+                    color: 0x00ff00, 
+                    wireframe: false,
+                    visible: visible
+                });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(offsetX, offsetY, offsetZ);
+                mesh.name = name;
+                playerRoot.add(mesh);
+                colliders.push({ mesh, w, h, d });
+                return mesh;
+            }
+
+            // Adjust these values to fit your model
+            const bodyCollider = createCollider("body", 2, 2, 1,  0, 2.95, 0);
+            const headCollider = createCollider("head", 1, 1, 1,  0, 4.45, 0);
+
+            console.log("R6 FBX loaded. Height:", playerState.height);
+        },
+        xhr => {
+            if (xhr.total) console.log("FBX:", Math.round(xhr.loaded / xhr.total * 100) + "%");
+        },
+        () => {
+            // Fallback box
+            const fallback = new THREE.Mesh(
+                new THREE.BoxGeometry(2, 5, 1),
+                new THREE.MeshStandardMaterial({ color: 0xff3333 })
+            );
+            fallback.position.y = 2.5;
+            fallback.castShadow = true;
+            playerRoot.add(fallback);
+            player = fallback;
+            playerState.height = 5;
+        }
 );
 
 // ─── Update ──────────────────────────────────────────────────────────────────
@@ -815,6 +834,13 @@ angleDifference = Math.atan2(
 // Smoothly rotate toward target
 player.rotation.y += angleDifference * 0.18;
     }
+    // --- Add this block for the walking sound ---
+    const isWalking = dir.lengthSq() > 0 && playerState.grounded;
+    if (isWalking) {
+        if (walkSound.paused) walkSound.play().catch(() => {}); // catch prevents autoplay errors before user interacts
+    } else {
+        if (!walkSound.paused) walkSound.pause();
+    }
 
     // Apply horizontal velocity, preserve vertical (gravity handled by Rapier)
     playerBody.setLinvel({ x: vx, y: curVel.y, z: vz }, true);
@@ -830,6 +856,139 @@ player.rotation.y += angleDifference * 0.18;
     const t = playerBody.translation();
     // Body centre is at capsule centre; player feet = centre - PLAYER_HALF_H - PLAYER_RADIUS
     playerRoot.position.set(t.x, t.y - PLAYER_HALF_H - PLAYER_RADIUS, t.z);
+// --- 2008 Animations ---
+if (limbs.leftArm && limbs.rightArm && limbs.leftLeg && limbs.rightLeg) {
+
+    // Correct base idle rotations
+    const baseLA = THREE.MathUtils.degToRad(-225);
+    const baseRA = THREE.MathUtils.degToRad(-45);
+    const baseLL = THREE.MathUtils.degToRad(180);
+    const baseRL = THREE.MathUtils.degToRad(180);
+
+    // Persistent jump blend
+    if (typeof window.jumpBlend === "undefined") {
+        window.jumpBlend = 0;
+    }
+
+    // Persistent limb momentum
+    if (typeof window.animVelocity === "undefined") {
+        window.animVelocity = {
+            leftArm: 0,
+            rightArm: 0,
+            leftLeg: 0,
+            rightLeg: 0
+        };
+    }
+
+    // Jump transition
+    const blendSpeed = 0.15;
+
+    const targetBlend = playerState.grounded ? 0 : 1;
+
+    window.jumpBlend = THREE.MathUtils.lerp(
+        window.jumpBlend,
+        targetBlend,
+        blendSpeed
+    );
+
+    // --------------------------------
+    // WALK / IDLE SWING
+    // --------------------------------
+
+    // Normal walking
+    const walkAngle = THREE.MathUtils.degToRad(25);
+    const walkSpeed = 9;
+
+    // Very subtle idle movement
+    const idleAngle = THREE.MathUtils.degToRad(3);
+    const idleSpeed = 1.5;
+
+    const walkSwing =
+        Math.sin(clock.getElapsedTime() * walkSpeed) * walkAngle;
+
+    const idleSwing =
+        Math.sin(clock.getElapsedTime() * idleSpeed) * idleAngle;
+
+    // Walking uses 25 degrees, idle uses 3 degrees
+    const swing = isWalking ? walkSwing : idleSwing;
+
+    // Walking only contributes while grounded
+    const walkAmount =
+        isWalking ? (1 - window.jumpBlend) : 0;
+
+    // Idle only contributes while grounded and not walking
+    const idleAmount =
+        !isWalking ? (1 - window.jumpBlend) : 0;
+
+    // Jump pose
+    const jumpLA =
+        THREE.MathUtils.degToRad(-180) * window.jumpBlend;
+
+    const jumpRA =
+        THREE.MathUtils.degToRad(-180) * window.jumpBlend;
+
+    // Target rotations
+    const targetLA =
+        baseLA +
+        (swing * (walkAmount + idleAmount)) +
+        jumpLA;
+
+    const targetRA =
+        baseRA -
+        (swing * (walkAmount + idleAmount)) +
+        jumpRA;
+
+    const targetLL =
+        baseLL -
+        (swing * (walkAmount + idleAmount));
+
+    const targetRL =
+        baseRL +
+        (swing * (walkAmount + idleAmount));
+
+    // --------------------------------
+    // MOMENTUM
+    // --------------------------------
+
+    const acceleration = 10;
+    const damping = 0.01;
+
+    // Left arm
+    window.animVelocity.leftArm +=
+        (targetLA - limbs.leftArm.rotation.x) * acceleration;
+
+    window.animVelocity.leftArm *= damping;
+
+    limbs.leftArm.rotation.x +=
+        window.animVelocity.leftArm;
+
+    // Right arm
+    window.animVelocity.rightArm +=
+        (targetRA - limbs.rightArm.rotation.x) * acceleration;
+
+    window.animVelocity.rightArm *= damping;
+
+    limbs.rightArm.rotation.x +=
+        window.animVelocity.rightArm;
+
+    // Left leg
+    window.animVelocity.leftLeg +=
+        (targetLL - limbs.leftLeg.rotation.x) * acceleration;
+
+    window.animVelocity.leftLeg *= damping;
+
+    limbs.leftLeg.rotation.x +=
+        window.animVelocity.leftLeg;
+
+    // Right leg
+    window.animVelocity.rightLeg +=
+        (targetRL - limbs.rightLeg.rotation.x) * acceleration;
+
+    window.animVelocity.rightLeg *= damping;
+
+    limbs.rightLeg.rotation.x +=
+        window.animVelocity.rightLeg;
+}
 }
 
 // Sync dynamic parts (non-player physics objects) to Three.js
