@@ -252,6 +252,17 @@
             text-align: right;
         }
 
+        .action-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .help-button {
+            min-width: 72px;
+        }
+
         .enter-button {
             min-width: 100px;
         }
@@ -406,7 +417,15 @@
 
                 </div>
 
-                <div class="enter-area">
+                <div class="enter-area action-row">
+
+                    <button
+                        class="classic-button help-button"
+                        id="helpButton"
+                        type="button"
+                    >
+                        Help
+                    </button>
 
                     <button
                         class="classic-button enter-button"
@@ -443,8 +462,20 @@
         const selectedFile =
             document.getElementById("selectedFile");
 
+        const helpButton =
+            document.getElementById("helpButton");
+
 
         let selectedLuaFile = null;
+
+
+        helpButton.addEventListener(
+            "click",
+            () => {
+                window.location.href =
+                    "help.html";
+            }
+        );
 
 
         fileInput.addEventListener(
@@ -574,4 +605,4 @@
     </script>
 
 </body>
-</html>>
+</html>>>
