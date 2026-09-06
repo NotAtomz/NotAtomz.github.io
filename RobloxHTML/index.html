@@ -5,20 +5,33 @@
     <title>Blox Emulation</title>
 
     <style>
-        html, body {
+        html {
             margin: 0;
             width: 100%;
-            height: 100%;
+            min-height: 100%;
         }
 
         body {
+            margin: 0;
+            width: 100%;
+            min-height: 100vh;
+
             background-image: url("Textures/UI/background.png");
             background-repeat: repeat;
             background-size: 150px 150px;
 
             display: flex;
             justify-content: center;
-            align-items: center;
+
+            /* IMPORTANT: a tall flex child must start at the top. Centering a
+               child taller than the viewport creates negative space above it
+               and makes the title look clipped even though overflow is enabled. */
+            align-items: flex-start;
+
+            box-sizing: border-box;
+            padding: 18px 0 30px;
+            overflow-x: hidden;
+            overflow-y: auto;
 
             font-family: Verdana, Arial, Helvetica, sans-serif;
             font-size: 11px;
@@ -31,6 +44,9 @@
 
         .window {
             width: 430px;
+            max-width: calc(100vw - 24px);
+            flex: 0 0 auto;
+            margin: 0 auto;
 
             background: #eeeeee;
 
@@ -352,6 +368,98 @@
             color: #4c6f91;
         }
 
+        /* =========================
+           CLASSIC AVATAR EDITOR
+           ========================= */
+        .avatar-section {
+            margin-top: 16px;
+            padding-top: 14px;
+            border-top: 1px solid #c5c5c5;
+        }
+
+        .avatar-title {
+            margin: 0 0 9px 0;
+            color: #444444;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .avatar-subtitle {
+            margin: 0 0 10px 0;
+            color: #777777;
+            font-size: 10px;
+            line-height: 14px;
+        }
+
+        .avatar-color-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 10px;
+            margin-bottom: 12px;
+        }
+
+        .avatar-color-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            color: #555555;
+            font-size: 10px;
+        }
+
+        .avatar-color {
+            width: 34px;
+            height: 22px;
+            padding: 0;
+            border: 1px solid #888888;
+            background: #ffffff;
+            cursor: pointer;
+        }
+
+        .avatar-file-block {
+            margin-top: 8px;
+        }
+
+        .avatar-file-label {
+            display: block;
+            margin-bottom: 4px;
+            color: #555555;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .avatar-template-note {
+            margin-top: 8px;
+            color: #888888;
+            font-size: 9px;
+            line-height: 13px;
+        }
+
+        .avatar-clear-button {
+            min-width: 48px;
+            margin-left: 6px;
+            padding-left: 8px;
+            padding-right: 8px;
+        }
+
+        .avatar-save-area {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid #d0d0d0;
+        }
+
+        .avatar-save-button {
+            width: 100%;
+        }
+
+        .avatar-save-status {
+            min-height: 13px;
+            margin-top: 6px;
+            color: #667788;
+            font-size: 9px;
+            text-align: center;
+        }
+
         /* Prevent giant stretching on small screens */
         @media (max-width: 500px) {
             .window {
@@ -361,6 +469,20 @@
             .window-body {
                 padding-left: 18px;
                 padding-right: 18px;
+            }
+
+            .file-row {
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            .selected-file {
+                min-width: 0;
+                margin-left: 0;
+            }
+
+            .avatar-clear-button {
+                margin-left: 0;
             }
         }
     </style>
@@ -444,6 +566,80 @@
                     <strong>.luau</strong>
                 </div>
 
+                <div class="avatar-section">
+                    <div class="avatar-title">
+                        Avatar Appearance:
+                    </div>
+
+                    <div class="avatar-subtitle">
+                        Pick classic R6 body colors and optionally upload a shirt or pants template.
+                    </div>
+
+                    <div class="avatar-color-grid">
+                        <label class="avatar-color-row">
+                            <span>Head</span>
+                            <input class="avatar-color" id="headColor" type="color" value="#ffff82">
+                        </label>
+
+                        <label class="avatar-color-row">
+                            <span>Torso</span>
+                            <input class="avatar-color" id="torsoColor" type="color" value="#ff8282">
+                        </label>
+
+                        <label class="avatar-color-row">
+                            <span>Left Arm</span>
+                            <input class="avatar-color" id="leftArmColor" type="color" value="#ffff82">
+                        </label>
+
+                        <label class="avatar-color-row">
+                            <span>Right Arm</span>
+                            <input class="avatar-color" id="rightArmColor" type="color" value="#ffff82">
+                        </label>
+
+                        <label class="avatar-color-row">
+                            <span>Left Leg</span>
+                            <input class="avatar-color" id="leftLegColor" type="color" value="#ffff82">
+                        </label>
+
+                        <label class="avatar-color-row">
+                            <span>Right Leg</span>
+                            <input class="avatar-color" id="rightLegColor" type="color" value="#ffff82">
+                        </label>
+                    </div>
+
+                    <div class="avatar-file-block">
+                        <span class="avatar-file-label">Classic Shirt Template:</span>
+                        <div class="file-row">
+                            <label for="shirtInput" class="classic-button">Choose Shirt</label>
+                            <input type="file" class="file-input" id="shirtInput" accept="image/png,.png">
+                            <div class="selected-file empty" id="selectedShirt">No shirt selected</div>
+                            <button type="button" class="classic-button avatar-clear-button" id="clearShirtButton">Clear</button>
+                        </div>
+                    </div>
+
+                    <div class="avatar-file-block">
+                        <span class="avatar-file-label">Classic Pants Template:</span>
+                        <div class="file-row">
+                            <label for="pantsInput" class="classic-button">Choose Pants</label>
+                            <input type="file" class="file-input" id="pantsInput" accept="image/png,.png">
+                            <div class="selected-file empty" id="selectedPants">No pants selected</div>
+                            <button type="button" class="classic-button avatar-clear-button" id="clearPantsButton">Clear</button>
+                        </div>
+                    </div>
+
+                    <div class="avatar-template-note">
+                        Shirt and pants must use the classic 585 x 559 R6 PNG template. Transparent pixels show the body color underneath.
+                    </div>
+
+                    <div class="avatar-save-area">
+                        <button type="button" class="classic-button avatar-save-button" id="saveAvatarButton">
+                            Save Avatar Appearance
+                        </button>
+                        <div class="avatar-save-status" id="avatarSaveStatus"></div>
+                    </div>
+                </div>
+
+
             </div>
 
         </div>
@@ -465,8 +661,422 @@
         const helpButton =
             document.getElementById("helpButton");
 
+        const shirtInput =
+            document.getElementById("shirtInput");
+
+        const pantsInput =
+            document.getElementById("pantsInput");
+
+        const selectedShirt =
+            document.getElementById("selectedShirt");
+
+        const selectedPants =
+            document.getElementById("selectedPants");
+
+        const clearShirtButton =
+            document.getElementById("clearShirtButton");
+
+        const clearPantsButton =
+            document.getElementById("clearPantsButton");
+
+        const saveAvatarButton =
+            document.getElementById("saveAvatarButton");
+
+        const avatarSaveStatus =
+            document.getElementById("avatarSaveStatus");
+
+        const avatarColorInputs = {
+            HeadColor:
+                document.getElementById("headColor"),
+            TorsoColor:
+                document.getElementById("torsoColor"),
+            LeftArmColor:
+                document.getElementById("leftArmColor"),
+            RightArmColor:
+                document.getElementById("rightArmColor"),
+            LeftLegColor:
+                document.getElementById("leftLegColor"),
+            RightLegColor:
+                document.getElementById("rightLegColor")
+        };
+
 
         let selectedLuaFile = null;
+        let selectedShirtDataUrl = "";
+        let selectedPantsDataUrl = "";
+        let shirtValidationPromise = Promise.resolve();
+        let pantsValidationPromise = Promise.resolve();
+
+        const CLASSIC_TEMPLATE_WIDTH = 585;
+        const CLASSIC_TEMPLATE_HEIGHT = 559;
+        const MAX_CLOTHING_FILE_BYTES = 1.5 * 1024 * 1024;
+
+        // sessionStorage transfers the current editor state into emulator.html.
+        // localStorage is the explicit Save button's persistent avatar profile.
+        const AVATAR_STORAGE_KEY =
+            "bloxAvatarDescription";
+
+        const DEFAULT_AVATAR_COLORS = {
+            HeadColor: "#ffff82",
+            TorsoColor: "#ff8282",
+            LeftArmColor: "#ffff82",
+            RightArmColor: "#ffff82",
+            LeftLegColor: "#ffff82",
+            RightLegColor: "#ffff82"
+        };
+
+        function sanitizeSavedColor(value, fallback) {
+            const text =
+                String(
+                    value ??
+                    ""
+                ).trim();
+
+            return /^#[0-9a-f]{6}$/i.test(text)
+                ? text.toLowerCase()
+                : fallback;
+        }
+
+        function getCurrentAvatarProfile() {
+            const colors = {};
+
+            for (
+                const [propertyName, input] of
+                Object.entries(
+                    avatarColorInputs
+                )
+            ) {
+                colors[propertyName] =
+                    sanitizeSavedColor(
+                        input.value,
+                        DEFAULT_AVATAR_COLORS[
+                            propertyName
+                        ]
+                    );
+            }
+
+            return {
+                version: 2,
+                colors,
+                shirtDataUrl:
+                    selectedShirtDataUrl,
+                pantsDataUrl:
+                    selectedPantsDataUrl
+            };
+        }
+
+        function setClothingLabel(
+            label,
+            hasSavedAsset,
+            type
+        ) {
+            if (hasSavedAsset) {
+                label.textContent =
+                    type === "shirt"
+                        ? "Saved shirt"
+                        : "Saved pants";
+
+                label.classList.remove(
+                    "empty"
+                );
+            } else {
+                label.textContent =
+                    type === "shirt"
+                        ? "No shirt selected"
+                        : "No pants selected";
+
+                label.classList.add(
+                    "empty"
+                );
+            }
+        }
+
+        function restoreSavedAvatarAppearance() {
+            let saved = null;
+
+            try {
+                saved =
+                    JSON.parse(
+                        localStorage.getItem(
+                            AVATAR_STORAGE_KEY
+                        ) ||
+                        "null"
+                    );
+            } catch (error) {
+                console.warn(
+                    "[Avatar] Could not read saved appearance:",
+                    error
+                );
+            }
+
+            if (!saved)
+                return;
+
+            for (
+                const [propertyName, input] of
+                Object.entries(
+                    avatarColorInputs
+                )
+            ) {
+                input.value =
+                    sanitizeSavedColor(
+                        saved?.colors?.[
+                            propertyName
+                        ],
+                        DEFAULT_AVATAR_COLORS[
+                            propertyName
+                        ]
+                    );
+            }
+
+            const savedShirt =
+                String(
+                    saved.shirtDataUrl ??
+                    ""
+                );
+
+            const savedPants =
+                String(
+                    saved.pantsDataUrl ??
+                    ""
+                );
+
+            selectedShirtDataUrl =
+                savedShirt.startsWith(
+                    "data:image/"
+                )
+                    ? savedShirt
+                    : "";
+
+            selectedPantsDataUrl =
+                savedPants.startsWith(
+                    "data:image/"
+                )
+                    ? savedPants
+                    : "";
+
+            setClothingLabel(
+                selectedShirt,
+                Boolean(
+                    selectedShirtDataUrl
+                ),
+                "shirt"
+            );
+
+            setClothingLabel(
+                selectedPants,
+                Boolean(
+                    selectedPantsDataUrl
+                ),
+                "pants"
+            );
+        }
+
+        function saveAvatarAppearance() {
+            const profile =
+                getCurrentAvatarProfile();
+
+            try {
+                localStorage.setItem(
+                    AVATAR_STORAGE_KEY,
+                    JSON.stringify(
+                        profile
+                    )
+                );
+
+                avatarSaveStatus.textContent =
+                    "Avatar appearance saved.";
+
+                return true;
+            } catch (error) {
+                console.error(
+                    "[Avatar] Save failed:",
+                    error
+                );
+
+                avatarSaveStatus.textContent =
+                    "Could not save avatar appearance.";
+
+                alert(
+                    "The avatar could not be saved. The uploaded shirt or pants may be too large for browser storage."
+                );
+
+                return false;
+            }
+        }
+
+        function clearAvatarClothing(type) {
+            if (type === "shirt") {
+                selectedShirtDataUrl =
+                    "";
+
+                shirtInput.value =
+                    "";
+
+                setClothingLabel(
+                    selectedShirt,
+                    false,
+                    "shirt"
+                );
+            } else {
+                selectedPantsDataUrl =
+                    "";
+
+                pantsInput.value =
+                    "";
+
+                setClothingLabel(
+                    selectedPants,
+                    false,
+                    "pants"
+                );
+            }
+
+            avatarSaveStatus.textContent =
+                "Unsaved changes.";
+        }
+
+        function readFileAsDataUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result || ""));
+                reader.onerror = () => reject(reader.error || new Error("File read failed"));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function loadImageFromDataUrl(dataUrl) {
+            return new Promise((resolve, reject) => {
+                const image = new Image();
+                image.onload = () => resolve(image);
+                image.onerror = () => reject(new Error("Invalid image"));
+                image.src = dataUrl;
+            });
+        }
+
+        async function validateClassicClothingTemplate(file) {
+            if (!file)
+                return "";
+
+            if (file.type && file.type !== "image/png") {
+                throw new Error("Classic clothing must be a PNG image.");
+            }
+
+            if (file.size > MAX_CLOTHING_FILE_BYTES) {
+                throw new Error("The clothing PNG is too large. Keep it under 1.5 MB.");
+            }
+
+            const dataUrl = await readFileAsDataUrl(file);
+            const image = await loadImageFromDataUrl(dataUrl);
+
+            if (
+                image.naturalWidth !== CLASSIC_TEMPLATE_WIDTH ||
+                image.naturalHeight !== CLASSIC_TEMPLATE_HEIGHT
+            ) {
+                throw new Error(
+                    `Invalid classic R6 template. Expected ${CLASSIC_TEMPLATE_WIDTH} x ${CLASSIC_TEMPLATE_HEIGHT}, got ${image.naturalWidth} x ${image.naturalHeight}.`
+                );
+            }
+
+            return dataUrl;
+        }
+
+        async function handleClothingSelection(input, label, type) {
+            const file = input.files[0] || null;
+
+            if (!file) {
+                label.textContent = type === "shirt" ? "No shirt selected" : "No pants selected";
+                label.classList.add("empty");
+
+                if (type === "shirt") selectedShirtDataUrl = "";
+                else selectedPantsDataUrl = "";
+
+                return;
+            }
+
+            label.textContent = "Checking template...";
+            label.classList.remove("empty");
+
+            try {
+                const dataUrl = await validateClassicClothingTemplate(file);
+                label.textContent = file.name;
+
+                if (type === "shirt") selectedShirtDataUrl = dataUrl;
+                else selectedPantsDataUrl = dataUrl;
+            } catch (error) {
+                alert(error.message || "Invalid clothing template.");
+                input.value = "";
+                label.textContent = type === "shirt" ? "No shirt selected" : "No pants selected";
+                label.classList.add("empty");
+
+                if (type === "shirt") selectedShirtDataUrl = "";
+                else selectedPantsDataUrl = "";
+            }
+        }
+
+        shirtInput.addEventListener("change", () => {
+            shirtValidationPromise =
+                handleClothingSelection(shirtInput, selectedShirt, "shirt");
+        });
+
+        pantsInput.addEventListener("change", () => {
+            pantsValidationPromise =
+                handleClothingSelection(pantsInput, selectedPants, "pants");
+
+            avatarSaveStatus.textContent =
+                "Unsaved changes.";
+        });
+
+        shirtInput.addEventListener("change", () => {
+            avatarSaveStatus.textContent =
+                "Unsaved changes.";
+        });
+
+        for (
+            const input of
+            Object.values(
+                avatarColorInputs
+            )
+        ) {
+            input.addEventListener(
+                "input",
+                () => {
+                    avatarSaveStatus.textContent =
+                        "Unsaved changes.";
+                }
+            );
+        }
+
+        clearShirtButton.addEventListener(
+            "click",
+            () =>
+                clearAvatarClothing(
+                    "shirt"
+                )
+        );
+
+        clearPantsButton.addEventListener(
+            "click",
+            () =>
+                clearAvatarClothing(
+                    "pants"
+                )
+        );
+
+        saveAvatarButton.addEventListener(
+            "click",
+            async () => {
+                await Promise.all([
+                    shirtValidationPromise,
+                    pantsValidationPromise
+                ]);
+
+                saveAvatarAppearance();
+            }
+        );
+
+        // Restore the persistent avatar immediately when index.html opens.
+        restoreSavedAvatarAppearance();
 
 
         helpButton.addEventListener(
@@ -563,6 +1173,13 @@
 
                 try {
 
+                    // If Enter is clicked immediately after choosing a template,
+                    // wait for its 585x559 validation/FileReader pass first.
+                    await Promise.all([
+                        shirtValidationPromise,
+                        pantsValidationPromise
+                    ]);
+
                     const source =
                         await selectedLuaFile.text();
 
@@ -576,6 +1193,15 @@
                     sessionStorage.setItem(
                         "bloxScriptName",
                         selectedLuaFile.name
+                    );
+
+                    // Enter always uses the CURRENT editor values even if the
+                    // user has not pressed Save. Save controls persistence only.
+                    sessionStorage.setItem(
+                        AVATAR_STORAGE_KEY,
+                        JSON.stringify(
+                            getCurrentAvatarProfile()
+                        )
                     );
 
 
