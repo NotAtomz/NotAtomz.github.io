@@ -174,9 +174,136 @@
             padding-right: 18px;
         }
     }
+
+    @font-face {
+        font-family: "BloxComicSans";
+        src: url("Textures/Fonts/Comic Sans MS.ttf") format("truetype");
+        font-style: normal;
+        font-weight: normal;
+    }
+
+    #classicTopBar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 22px;
+        display: flex;
+        align-items: stretch;
+        z-index: 6;
+        font-family: "BloxComicSans", "Comic Sans MS", cursive;
+        background: rgba(212, 208, 200, 0.82);
+        box-sizing: border-box;
+        user-select: none;
+    }
+
+    .classicTopButton {
+        height: 22px;
+        padding: 0 14px;
+        margin: 0;
+        border: 0;
+        background: transparent;
+        color: #333333;
+        font-family: inherit;
+        font-size: 12px;
+        line-height: 22px;
+        text-align: center;
+        cursor: pointer;
+        box-sizing: border-box;
+        outline: none;
+        white-space: nowrap;
+    }
+
+    #toolsButton {
+        width: 78px;
+    }
+
+    #insertButton {
+        width: 87px;
+    }
+
+    #fullscreenButton {
+        width: 110px;
+    }
+
+    #helpButton {
+        width: 89px;
+    }
+
+    #exitButton {
+        width: 75px;
+    }
+
+    .classicTopButton:disabled {
+        color: #888888;
+        cursor: default;
+        opacity: 0.72;
+    }
+
+
+    /* ─── Classic vertical Health HUD ─────────────────────────────────────── */
+    #classicHealthHud {
+        position: fixed;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 6;
+        width: 48px;
+        height: 158px;
+        pointer-events: none;
+        user-select: none;
+        font-family: "BloxComicSans", "Comic Sans MS", cursive;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    #classicHealthTrack {
+        position: relative;
+        width: 8px;
+        height: 132px;
+        overflow: hidden;
+        background: #b51e1e;
+        border: none;
+        box-sizing: border-box;
+    }
+
+    #classicHealthFill {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        background: #54d900;
+    }
+
+    #classicHealthLabel {
+        margin-top: 3px;
+        color: #1717c5;
+        font-size: 12px;
+        font-weight: bold;
+        line-height: 16px;
+        text-shadow: 0 1px 0 rgba(255,255,255,0.75);
+    }
+
 </style>
 </head>
 <body>
+
+<div id="classicTopBar">
+    <button class="classicTopButton" id="toolsButton" disabled>Tools</button>
+    <button class="classicTopButton" id="insertButton" disabled>Insert</button>
+    <button class="classicTopButton" id="fullscreenButton">Fullscreen</button>
+    <button class="classicTopButton" id="helpButton">Help...</button>
+    <button class="classicTopButton" id="exitButton">Exit</button>
+</div>
+
+<div id="classicHealthHud">
+    <div id="classicHealthTrack">
+        <div id="classicHealthFill"></div>
+    </div>
+    <div id="classicHealthLabel">Health</div>
+</div>
+
 <canvas id="game"></canvas>
 
 <div id="start">
@@ -244,6 +371,53 @@ const physObjects = [];
 const canvas = document.getElementById("game");
 const startScreen = document.getElementById("start");
 
+// ─── Classic top-bar button actions ───────────────────────────────────────────
+const fullscreenButton = document.getElementById("fullscreenButton");
+const helpButton = document.getElementById("helpButton");
+const exitButton = document.getElementById("exitButton");
+
+const classicHealthHud = document.getElementById("classicHealthHud");
+const classicHealthFill = document.getElementById("classicHealthFill");
+
+function updateFullscreenButtonText() {
+    if (!fullscreenButton)
+        return;
+
+    fullscreenButton.textContent =
+        document.fullscreenElement
+            ? "UnFullscreen"
+            : "Fullscreen";
+}
+
+fullscreenButton?.addEventListener("click", async () => {
+    try {
+        if (document.fullscreenElement) {
+            await document.exitFullscreen();
+        } else {
+            await document.documentElement.requestFullscreen();
+        }
+    } catch (error) {
+        console.warn("Could not toggle fullscreen:", error);
+    }
+
+    updateFullscreenButtonText();
+});
+
+document.addEventListener(
+    "fullscreenchange",
+    updateFullscreenButtonText
+);
+
+updateFullscreenButtonText();
+
+helpButton?.addEventListener("click", () => {
+    window.location.href = "help.html";
+});
+
+exitButton?.addEventListener("click", () => {
+    window.location.href = "index.html";
+});
+
 // ─── Editable cursor hotspot ─────────────────────────────────────────────────
 // Increase these if the cursor image appears too far down/right.
 // Decrease them if it appears too far up/left.
@@ -259,7 +433,7 @@ canvas.style.cursor = emulatorCursor;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = false;
+renderer.shadowMap.enabled = true;
 
 // Softer classic-style shadow filtering.
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -274,6 +448,13 @@ scene.fog = new THREE.Fog(0x9ab3c8, 80, 320);
 
 // ── Skybox — inverted box, 6 MeshBasicMaterial faces, always works ────────────
 // ── Skybox — manually selected pixel region ─────────────────────────────────
+
+// Skybox-only exposure/brightness.
+// 1.0 = original texture brightness
+// 0.8 = slightly darker
+// 0.6 = noticeably darker
+const SKYBOX_BRIGHTNESS = 0.78;
+
 function makeSkyFaceMat(
     img,
     point1,
@@ -341,6 +522,11 @@ function makeSkyFaceMat(
 
     return new THREE.MeshBasicMaterial({
         map: tex,
+
+        // Multiply the sky texture by this value to simulate lower exposure
+        // without changing the brightness of Parts, the player, or lighting.
+        color: new THREE.Color().setScalar(SKYBOX_BRIGHTNESS),
+
         side: THREE.BackSide,
         depthWrite: false,
         depthTest: false,
@@ -435,11 +621,11 @@ const camera = new THREE.PerspectiveCamera(
 const hemi = new THREE.HemisphereLight(
     0xffffff,
     0x667788,
-    0.4
+    3
 );
 scene.add(hemi);
 
-const sun = new THREE.DirectionalLight(0xffffff, 3.0);
+const sun = new THREE.DirectionalLight(0xffffff, 1.0);
 sun.castShadow = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -588,7 +774,7 @@ function createPart(w, h, d, x, y, z, options = {}) {
         friction    = 0.7,
         restitution = 0.1,
         mass        = 1.0,
-        castShadow  = true,
+        castShadow  = false,
         visible     = true,
     } = options;
     const max = renderer.capabilities.getMaxAnisotropy();
@@ -613,7 +799,8 @@ function createPart(w, h, d, x, y, z, options = {}) {
         [sideMat, sideMat, topMat, botMat, sideMat, sideMat]
     );
     mesh.position.set(x, y, z);
-    mesh.castShadow  = castShadow;
+    // World/map Parts receive the player's shadow but do not cast their own.
+    mesh.castShadow  = false;
     mesh.receiveShadow = true;
     mesh.visible     = visible;
     scene.add(mesh);
@@ -660,8 +847,9 @@ function editPart(part, options = {}) {
     // Visible
     if (options.visible !== undefined) mesh.visible = options.visible;
 
-    // Cast shadow
-    if (options.castShadow !== undefined) mesh.castShadow = options.castShadow;
+    // Only the player is allowed to cast shadows. World Parts always remain
+    // receivers only, regardless of their Lua-facing CastShadow value.
+    if (options.castShadow !== undefined) mesh.castShadow = false;
 
     // Anchored — swap body type
     if (options.anchored !== undefined && options.anchored !== part.anchored) {
@@ -740,6 +928,47 @@ function getLuaInstanceId(instance) {
 }
 
 const luaSignalInternals = new WeakMap();
+
+// Per-instance property signals used by GetPropertyChangedSignal().
+// Kept outside Mutable() so luau-web never sees engine bookkeeping as fields.
+const luaPropertySignals = new WeakMap();
+
+function getPropertySignal(instance, propertyName, create = true) {
+    if (!instance || !propertyName)
+        return null;
+
+    let map =
+        luaPropertySignals.get(instance);
+
+    if (!map && create) {
+        map = new Map();
+        luaPropertySignals.set(
+            instance,
+            map
+        );
+    }
+
+    if (!map)
+        return null;
+
+    let signal =
+        map.get(propertyName);
+
+    if (!signal && create) {
+        signal =
+            createLuaSignal(
+                `${instance.ClassName || "Instance"}.${propertyName}Changed`,
+                instance
+            );
+
+        map.set(
+            propertyName,
+            signal
+        );
+    }
+
+    return signal || null;
+}
 
 function getLastFunctionArgument(args) {
     // Lua's ":" syntax passes the object itself as the first argument to a
@@ -1171,12 +1400,34 @@ function fireChanged(instance, propertyName) {
     if (!instance)
         return;
 
-    // ValueBase.Changed is special in classic Roblox: it represents Value
-    // changing and passes the new value, rather than generic property names.
+    // GetPropertyChangedSignal("X") is independent from Changed and never
+    // receives the property name as an argument.
+    const propertySignal =
+        getPropertySignal(
+            instance,
+            propertyName,
+            false
+        );
+
+    if (propertySignal) {
+        fireLuaSignal(
+            propertySignal
+        );
+    }
+
+    // Classic ValueBase.Changed is special: only Value changes fire the generic
+    // Changed event, and the NEW value is passed instead of the property name.
     if (
-        isA?.(instance, "ValueBase") &&
-        propertyName !== "Value"
+        isA?.(instance, "ValueBase")
     ) {
+        if (propertyName !== "Value")
+            return;
+
+        fireLuaSignal(
+            instance.Changed,
+            instance.Value
+        );
+
         return;
     }
 
@@ -1193,17 +1444,300 @@ function disconnectInstanceSignals(instance) {
     disconnectLuaSignal(instance?.AncestryChanged);
     disconnectLuaSignal(instance?.Touched);
     disconnectLuaSignal(instance?.TouchEnded);
+
+    const propertySignals =
+        luaPropertySignals.get(instance);
+
+    if (propertySignals) {
+        for (
+            const signal of
+            propertySignals.values()
+        ) {
+            disconnectLuaSignal(signal);
+        }
+
+        propertySignals.clear();
+        luaPropertySignals.delete(instance);
+    }
 }
 
 const activeTouchPairs = new Set();
 
 
 function createVector3(x = 0, y = 0, z = 0) {
-    return Mutable({
-        X: Number(x) || 0,
-        Y: Number(y) || 0,
-        Z: Number(z) || 0
-    });
+    const vx = Number(x) || 0;
+    const vy = Number(y) || 0;
+    const vz = Number(z) || 0;
+
+    const magnitude =
+        Math.hypot(
+            vx,
+            vy,
+            vz
+        );
+
+    let vector = null;
+
+    const dotImpl =
+        (...args) => {
+            const other =
+                args.find(arg =>
+                    arg &&
+                    typeof arg === "object" &&
+                    arg !== vector &&
+                    "X" in arg &&
+                    "Y" in arg &&
+                    "Z" in arg
+                );
+
+            if (!other)
+                return 0;
+
+            return (
+                vx * (Number(other.X) || 0) +
+                vy * (Number(other.Y) || 0) +
+                vz * (Number(other.Z) || 0)
+            );
+        };
+
+    const crossImpl =
+        (...args) => {
+            const other =
+                args.find(arg =>
+                    arg &&
+                    typeof arg === "object" &&
+                    arg !== vector &&
+                    "X" in arg &&
+                    "Y" in arg &&
+                    "Z" in arg
+                );
+
+            if (!other)
+                return createVector3();
+
+            const ox = Number(other.X) || 0;
+            const oy = Number(other.Y) || 0;
+            const oz = Number(other.Z) || 0;
+
+            return createVector3(
+                vy * oz - vz * oy,
+                vz * ox - vx * oz,
+                vx * oy - vy * ox
+            );
+        };
+
+    const lerpImpl =
+        (...args) => {
+            const other =
+                args.find(arg =>
+                    arg &&
+                    typeof arg === "object" &&
+                    arg !== vector &&
+                    "X" in arg &&
+                    "Y" in arg &&
+                    "Z" in arg
+                );
+
+            const alphaArg =
+                [...args]
+                    .reverse()
+                    .find(arg =>
+                        typeof arg === "number"
+                    );
+
+            const alpha =
+                Number(alphaArg) || 0;
+
+            if (!other)
+                return vector;
+
+            return createVector3(
+                vx + ((Number(other.X) || 0) - vx) * alpha,
+                vy + ((Number(other.Y) || 0) - vy) * alpha,
+                vz + ((Number(other.Z) || 0) - vz) * alpha
+            );
+        };
+
+    // IMPORTANT:
+    // Do NOT build Unit by calling createVector3() inside the object literal.
+    // That recursively tries to build Unit.Unit.Unit... forever.
+    vector =
+        Mutable({
+            X: vx,
+            Y: vy,
+            Z: vz,
+
+            Magnitude:
+                magnitude,
+
+            magnitude:
+                magnitude,
+
+            Unit:
+                null,
+
+            unit:
+                null,
+
+            Dot:
+                dotImpl,
+
+            dot:
+                dotImpl,
+
+            Cross:
+                crossImpl,
+
+            cross:
+                crossImpl,
+
+            Lerp:
+                lerpImpl,
+
+            lerp:
+                lerpImpl
+        });
+
+    if (
+        magnitude >
+        1e-12
+    ) {
+        // Build a normalized value without asking that value to recursively
+        // create another normalized value of itself.
+        const ux =
+            vx / magnitude;
+
+        const uy =
+            vy / magnitude;
+
+        const uz =
+            vz / magnitude;
+
+        const unitVector =
+            Mutable({
+                X: ux,
+                Y: uy,
+                Z: uz,
+
+                Magnitude: 1,
+                magnitude: 1,
+
+                Unit: null,
+                unit: null,
+
+                Dot:
+                    (...args) => {
+                        const other =
+                            args.find(arg =>
+                                arg &&
+                                typeof arg === "object" &&
+                                arg !== unitVector &&
+                                "X" in arg &&
+                                "Y" in arg &&
+                                "Z" in arg
+                            );
+
+                        if (!other)
+                            return 0;
+
+                        return (
+                            ux * (Number(other.X) || 0) +
+                            uy * (Number(other.Y) || 0) +
+                            uz * (Number(other.Z) || 0)
+                        );
+                    },
+
+                Cross:
+                    (...args) => {
+                        const other =
+                            args.find(arg =>
+                                arg &&
+                                typeof arg === "object" &&
+                                arg !== unitVector &&
+                                "X" in arg &&
+                                "Y" in arg &&
+                                "Z" in arg
+                            );
+
+                        if (!other)
+                            return createVector3();
+
+                        const ox = Number(other.X) || 0;
+                        const oy = Number(other.Y) || 0;
+                        const oz = Number(other.Z) || 0;
+
+                        return createVector3(
+                            uy * oz - uz * oy,
+                            uz * ox - ux * oz,
+                            ux * oy - uy * ox
+                        );
+                    },
+
+                Lerp:
+                    (...args) => {
+                        const other =
+                            args.find(arg =>
+                                arg &&
+                                typeof arg === "object" &&
+                                arg !== unitVector &&
+                                "X" in arg &&
+                                "Y" in arg &&
+                                "Z" in arg
+                            );
+
+                        const alphaArg =
+                            [...args]
+                                .reverse()
+                                .find(arg =>
+                                    typeof arg === "number"
+                                );
+
+                        const alpha =
+                            Number(alphaArg) || 0;
+
+                        if (!other)
+                            return unitVector;
+
+                        return createVector3(
+                            ux + ((Number(other.X) || 0) - ux) * alpha,
+                            uy + ((Number(other.Y) || 0) - uy) * alpha,
+                            uz + ((Number(other.Z) || 0) - uz) * alpha
+                        );
+                    }
+            });
+
+        unitVector.dot =
+            unitVector.Dot;
+
+        unitVector.cross =
+            unitVector.Cross;
+
+        unitVector.lerp =
+            unitVector.Lerp;
+
+        // A normalized vector's Unit is itself.
+        unitVector.Unit =
+            unitVector;
+
+        unitVector.unit =
+            unitVector;
+
+        vector.Unit =
+            unitVector;
+
+        vector.unit =
+            unitVector;
+    } else {
+        // Roblox-style zero-vector behavior: Unit stays a zero vector rather
+        // than triggering recursive construction.
+        vector.Unit =
+            vector;
+
+        vector.unit =
+            vector;
+    }
+
+    return vector;
 }
 
 const Vector3Api = Mutable({
@@ -2368,6 +2902,7 @@ const luaJoints = new Set();
 const luaBodyMovers = new Set();
 const luaValueObjects = new Set();
 const luaHumanoids = new Set();
+const luaSounds = new Set();
 
 // Phase 3.6 runtime state is declared early because Instance verification can
 // destroy objects before the playable Character is constructed.
@@ -2383,11 +2918,13 @@ const childAliasState = new WeakMap();
 const CLASS_PARENTS = {
     Part: ["BasePart", "PVInstance", "Instance"],
     Seat: ["BasePart", "PVInstance", "Instance"],
+    SpawnLocation: ["BasePart", "PVInstance", "Instance"],
 
     Model: ["PVInstance", "Instance"],
     Folder: ["Instance"],
 
     Humanoid: ["Instance"],
+    Sound: ["Instance"],
 
     Terrain: ["Instance"],
     SelectionBox: ["Instance"],
@@ -2610,6 +3147,32 @@ function refreshChildAliases(parent) {
 
 function addCommonInstanceApi(instance) {
     addInstanceSignals(instance);
+
+    // Roblox-style property signal. The same signal object is returned every
+    // time for the same Instance/property pair.
+    instance.GetPropertyChangedSignal =
+        (...args) => {
+            const propertyName =
+                getStringArg(
+                    args,
+                    ""
+                );
+
+            if (!propertyName) {
+                throw new Error(
+                    "GetPropertyChangedSignal expected a property name"
+                );
+            }
+
+            return getPropertySignal(
+                instance,
+                propertyName,
+                true
+            );
+        };
+
+    instance.getPropertyChangedSignal =
+        instance.GetPropertyChangedSignal;
 
     instance.GetChildren = (...args) =>
         getLuaChildren(instance);
@@ -2970,8 +3533,14 @@ function destroyLuaInstance(instance) {
                 visual
             );
 
-            visual.geometry?.dispose?.();
-            visual.material?.dispose?.();
+            visual.traverse?.(
+                child => {
+                    child.geometry?.dispose?.();
+                }
+            );
+
+            instance.__selectionMaterial
+                ?.dispose?.();
         }
 
         selectionBoxes.delete(
@@ -2986,6 +3555,48 @@ function destroyLuaInstance(instance) {
     luaHumanoids.delete(
         instance
     );
+
+    if (
+        luaSounds.has(
+            instance
+        )
+    ) {
+        const audio =
+            instance.__audio;
+
+        if (
+            instance.PlayOnRemove &&
+            audio &&
+            audio.src
+        ) {
+            try {
+                audio.currentTime =
+                    0;
+
+                audio.play().catch(
+                    () => {}
+                );
+            } catch {}
+        } else {
+            audio?.pause?.();
+        }
+
+        disconnectLuaSignal(
+            instance.Ended
+        );
+
+        disconnectLuaSignal(
+            instance.Stopped
+        );
+
+        disconnectLuaSignal(
+            instance.Loaded
+        );
+
+        luaSounds.delete(
+            instance
+        );
+    }
 
     const part =
         instance.__internal;
@@ -5172,6 +5783,41 @@ function cloneLuaInstance(source) {
         }
     } else if (
         source.ClassName ===
+        "Sound"
+    ) {
+        c.SoundId =
+            source.SoundId;
+
+        c.Volume =
+            source.Volume;
+
+        c.Pitch =
+            source.Pitch;
+
+        c.Looped =
+            source.Looped;
+
+        c.TimePosition =
+            source.TimePosition;
+
+        c.PlayOnRemove =
+            source.PlayOnRemove;
+
+        c.MinDistance =
+            source.MinDistance;
+
+        c.MaxDistance =
+            source.MaxDistance;
+
+        c.EmitterSize =
+            source.EmitterSize;
+
+        // Roblox Clone() should not automatically start a sound merely because
+        // the original is currently playing.
+        c.Playing =
+            false;
+    } else if (
+        source.ClassName ===
         "Humanoid"
     ) {
         c.Health =
@@ -5513,6 +6159,43 @@ function createLuaPart(className = "Part") {
 }
 
 
+// ─── Classic 2010 SpawnLocation ───────────────────────────────────────────────
+//
+// SpawnLocation is rendered/physicalized exactly like a normal Part, but adds
+// the classic spawn-specific properties used by old Roblox places.
+function createLuaSpawnLocation() {
+    const spawn =
+        createLuaPart(
+            "SpawnLocation"
+        );
+
+    spawn.Name =
+        "SpawnLocation";
+
+    // Classic SpawnLocation-specific properties.
+    spawn.Enabled =
+        true;
+
+    spawn.Neutral =
+        true;
+
+    spawn.TeamColor =
+        BrickColorApi.new(
+            "Medium stone grey"
+        );
+
+    spawn.AllowTeamChangeOnTouch =
+        false;
+
+    // Classic SpawnLocation force-field duration property (seconds).
+    // The emulator's existing visual spawn effect remains separate.
+    spawn.Duration =
+        10;
+
+    return spawn;
+}
+
+
 function createLuaSeat() {
     const seat =
         createLuaPart(
@@ -5553,6 +6236,647 @@ function createLuaSeat() {
 
     return seat;
 }
+
+// ─── Classic 2010-style Sound ────────────────────────────────────────────────
+//
+// Security / asset rule for Blox Emulation:
+// SoundId is ALWAYS resolved inside the local Sounds/ directory.
+// Example:
+//     sound.SoundId = "victory.wav"
+// becomes:
+//     Sounds/victory.wav
+//
+// URLs, drive paths, and ".." path traversal are rejected.
+function normalizeLocalSoundId(value) {
+    let id =
+        String(
+            value ?? ""
+        ).trim();
+
+    if (!id)
+        return "";
+
+    id =
+        id.replace(
+            /\\/g,
+            "/"
+        );
+
+    // Accept users writing "Sounds/foo.wav" too, but normalize it back to
+    // the relative SoundId Roblox-facing property.
+    if (
+        id.toLowerCase().startsWith(
+            "sounds/"
+        )
+    ) {
+        id =
+            id.slice(7);
+    }
+
+    // Never allow external URLs, protocols, absolute paths, query strings,
+    // fragments, or directory traversal outside the Sounds folder.
+    if (
+        /^[a-z][a-z0-9+.-]*:/i.test(id) ||
+        id.startsWith("/") ||
+        id.includes("..") ||
+        id.includes("?") ||
+        id.includes("#")
+    ) {
+        return "";
+    }
+
+    const pieces =
+        id.split("/")
+            .filter(piece =>
+                piece &&
+                piece !== "."
+            );
+
+    if (
+        pieces.length === 0
+    ) {
+        return "";
+    }
+
+    return pieces.join("/");
+}
+
+function getLocalSoundPath(soundId) {
+    const clean =
+        normalizeLocalSoundId(
+            soundId
+        );
+
+    return clean
+        ? `Sounds/${clean}`
+        : "";
+}
+
+function createLuaSound() {
+    const audio =
+        new Audio();
+
+    audio.preload =
+        "auto";
+
+    const sound =
+        finalizeLuaInstance(
+            Mutable({
+                Name:
+                    "Sound",
+
+                ClassName:
+                    "Sound",
+
+                Parent:
+                    null,
+
+                Archivable:
+                    true,
+
+                // Classic-style Sound properties.
+                SoundId:
+                    "",
+
+                Volume:
+                    0.5,
+
+                Pitch:
+                    1,
+
+                Looped:
+                    false,
+
+                Playing:
+                    false,
+
+                TimePosition:
+                    0,
+
+                TimeLength:
+                    0,
+
+                IsLoaded:
+                    false,
+
+                PlayOnRemove:
+                    false,
+
+                // Classic 3D-distance style fields are exposed for script
+                // compatibility. This first implementation plays globally.
+                MinDistance:
+                    10,
+
+                MaxDistance:
+                    10000,
+
+                EmitterSize:
+                    10,
+
+                Ended:
+                    createLuaSignal(
+                        "Sound.Ended"
+                    ),
+
+                Stopped:
+                    createLuaSignal(
+                        "Sound.Stopped"
+                    ),
+
+                Loaded:
+                    createLuaSignal(
+                        "Sound.Loaded"
+                    )
+            })
+        );
+
+    Object.defineProperty(
+        sound,
+        "__audio",
+        {
+            value:
+                audio,
+
+            writable:
+                false,
+
+            enumerable:
+                false
+        }
+    );
+
+    Object.defineProperty(
+        sound,
+        "__lastSound",
+        {
+            value: {
+                SoundId:
+                    "",
+
+                Volume:
+                    0.5,
+
+                Pitch:
+                    1,
+
+                Looped:
+                    false,
+
+                Playing:
+                    false,
+
+                TimePosition:
+                    0
+            },
+
+            writable:
+                true,
+
+            enumerable:
+                false
+        }
+    );
+
+    audio.addEventListener(
+        "loadedmetadata",
+        () => {
+            if (
+                sound.__destroyed
+            ) {
+                return;
+            }
+
+            sound.IsLoaded =
+                true;
+
+            sound.TimeLength =
+                Number.isFinite(
+                    audio.duration
+                )
+                    ? audio.duration
+                    : 0;
+
+            fireLuaSignal(
+                sound.Loaded
+            );
+        }
+    );
+
+    audio.addEventListener(
+        "ended",
+        () => {
+            if (
+                sound.__destroyed ||
+                sound.Looped
+            ) {
+                return;
+            }
+
+            sound.Playing =
+                false;
+
+            sound.__lastSound.Playing =
+                false;
+
+            fireLuaSignal(
+                sound.Ended
+            );
+
+            fireChanged(
+                sound,
+                "Playing"
+            );
+        }
+    );
+
+    audio.addEventListener(
+        "error",
+        () => {
+            if (
+                sound.__destroyed
+            ) {
+                return;
+            }
+
+            sound.IsLoaded =
+                false;
+
+            sound.TimeLength =
+                0;
+
+            console.warn(
+                `[Sound] Could not load "${sound.SoundId}". Sounds must exist inside the Sounds folder.`
+            );
+        }
+    );
+
+    sound.Play =
+        (...args) => {
+            sound.Playing =
+                true;
+
+            syncLuaSound(
+                sound,
+                true
+            );
+        };
+
+    sound.play =
+        sound.Play;
+
+    sound.Stop =
+        (...args) => {
+            const wasPlaying =
+                !audio.paused ||
+                sound.Playing;
+
+            audio.pause();
+
+            try {
+                audio.currentTime =
+                    0;
+            } catch {}
+
+            sound.Playing =
+                false;
+
+            sound.TimePosition =
+                0;
+
+            sound.__lastSound.Playing =
+                false;
+
+            sound.__lastSound.TimePosition =
+                0;
+
+            if (wasPlaying) {
+                fireLuaSignal(
+                    sound.Stopped
+                );
+            }
+        };
+
+    sound.stop =
+        sound.Stop;
+
+    sound.Pause =
+        (...args) => {
+            audio.pause();
+
+            sound.Playing =
+                false;
+
+            sound.__lastSound.Playing =
+                false;
+        };
+
+    sound.pause =
+        sound.Pause;
+
+    sound.Resume =
+        (...args) => {
+            sound.Playing =
+                true;
+
+            syncLuaSound(
+                sound,
+                true
+            );
+        };
+
+    sound.resume =
+        sound.Resume;
+
+    luaSounds.add(
+        sound
+    );
+
+    return sound;
+}
+
+function syncLuaSound(
+    sound,
+    forcePlay = false
+) {
+    if (
+        !sound ||
+        sound.__destroyed
+    ) {
+        return;
+    }
+
+    const audio =
+        sound.__audio;
+
+    const last =
+        sound.__lastSound;
+
+    if (
+        !audio ||
+        !last
+    ) {
+        return;
+    }
+
+    // SoundId -> ONLY Sounds/<SoundId>
+    const normalizedId =
+        normalizeLocalSoundId(
+            sound.SoundId
+        );
+
+    if (
+        normalizedId !==
+        sound.SoundId
+    ) {
+        sound.SoundId =
+            normalizedId;
+    }
+
+    if (
+        normalizedId !==
+        last.SoundId
+    ) {
+        audio.pause();
+
+        const path =
+            getLocalSoundPath(
+                normalizedId
+            );
+
+        if (path) {
+            audio.src =
+                path;
+
+            audio.load();
+        } else {
+            audio.removeAttribute(
+                "src"
+            );
+
+            audio.load();
+        }
+
+        sound.IsLoaded =
+            false;
+
+        sound.TimeLength =
+            0;
+
+        sound.TimePosition =
+            0;
+
+        last.SoundId =
+            normalizedId;
+
+        last.TimePosition =
+            0;
+
+        fireChanged(
+            sound,
+            "SoundId"
+        );
+    }
+
+    const volume =
+        THREE.MathUtils.clamp(
+            Number(
+                sound.Volume
+            ) || 0,
+            0,
+            1
+        );
+
+    if (
+        volume !==
+        last.Volume
+    ) {
+        sound.Volume =
+            volume;
+
+        audio.volume =
+            volume;
+
+        last.Volume =
+            volume;
+
+        fireChanged(
+            sound,
+            "Volume"
+        );
+    } else {
+        audio.volume =
+            volume;
+    }
+
+    const pitch =
+        THREE.MathUtils.clamp(
+            Number(
+                sound.Pitch
+            ) || 0,
+            0.1,
+            4
+        );
+
+    if (
+        pitch !==
+        last.Pitch
+    ) {
+        sound.Pitch =
+            pitch;
+
+        audio.playbackRate =
+            pitch;
+
+        last.Pitch =
+            pitch;
+
+        fireChanged(
+            sound,
+            "Pitch"
+        );
+    } else {
+        audio.playbackRate =
+            pitch;
+    }
+
+    const looped =
+        Boolean(
+            sound.Looped
+        );
+
+    if (
+        looped !==
+        last.Looped
+    ) {
+        audio.loop =
+            looped;
+
+        last.Looped =
+            looped;
+
+        fireChanged(
+            sound,
+            "Looped"
+        );
+    } else {
+        audio.loop =
+            looped;
+    }
+
+    // A script may assign TimePosition directly.
+    const requestedTime =
+        Math.max(
+            0,
+            Number(
+                sound.TimePosition
+            ) || 0
+        );
+
+    if (
+        Math.abs(
+            requestedTime -
+            last.TimePosition
+        ) >
+        0.05
+    ) {
+        try {
+            audio.currentTime =
+                requestedTime;
+        } catch {}
+
+        last.TimePosition =
+            requestedTime;
+    }
+
+    const wantsPlaying =
+        forcePlay ||
+        Boolean(
+            sound.Playing
+        );
+
+    if (
+        wantsPlaying &&
+        (
+            forcePlay ||
+            !last.Playing ||
+            audio.paused
+        )
+    ) {
+        if (
+            audio.src &&
+            normalizeLocalSoundId(
+                sound.SoundId
+            )
+        ) {
+            audio.play()
+                .catch(error => {
+                    // Browsers can temporarily block playback before the first
+                    // user gesture. Keep Playing=true so a later sync can retry.
+                    if (
+                        error?.name !==
+                        "NotAllowedError"
+                    ) {
+                        console.warn(
+                            "[Sound] Play failed:",
+                            error
+                        );
+                    }
+                });
+        }
+
+        sound.Playing =
+            true;
+
+        last.Playing =
+            true;
+    } else if (
+        !wantsPlaying &&
+        last.Playing
+    ) {
+        audio.pause();
+
+        last.Playing =
+            false;
+
+        fireLuaSignal(
+            sound.Stopped
+        );
+    }
+
+    if (
+        !audio.paused &&
+        Number.isFinite(
+            audio.currentTime
+        )
+    ) {
+        sound.TimePosition =
+            audio.currentTime;
+
+        last.TimePosition =
+            audio.currentTime;
+    }
+
+    if (
+        Number.isFinite(
+            audio.duration
+        )
+    ) {
+        sound.TimeLength =
+            audio.duration;
+    }
+}
+
+function syncLuaSounds() {
+    for (
+        const sound of
+        [...luaSounds]
+    ) {
+        syncLuaSound(
+            sound
+        );
+    }
+}
+
 
 // ─── Phase 3.5: networking, bindables, SelectionBox, Terrain ─────────────────
 
@@ -5738,39 +7062,80 @@ function createLuaSelectionBox() {
                 Archivable: true,
                 Adornee: null,
                 Color3: createColor3(0, 1, 0),
-                LineThickness: 0.05,
+
+                // Default thickness for ALL Instance.new("SelectionBox").
+                // Edit this number if you want every SelectionBox thicker/thinner.
+                LineThickness: 0.25,
+
                 SurfaceTransparency: 1,
                 Visible: true
             })
         );
 
-    const geometry =
-        new THREE.EdgesGeometry(
-            new THREE.BoxGeometry(1,1,1)
-        );
+    const group =
+        new THREE.Group();
 
-    const material =
-        new THREE.LineBasicMaterial({
+    group.visible = false;
+    group.renderOrder = 50;
+
+    // SelectionBox edges are real thin cuboids rather than WebGL lines.
+    // This avoids browsers forcing LineBasicMaterial to ~1 pixel wide.
+    const edgeMaterial =
+        new THREE.MeshBasicMaterial({
             color: 0x00ff00,
             transparent: true,
-            opacity: 1
+            opacity: 1,
+            depthTest: true,
+            depthWrite: false,
+            toneMapped: false
         });
 
-    const lines =
-        new THREE.LineSegments(
-            geometry,
-            material
-        );
+    const edges = [];
 
-    lines.visible = false;
-    lines.renderOrder = 50;
-    scene.add(lines);
+    for (let i = 0; i < 12; i++) {
+        const edge =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    1,
+                    1,
+                    1
+                ),
+                edgeMaterial
+            );
+
+        edge.renderOrder = 50;
+        edge.castShadow = false;
+        edge.receiveShadow = false;
+
+        group.add(edge);
+        edges.push(edge);
+    }
+
+    scene.add(group);
 
     Object.defineProperty(
         box,
         "__selectionVisual",
         {
-            value: lines,
+            value: group,
+            enumerable: false
+        }
+    );
+
+    Object.defineProperty(
+        box,
+        "__selectionEdges",
+        {
+            value: edges,
+            enumerable: false
+        }
+    );
+
+    Object.defineProperty(
+        box,
+        "__selectionMaterial",
+        {
+            value: edgeMaterial,
             enumerable: false
         }
     );
@@ -5814,11 +7179,18 @@ function syncSelectionBoxes() {
         const visual =
             box.__selectionVisual;
 
+        const edges =
+            box.__selectionEdges;
+
+        const material =
+            box.__selectionMaterial;
+
         const part =
             box.Adornee;
 
         if (
             !visual ||
+            !edges ||
             !box.Visible ||
             !part ||
             !isA(part, "BasePart") ||
@@ -5850,17 +7222,120 @@ function syncSelectionBoxes() {
         visual.visible = true;
         visual.position.copy(p);
         visual.quaternion.copy(q);
-        visual.scale.set(
-            Number(part.Size?.X)||1,
-            Number(part.Size?.Y)||1,
-            Number(part.Size?.Z)||1
-        );
+        visual.scale.set(1, 1, 1);
 
-        visual.material.color.setRGB(
-            THREE.MathUtils.clamp(Number(box.Color3?.R)||0,0,1),
-            THREE.MathUtils.clamp(Number(box.Color3?.G)||0,0,1),
-            THREE.MathUtils.clamp(Number(box.Color3?.B)||0,0,1)
-        );
+        const sx =
+            Math.max(
+                0.001,
+                Number(part.Size?.X) || 1
+            );
+
+        const sy =
+            Math.max(
+                0.001,
+                Number(part.Size?.Y) || 1
+            );
+
+        const sz =
+            Math.max(
+                0.001,
+                Number(part.Size?.Z) || 1
+            );
+
+        // Roblox-style LineThickness now actually affects rendering.
+        // Increase LineThickness in Luau or change the default in
+        // createLuaSelectionBox() above.
+        const thickness =
+            Math.max(
+                0.01,
+                Number(box.LineThickness) || 0.25
+            );
+
+        const hx = sx / 2;
+        const hy = sy / 2;
+        const hz = sz / 2;
+
+        let edgeIndex = 0;
+
+        // Four X-axis edges.
+        for (const y of [-hy, hy]) {
+            for (const z of [-hz, hz]) {
+                const edge =
+                    edges[edgeIndex++];
+
+                edge.position.set(
+                    0,
+                    y,
+                    z
+                );
+
+                edge.scale.set(
+                    sx + thickness,
+                    thickness,
+                    thickness
+                );
+            }
+        }
+
+        // Four Y-axis edges.
+        for (const x of [-hx, hx]) {
+            for (const z of [-hz, hz]) {
+                const edge =
+                    edges[edgeIndex++];
+
+                edge.position.set(
+                    x,
+                    0,
+                    z
+                );
+
+                edge.scale.set(
+                    thickness,
+                    sy + thickness,
+                    thickness
+                );
+            }
+        }
+
+        // Four Z-axis edges.
+        for (const x of [-hx, hx]) {
+            for (const y of [-hy, hy]) {
+                const edge =
+                    edges[edgeIndex++];
+
+                edge.position.set(
+                    x,
+                    y,
+                    0
+                );
+
+                edge.scale.set(
+                    thickness,
+                    thickness,
+                    sz + thickness
+                );
+            }
+        }
+
+        if (material) {
+            material.color.setRGB(
+                THREE.MathUtils.clamp(
+                    Number(box.Color3?.R) || 0,
+                    0,
+                    1
+                ),
+                THREE.MathUtils.clamp(
+                    Number(box.Color3?.G) || 0,
+                    0,
+                    1
+                ),
+                THREE.MathUtils.clamp(
+                    Number(box.Color3?.B) || 0,
+                    0,
+                    1
+                )
+            );
+        }
     }
 }
 
@@ -5890,6 +7365,11 @@ const InstanceApi = Mutable({
             instance =
                 createLuaPart();
         } else if (
+            className === "SpawnLocation"
+        ) {
+            instance =
+                createLuaSpawnLocation();
+        } else if (
             className === "Seat"
         ) {
             instance =
@@ -5909,6 +7389,11 @@ const InstanceApi = Mutable({
         ) {
             instance =
                 createLuaHumanoid();
+        } else if (
+            className === "Sound"
+        ) {
+            instance =
+                createLuaSound();
         } else if (
             className === "Terrain"
         ) {
@@ -8451,6 +9936,244 @@ verifyPhase35Infrastructure();
 let activeLuauState = null;
 let activeLuauChunk = null;
 
+const CLASSIC_DATATYPE_BOOTSTRAP = `
+-- Blox Emulation classic datatype compatibility layer.
+-- This keeps the 2010-style API surface while giving JS-backed Roblox values
+-- the operator behavior scripts expect.
+
+do
+    local HostVector3 = Vector3
+    local HostCFrame = CFrame
+    local HostColor3 = Color3
+
+    local vectorMeta = {}
+    local cframeMeta = {}
+
+    local function isVector(v)
+        return type(v) == "table"
+            and v.X ~= nil
+            and v.Y ~= nil
+            and v.Z ~= nil
+            and v._qx == nil
+    end
+
+    local function decorateVector(v)
+        if type(v) == "table" then
+            pcall(setmetatable, v, vectorMeta)
+        end
+        return v
+    end
+
+    vectorMeta.__add = function(a, b)
+        return decorateVector(
+            HostVector3.new(
+                a.X + b.X,
+                a.Y + b.Y,
+                a.Z + b.Z
+            )
+        )
+    end
+
+    vectorMeta.__sub = function(a, b)
+        return decorateVector(
+            HostVector3.new(
+                a.X - b.X,
+                a.Y - b.Y,
+                a.Z - b.Z
+            )
+        )
+    end
+
+    vectorMeta.__unm = function(a)
+        return decorateVector(
+            HostVector3.new(
+                -a.X,
+                -a.Y,
+                -a.Z
+            )
+        )
+    end
+
+    vectorMeta.__mul = function(a, b)
+        if type(a) == "number" then
+            return decorateVector(
+                HostVector3.new(
+                    a * b.X,
+                    a * b.Y,
+                    a * b.Z
+                )
+            )
+        end
+
+        if type(b) == "number" then
+            return decorateVector(
+                HostVector3.new(
+                    a.X * b,
+                    a.Y * b,
+                    a.Z * b
+                )
+            )
+        end
+
+        return decorateVector(
+            HostVector3.new(
+                a.X * b.X,
+                a.Y * b.Y,
+                a.Z * b.Z
+            )
+        )
+    end
+
+    vectorMeta.__div = function(a, b)
+        if type(b) == "number" then
+            return decorateVector(
+                HostVector3.new(
+                    a.X / b,
+                    a.Y / b,
+                    a.Z / b
+                )
+            )
+        end
+
+        return decorateVector(
+            HostVector3.new(
+                a.X / b.X,
+                a.Y / b.Y,
+                a.Z / b.Z
+            )
+        )
+    end
+
+    vectorMeta.__eq = function(a, b)
+        return isVector(a)
+            and isVector(b)
+            and a.X == b.X
+            and a.Y == b.Y
+            and a.Z == b.Z
+    end
+
+    vectorMeta.__tostring = function(a)
+        return tostring(a.X)
+            .. ", "
+            .. tostring(a.Y)
+            .. ", "
+            .. tostring(a.Z)
+    end
+
+    local Vector3 = {
+        new = function(x, y, z)
+            return decorateVector(
+                HostVector3.new(
+                    x or 0,
+                    y or 0,
+                    z or 0
+                )
+            )
+        end
+    }
+
+    local function decorateCFrame(cf)
+        if type(cf) == "table" then
+            pcall(setmetatable, cf, cframeMeta)
+        end
+        return cf
+    end
+
+    cframeMeta.__mul = function(a, b)
+        local result = a:Multiply(b)
+
+        if isVector(result) then
+            return decorateVector(result)
+        end
+
+        return decorateCFrame(result)
+    end
+
+    cframeMeta.__add = function(a, b)
+        if not isVector(b) then
+            error("CFrame can only be added to a Vector3", 2)
+        end
+
+        return decorateCFrame(
+            HostCFrame.new(
+                a.X + b.X,
+                a.Y + b.Y,
+                a.Z + b.Z
+            ):Multiply(
+                HostCFrame.Angles(
+                    a._rx or 0,
+                    a._ry or 0,
+                    a._rz or 0
+                )
+            )
+        )
+    end
+
+    cframeMeta.__sub = function(a, b)
+        if not isVector(b) then
+            error("CFrame can only be subtracted by a Vector3", 2)
+        end
+
+        return decorateCFrame(
+            HostCFrame.new(
+                a.X - b.X,
+                a.Y - b.Y,
+                a.Z - b.Z
+            ):Multiply(
+                HostCFrame.Angles(
+                    a._rx or 0,
+                    a._ry or 0,
+                    a._rz or 0
+                )
+            )
+        )
+    end
+
+    local CFrame = {
+        new = function(...)
+            return decorateCFrame(
+                HostCFrame.new(...)
+            )
+        end,
+
+        Angles = function(...)
+            return decorateCFrame(
+                HostCFrame.Angles(...)
+            )
+        end,
+
+        fromEulerAnglesXYZ = function(...)
+            return decorateCFrame(
+                HostCFrame.fromEulerAnglesXYZ(...)
+            )
+        end,
+
+        fromEulerAnglesYXZ = function(...)
+            return decorateCFrame(
+                HostCFrame.fromEulerAnglesYXZ(...)
+            )
+        end,
+
+        lookAt = function(...)
+            return decorateCFrame(
+                HostCFrame.lookAt(...)
+            )
+        end
+    }
+
+    -- Keep classic Color3 constructors routed through the host datatype.
+    local Color3 = {
+        new = function(...)
+            return HostColor3.new(...)
+        end,
+
+        fromRGB = function(...)
+            return HostColor3.fromRGB(...)
+        end
+    }
+end
+`;
+
 async function executeLuauScript() {
 
     const source =
@@ -8536,12 +10259,21 @@ async function executeLuauScript() {
 
         activeLuauChunk =
             activeLuauState.loadstring(
-                source,
+                CLASSIC_DATATYPE_BOOTSTRAP +
+                    "\n" +
+                    source,
                 scriptName,
                 true
             );
 
         await activeLuauChunk();
+
+        // The Character exists before the uploaded map script runs. Once the
+        // map has created/configured its SpawnLocations, move the initial
+        // Character to one of the enabled pads.
+        movePlayerToChosenSpawn(
+            false
+        );
 
         console.log(
             `[Luau] Executed ${scriptName}`
@@ -8616,6 +10348,96 @@ function syncLuaValueObjects() {
 let currentPlayerHumanoid = null;
 let currentCharacterModel = null;
 const characterVisualBindings = [];
+
+// ─── Classic Health HUD + regeneration ───────────────────────────────────────
+//
+// Classic-style regeneration: 1% of MaxHealth per second.
+// At the normal 100 MaxHealth, this restores about 1 health per second.
+const CLASSIC_HEALTH_REGEN_RATE = 0.01;
+
+function updateClassicHealthHud() {
+    if (!classicHealthFill)
+        return;
+
+    const humanoid =
+        currentPlayerHumanoid;
+
+    if (
+        !humanoid ||
+        humanoid.__destroyed
+    ) {
+        classicHealthFill.style.height =
+            "0%";
+        return;
+    }
+
+    const maxHealth =
+        Math.max(
+            0,
+            Number(humanoid.MaxHealth) || 0
+        );
+
+    const health =
+        THREE.MathUtils.clamp(
+            Number(humanoid.Health) || 0,
+            0,
+            maxHealth
+        );
+
+    const percent =
+        maxHealth > 0
+            ? (health / maxHealth) * 100
+            : 0;
+
+    // Bottom anchored: losing health removes green from the TOP downward,
+    // leaving the red damaged section visible above it like the 2010 HUD.
+    classicHealthFill.style.height =
+        `${percent}%`;
+}
+
+function updateClassicHealthRegeneration(delta) {
+    const humanoid =
+        currentPlayerHumanoid;
+
+    if (
+        !humanoid ||
+        humanoid.__destroyed ||
+        humanoid.__dead ||
+        characterJointsBroken
+    ) {
+        return;
+    }
+
+    const maxHealth =
+        Math.max(
+            0,
+            Number(humanoid.MaxHealth) || 0
+        );
+
+    const health =
+        THREE.MathUtils.clamp(
+            Number(humanoid.Health) || 0,
+            0,
+            maxHealth
+        );
+
+    if (
+        maxHealth <= 0 ||
+        health <= 0 ||
+        health >= maxHealth
+    ) {
+        return;
+    }
+
+    humanoid.Health =
+        Math.min(
+            maxHealth,
+            health +
+                maxHealth *
+                CLASSIC_HEALTH_REGEN_RATE *
+                delta
+        );
+}
 
 
 function syncHumanoids() {
@@ -10209,16 +12031,71 @@ if (
         const canCollide =
             Boolean(instance.CanCollide);
 
-        if (canCollide !== last.CanCollide) {
+        // Keep the ACTUAL Rapier collider state authoritative with the Lua
+        // CanCollide property. This also repairs any stale solid collider left
+        // behind after body recreation / map loading even if __last already
+        // contains the correct Boolean.
+        let rapierCollisionMismatch =
+            false;
 
+        for (
+            let i = 0;
+            i < part.body.numColliders();
+            i++
+        ) {
+            const collider =
+                part.body.collider(i);
+
+            if (
+                collider &&
+                collider.isSensor() ===
+                    canCollide
+            ) {
+                rapierCollisionMismatch =
+                    true;
+                break;
+            }
+        }
+
+        if (
+            canCollide !== last.CanCollide ||
+            rapierCollisionMismatch
+        ) {
             editPart(part, {
                 canCollide
             });
 
+            // editPart only changes when part.canCollide differs. Force the
+            // collider sensor state here as a final guarantee.
+            for (
+                let i = 0;
+                i < part.body.numColliders();
+                i++
+            ) {
+                const collider =
+                    part.body.collider(i);
+
+                collider?.setSensor(
+                    !canCollide
+                );
+            }
+
+            part.canCollide =
+                canCollide;
+
+            const propertyChanged =
+                canCollide !==
+                last.CanCollide;
+
             last.CanCollide =
                 canCollide;
 
-            fireChanged(instance, "CanCollide");
+            if (propertyChanged) {
+                fireChanged(
+                    instance,
+                    "CanCollide"
+                );
+            }
         }
 
         // Transparency
@@ -11026,6 +12903,648 @@ const playerState = {
     jumpPower: 23,
 };
 
+
+// ─── Recoverable physics-instability ragdoll ─────────────────────────────────
+//
+// This is intentionally NON-LETHAL. It does not call BreakJoints(), does not
+// reduce Health, and keeps the normal R6 procedural animation system running.
+// The visible character tips/falls while the main player body keeps simulating.
+const PHYSICS_RAGDOLL_MIN_SECONDS = 2;
+const PHYSICS_RAGDOLL_MAX_SECONDS = 5;
+
+// High enough that normal WalkSpeed/jumping/landing should not trip it.
+const PHYSICS_RAGDOLL_SPEED_THRESHOLD = 55000;
+const PHYSICS_RAGDOLL_VERTICAL_THRESHOLD = 55000;
+
+// Rapid repeated horizontal velocity changes = spasms/jittering.
+const PHYSICS_RAGDOLL_JITTER_ACCEL = 180;
+const PHYSICS_RAGDOLL_JITTER_HITS = 3;
+
+// Extremely abrupt motion is treated as generic physics instability.
+const PHYSICS_RAGDOLL_EXTREME_ACCEL = 12000;
+const PHYSICS_RAGDOLL_POSITION_JUMP = 80;
+
+const physicsRagdoll = {
+    active: false,
+    recovering: false,
+    recoverAt: 0,
+    recoveryStartedAt: 0,
+    recoveryDuration: 0.65,
+    recoveryStartRotation: new THREE.Quaternion(),
+    recoveryTargetRotation: new THREE.Quaternion(),
+    jitterHits: 0,
+    lastVelocity: new THREE.Vector3(),
+    lastPosition: new THREE.Vector3(),
+    hasSample: false,
+    lastTriggerAt: -Infinity,
+    reason: ""
+};
+
+let splatSoundBuffer = null;
+
+fetch("Sounds/splat.wav")
+    .then(r => r.arrayBuffer())
+    .then(buf => audioCtx.decodeAudioData(buf))
+    .then(decoded => {
+        splatSoundBuffer = decoded;
+    })
+    .catch(() => {
+        // Optional sound: silently skip if it is not present.
+    });
+
+function playSplatSound() {
+    if (!splatSoundBuffer)
+        return;
+
+    if (audioCtx.state === "suspended")
+        audioCtx.resume();
+
+    const src = audioCtx.createBufferSource();
+    src.buffer = splatSoundBuffer;
+    src.connect(audioCtx.destination);
+    src.start(0);
+}
+
+function setPlayerRigidRotationEnabled(enabled) {
+    const allowRotation =
+        Boolean(enabled);
+
+    // Rapier 0.12 exposes setEnabledRotations(). Keep a fallback for builds
+    // that expose lockRotations() instead.
+    if (
+        typeof playerBody?.setEnabledRotations ===
+        "function"
+    ) {
+        playerBody.setEnabledRotations(
+            allowRotation,
+            allowRotation,
+            allowRotation,
+            true
+        );
+    } else if (
+        typeof playerBody?.lockRotations ===
+        "function"
+    ) {
+        playerBody.lockRotations(
+            !allowRotation,
+            true
+        );
+    }
+}
+
+function getPlayerBodyQuaternion() {
+    const r =
+        playerBody.rotation();
+
+    return new THREE.Quaternion(
+        r.x,
+        r.y,
+        r.z,
+        r.w
+    ).normalize();
+}
+
+function setPlayerBodyQuaternion(q) {
+    const normalized =
+        q.clone().normalize();
+
+    playerBody.setRotation(
+        {
+            x: normalized.x,
+            y: normalized.y,
+            z: normalized.z,
+            w: normalized.w
+        },
+        true
+    );
+}
+
+function resetPhysicsRagdollState() {
+    physicsRagdoll.active = false;
+    physicsRagdoll.recovering = false;
+    physicsRagdoll.recoverAt = 0;
+    physicsRagdoll.recoveryStartedAt = 0;
+    physicsRagdoll.jitterHits = 0;
+    physicsRagdoll.hasSample = false;
+    physicsRagdoll.reason = "";
+
+    setPlayerRigidRotationEnabled(
+        false
+    );
+
+    playerBody.setAngvel(
+        { x: 0, y: 0, z: 0 },
+        true
+    );
+
+    // Restore a normal upright physics orientation.
+    setPlayerBodyQuaternion(
+        new THREE.Quaternion()
+    );
+
+    if (playerRoot) {
+        playerRoot.quaternion.identity();
+    }
+
+    if (player) {
+        player.position.y =
+            PLAYER_VISUAL_Y_OFFSET;
+    }
+}
+
+function triggerPhysicsRagdoll(reason = "physics instability") {
+    if (
+        physicsRagdoll.active ||
+        physicsRagdoll.recovering ||
+        characterJointsBroken ||
+        currentPlayerHumanoid?.__dead ||
+        !player
+    ) {
+        return false;
+    }
+
+    const now =
+        performance.now();
+
+    // Prevent one unstable collision from immediately retriggering after recovery.
+    if (
+        now -
+        physicsRagdoll.lastTriggerAt <
+        1200
+    ) {
+        return false;
+    }
+
+    physicsRagdoll.active = true;
+    physicsRagdoll.recovering = false;
+    physicsRagdoll.lastTriggerAt = now;
+    physicsRagdoll.reason = reason;
+    physicsRagdoll.jitterHits = 0;
+
+    const delaySeconds =
+        PHYSICS_RAGDOLL_MIN_SECONDS +
+        Math.random() *
+        (
+            PHYSICS_RAGDOLL_MAX_SECONDS -
+            PHYSICS_RAGDOLL_MIN_SECONDS
+        );
+
+    physicsRagdoll.recoverAt =
+        now +
+        delaySeconds * 1000;
+
+    // The capsule becomes a genuine freely rotating Rapier rigid body.
+    // It stays enabled and solid, so it continues colliding with the world.
+    setPlayerMainColliderEnabled(
+        true
+    );
+
+    if (playerCollider) {
+        playerCollider.setSensor(
+            false
+        );
+    }
+
+    setPlayerRigidRotationEnabled(
+        true
+    );
+
+    // Give the body an initial tumble so a bad physics event actually makes
+    // the character fall instead of remaining perfectly balanced upright.
+    const tumbleStrength =
+        4.5 +
+        Math.random() * 3.5;
+
+    const angle =
+        Math.random() *
+        Math.PI * 2;
+
+    const existingAngvel =
+        playerBody.angvel();
+
+    playerBody.setAngvel(
+        {
+            x:
+                existingAngvel.x +
+                Math.cos(angle) *
+                tumbleStrength,
+
+            y:
+                existingAngvel.y +
+                (
+                    Math.random() -
+                    0.5
+                ) * 2.0,
+
+            z:
+                existingAngvel.z +
+                Math.sin(angle) *
+                tumbleStrength
+        },
+        true
+    );
+
+    if (!walkSound.paused)
+        walkSound.pause();
+
+    console.log(
+        `[Physics] Full rigid-body ragdoll: ${reason}; recovery in ${delaySeconds.toFixed(2)}s`
+    );
+
+    return true;
+}
+
+function beginPhysicsRagdollRecovery() {
+    if (
+        !physicsRagdoll.active ||
+        physicsRagdoll.recovering
+    ) {
+        return;
+    }
+
+    physicsRagdoll.active = false;
+    physicsRagdoll.recovering = true;
+    physicsRagdoll.recoveryStartedAt =
+        performance.now();
+
+    playerBody.setAngvel(
+        { x: 0, y: 0, z: 0 },
+        true
+    );
+
+    physicsRagdoll
+        .recoveryStartRotation
+        .copy(
+            getPlayerBodyQuaternion()
+        );
+
+    // Recover upright while preserving the body's current yaw.
+    const bodyEuler =
+        new THREE.Euler()
+            .setFromQuaternion(
+                physicsRagdoll
+                    .recoveryStartRotation,
+                "YXZ"
+            );
+
+    physicsRagdoll
+        .recoveryTargetRotation
+        .setFromEuler(
+            new THREE.Euler(
+                0,
+                bodyEuler.y,
+                0,
+                "YXZ"
+            )
+        );
+
+    // User-requested recovery sound.
+    playSplatSound();
+
+    console.log(
+        `[Physics] Recovering from ${physicsRagdoll.reason || "physics instability"}`
+    );
+}
+
+function updatePhysicsRagdollVisual(delta) {
+    if (
+        !player ||
+        !playerRoot
+    ) {
+        return;
+    }
+
+    const bodyPosition =
+        playerBody.translation();
+
+    if (physicsRagdoll.active) {
+        // The Rapier body now owns BOTH translation and rotation.
+        const bodyQuaternion =
+            getPlayerBodyQuaternion();
+
+        // During rigid-body ragdoll, put the visual origin at the capsule's
+        // centre instead of its upright foot point, then rotate the whole R6
+        // with the collider. Limb animation pivots remain attached and continue.
+        playerRoot.position.set(
+            bodyPosition.x,
+            bodyPosition.y,
+            bodyPosition.z
+        );
+
+        playerRoot.quaternion.copy(
+            bodyQuaternion
+        );
+
+        player.position.y =
+            PLAYER_VISUAL_Y_OFFSET -
+            PLAYER_HALF_H -
+            PLAYER_RADIUS;
+
+        if (
+            performance.now() >=
+            physicsRagdoll.recoverAt
+        ) {
+            beginPhysicsRagdollRecovery();
+        }
+
+        return;
+    }
+
+    if (physicsRagdoll.recovering) {
+        const elapsed =
+            (
+                performance.now() -
+                physicsRagdoll.recoveryStartedAt
+            ) / 1000;
+
+        const t =
+            THREE.MathUtils.clamp(
+                elapsed /
+                physicsRagdoll.recoveryDuration,
+                0,
+                1
+            );
+
+        const smooth =
+            t * t *
+            (3 - 2 * t);
+
+        const q =
+            physicsRagdoll
+                .recoveryStartRotation
+                .clone()
+                .slerp(
+                    physicsRagdoll
+                        .recoveryTargetRotation,
+                    smooth
+                );
+
+        // While getting up, keep the collider solid and rotate the actual
+        // rigid body toward upright, not just the graphics.
+        setPlayerBodyQuaternion(
+            q
+        );
+
+        playerBody.setAngvel(
+            { x: 0, y: 0, z: 0 },
+            true
+        );
+
+        playerRoot.position.set(
+            bodyPosition.x,
+            bodyPosition.y,
+            bodyPosition.z
+        );
+
+        playerRoot.quaternion.copy(
+            q
+        );
+
+        player.position.y =
+            PLAYER_VISUAL_Y_OFFSET -
+            PLAYER_HALF_H -
+            PLAYER_RADIUS;
+
+        if (t >= 1) {
+            physicsRagdoll.recovering =
+                false;
+
+            setPlayerRigidRotationEnabled(
+                false
+            );
+
+            playerBody.setAngvel(
+                { x: 0, y: 0, z: 0 },
+                true
+            );
+
+            setPlayerBodyQuaternion(
+                physicsRagdoll
+                    .recoveryTargetRotation
+            );
+
+            playerRoot.quaternion.identity();
+
+            player.position.y =
+                PLAYER_VISUAL_Y_OFFSET;
+
+            physicsRagdoll.reason = "";
+        }
+
+        return;
+    }
+
+    // Normal upright controller mode.
+    playerRoot.quaternion.identity();
+
+    player.position.y =
+        PLAYER_VISUAL_Y_OFFSET;
+}
+
+function detectCharacterSelfCollisionInstability() {
+    // The normal living R6 uses one capsule, so it cannot ordinarily collide
+    // with its own limbs. If detached character bodies ever coexist with the
+    // main capsule, however, treat close overlap as a self-collision instability.
+    if (
+        !playerBody ||
+        characterRagdollBodies.length === 0
+    ) {
+        return false;
+    }
+
+    const p =
+        playerBody.translation();
+
+    for (
+        const ragdollPart of
+        characterRagdollBodies
+    ) {
+        const body =
+            ragdollPart?.body;
+
+        if (!body)
+            continue;
+
+        const q =
+            body.translation();
+
+        if (
+            Math.hypot(
+                q.x - p.x,
+                q.y - p.y,
+                q.z - p.z
+            ) < 1.6
+        ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function detectPhysicsInstability(delta) {
+    if (
+        physicsRagdoll.active ||
+        physicsRagdoll.recovering ||
+        characterJointsBroken ||
+        currentPlayerHumanoid?.__dead ||
+        !playerBody
+    ) {
+        return;
+    }
+
+    const dt =
+        Math.max(
+            Number(delta) || 0,
+            1 / 240
+        );
+
+    const rawVel =
+        playerBody.linvel();
+
+    const rawPos =
+        playerBody.translation();
+
+    const velocity =
+        new THREE.Vector3(
+            rawVel.x,
+            rawVel.y,
+            rawVel.z
+        );
+
+    const position =
+        new THREE.Vector3(
+            rawPos.x,
+            rawPos.y,
+            rawPos.z
+        );
+
+    // Invalid numbers are a direct physics-instability condition.
+    if (
+        !Number.isFinite(velocity.x) ||
+        !Number.isFinite(velocity.y) ||
+        !Number.isFinite(velocity.z) ||
+        !Number.isFinite(position.x) ||
+        !Number.isFinite(position.y) ||
+        !Number.isFinite(position.z)
+    ) {
+        triggerPhysicsRagdoll(
+            "non-finite physics state"
+        );
+        physicsRagdoll.hasSample = false;
+        return;
+    }
+
+    const totalSpeed =
+        velocity.length();
+
+    const horizontalSpeed =
+        Math.hypot(
+            velocity.x,
+            velocity.z
+        );
+
+    // Velocity threshold.
+    if (
+        totalSpeed >
+            PHYSICS_RAGDOLL_SPEED_THRESHOLD ||
+        Math.abs(velocity.y) >
+            PHYSICS_RAGDOLL_VERTICAL_THRESHOLD
+    ) {
+        triggerPhysicsRagdoll(
+            "velocity threshold"
+        );
+    }
+
+    if (physicsRagdoll.hasSample) {
+        const horizontalDv =
+            Math.hypot(
+                velocity.x -
+                    physicsRagdoll.lastVelocity.x,
+                velocity.z -
+                    physicsRagdoll.lastVelocity.z
+            );
+
+        const horizontalAccel =
+            horizontalDv / dt;
+
+        const totalAccel =
+            velocity.distanceTo(
+                physicsRagdoll.lastVelocity
+            ) / dt;
+
+        const positionJump =
+            position.distanceTo(
+                physicsRagdoll.lastPosition
+            );
+
+        // Spasms/jitter: require multiple suspicious horizontal corrections so
+        // one ordinary landing does not knock the player down.
+        if (
+            horizontalAccel >
+                PHYSICS_RAGDOLL_JITTER_ACCEL &&
+            horizontalSpeed > 3
+        ) {
+            physicsRagdoll.jitterHits++;
+        } else {
+            physicsRagdoll.jitterHits =
+                Math.max(
+                    0,
+                    physicsRagdoll.jitterHits - 1
+                );
+        }
+
+        if (
+            physicsRagdoll.jitterHits >=
+            PHYSICS_RAGDOLL_JITTER_HITS
+        ) {
+            triggerPhysicsRagdoll(
+                "spasms / jittering"
+            );
+        }
+
+        // Generic severe instability: huge impulse/correction or teleport-like
+        // jump that was not part of a normal respawn.
+        if (
+            totalAccel >
+                PHYSICS_RAGDOLL_EXTREME_ACCEL &&
+            totalSpeed > 15
+        ) {
+            triggerPhysicsRagdoll(
+                "physics instability"
+            );
+        }
+
+        if (
+            positionJump >
+                PHYSICS_RAGDOLL_POSITION_JUMP &&
+            totalSpeed > 15
+        ) {
+            triggerPhysicsRagdoll(
+                "physics position instability"
+            );
+        }
+    }
+
+    if (
+        detectCharacterSelfCollisionInstability()
+    ) {
+        triggerPhysicsRagdoll(
+            "self-collision"
+        );
+    }
+
+    physicsRagdoll.lastVelocity.copy(
+        velocity
+    );
+
+    physicsRagdoll.lastPosition.copy(
+        position
+    );
+
+    physicsRagdoll.hasSample = true;
+}
+
 // ─── Phase 3.6: Seat attachment helpers ──────────────────────────────────────
 function setPlayerMainColliderEnabled(enabled) {
     const active =
@@ -11141,6 +13660,11 @@ function unseatPlayer(
     ) {
         oldSeat.Occupant =
             null;
+
+        fireChanged(
+            oldSeat,
+            "Occupant"
+        );
     }
 
     if (destroyWeld) {
@@ -11306,6 +13830,11 @@ function seatPlayerOnSeat(
 
     seat.Occupant =
         humanoid;
+
+    fireChanged(
+        seat,
+        "Occupant"
+    );
 
     humanoid.Sit =
         true;
@@ -12637,6 +15166,137 @@ console.log(
     "[Player] Using in-engine part-based R6 rig; r6_rigged.fbx disabled."
 );
 
+// ─── 2010-style spawn SelectionBox force field ───────────────────────────────
+//
+// Visual only: this does NOT make the player invincible.
+const SPAWN_SELECTION_DURATION_MS = 10000;
+const spawnSelectionBoxes = [];
+let spawnSelectionStartedAt = 0;
+
+function clearSpawnSelectionBoxes() {
+    for (
+        const box of
+        spawnSelectionBoxes
+    ) {
+        if (
+            box &&
+            !box.__destroyed
+        ) {
+            destroyLuaInstance(
+                box
+            );
+        }
+    }
+
+    spawnSelectionBoxes.length = 0;
+    spawnSelectionStartedAt = 0;
+}
+
+function startSpawnSelectionEffect(
+    characterParts
+) {
+    clearSpawnSelectionBoxes();
+
+    if (
+        !Array.isArray(
+            characterParts
+        )
+    ) {
+        return;
+    }
+
+    for (
+        const part of
+        characterParts
+    ) {
+        if (!part)
+            continue;
+
+        const box =
+            createLuaSelectionBox();
+
+        box.Name =
+            "SpawnSelectionBox";
+
+        box.Adornee =
+            part;
+
+        box.Parent =
+            currentCharacterModel;
+
+        box.LineThickness =
+            0.25;
+
+        box.SurfaceTransparency =
+            1;
+
+        box.Visible =
+            true;
+
+        spawnSelectionBoxes.push(
+            box
+        );
+    }
+
+    spawnSelectionStartedAt =
+        performance.now();
+}
+
+function updateSpawnSelectionEffect() {
+    if (
+        spawnSelectionBoxes.length ===
+        0
+    ) {
+        return;
+    }
+
+    const elapsed =
+        performance.now() -
+        spawnSelectionStartedAt;
+
+    if (
+        elapsed >=
+        SPAWN_SELECTION_DURATION_MS
+    ) {
+        clearSpawnSelectionBoxes();
+        return;
+    }
+
+    // Smooth rainbow cycle across the full 10-second spawn effect.
+    const hue =
+        (
+            elapsed /
+            1600
+        ) % 1;
+
+    const color =
+        new THREE.Color()
+            .setHSL(
+                hue,
+                1,
+                0.5
+            );
+
+    for (
+        const box of
+        spawnSelectionBoxes
+    ) {
+        if (
+            !box ||
+            box.__destroyed
+        ) {
+            continue;
+        }
+
+        box.Color3 =
+            createColor3(
+                color.r,
+                color.g,
+                color.b
+            );
+    }
+}
+
 // ─── Phase 2: expose the playable R6 as LocalPlayer.Character ────────────────
 function buildLocalPlayerCharacterModel() {
     const character =
@@ -12760,6 +15420,16 @@ function buildLocalPlayerCharacterModel() {
     localPlayerApi.Character =
         character;
 
+    // Highlight Head, Torso, both arms, and both legs for ten seconds.
+    startSpawnSelectionEffect([
+        head,
+        torso,
+        leftArm,
+        rightArm,
+        leftLeg,
+        rightLeg
+    ]);
+
     fireLuaSignal(
         localPlayerApi.CharacterAdded,
         character
@@ -12821,6 +15491,8 @@ function rebuildLocalPlayerCharacter(
 
     localPlayerApi.Character =
         null;
+
+    clearSpawnSelectionBoxes();
 
     // Remove ragdoll sync entries first. Their rigid bodies are then removed by
     // destroying the old Character proxies, whose __internal points at them.
@@ -12889,6 +15561,8 @@ function rebuildLocalPlayerCharacter(
     characterJointsBroken =
         false;
 
+    resetPhysicsRagdollState();
+
     playerBody.setGravityScale?.(
         1,
         true
@@ -12902,34 +15576,10 @@ function rebuildLocalPlayerCharacter(
         false
     );
 
-    playerBody.setTranslation(
-        {
-            x: PLAYER_SPAWN.x,
-            y: PLAYER_SPAWN.y,
-            z: PLAYER_SPAWN.z
-        },
-        true
-    );
-
-    playerBody.setLinvel(
-        { x: 0, y: 0, z: 0 },
-        true
-    );
-
-    playerBody.setAngvel(
-        { x: 0, y: 0, z: 0 },
-        true
-    );
-
-    playerStepRemaining =
-        0;
-
-    playerRoot.position.set(
-        PLAYER_SPAWN.x,
-        PLAYER_SPAWN.y -
-            PLAYER_HALF_H -
-            PLAYER_RADIUS,
-        PLAYER_SPAWN.z
+    // Pick a fresh random enabled SpawnLocation for each Character spawn.
+    // Falls back to (0, 4, 0) when none are available.
+    movePlayerToChosenSpawn(
+        false
     );
 
     player =
@@ -13044,13 +15694,24 @@ function checkGrounded() {
         ray,
         0.15,
         true,
-        undefined,   // filterFlags
+
+        // CanCollide=false Parts are Rapier sensors. They should still be
+        // detectable by Touched, but must never count as physical ground.
+        RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
+
         undefined,   // filterGroups
         undefined,   // excludeCollider
-        playerBody   // excludeRigidBody
+        playerBody,  // excludeRigidBody
+
+        // Hard fallback: never let a sensor be considered ground.
+        collider =>
+            !collider.isSensor()
     );
 
-    return hit !== null;
+    return (
+        hit !== null &&
+        !hit.collider?.isSensor?.()
+    );
 }
 
 // ─── Classic Roblox-style step-up helper ─────────────────────────────────────
@@ -13117,14 +15778,28 @@ function detectPlayerStep(moveDir) {
         ray,
         PLAYER_MAX_STEP_HEIGHT + 0.20,
         true,
+
+        // Ignore CanCollide=false sensor Parts. Without this, the stair helper
+        // sees them as a ledge and manually lifts the player while walking,
+        // which makes a non-collidable Part feel solid only during movement.
+        RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
+
         undefined,
         undefined,
-        undefined,
-        playerBody
+        playerBody,
+
+        // Hard fallback: the stair helper may only see physically solid
+        // colliders. Touched sensors are deliberately invisible to this query.
+        collider =>
+            !collider.isSensor()
     );
 
-    if (!hit)
+    if (
+        !hit ||
+        hit.collider?.isSensor?.()
+    ) {
         return 0;
+    }
 
     const hitY =
         rayOriginY -
@@ -13158,6 +15833,15 @@ function updatePlayerStep(moveDir, delta) {
                     PLAYER_MAX_STEP_HEIGHT + PLAYER_STEP_EPSILON
                 )
             );
+    } else if (
+        moveDir &&
+        moveDir.lengthSq() > 0
+    ) {
+        // While actively walking, no valid SOLID step means there is nothing
+        // left to climb. Do not keep carrying a stale lift across a
+        // CanCollide=false sensor.
+        playerStepRemaining =
+            0;
     }
 
     if (playerStepRemaining <= 0)
@@ -13199,12 +15883,165 @@ function updatePlayerStep(moveDir, delta) {
 
 const VOID_Y = -500;
 
-// Player spawn position
+// Fallback player spawn position when no enabled SpawnLocation exists.
 const PLAYER_SPAWN = {
     x: 0,
     y: 4,
     z: 0
 };
+
+// User-requested offset: the player's physics centre is placed 5 studs above
+// the SpawnLocation's Position.
+const SPAWN_LOCATION_Y_OFFSET = 5;
+
+function isInstanceInsideWorkspace(instance) {
+    if (
+        !instance ||
+        instance.__destroyed
+    ) {
+        return false;
+    }
+
+    let parent =
+        instance.Parent;
+
+    while (parent) {
+        if (parent === workspaceApi)
+            return true;
+
+        parent =
+            parent.Parent;
+    }
+
+    return false;
+}
+
+function getEnabledSpawnLocations() {
+    const enabled =
+        [];
+
+    for (
+        const instance of
+        luaInstances
+    ) {
+        if (
+            !instance ||
+            instance.__destroyed ||
+            instance.ClassName !==
+                "SpawnLocation" ||
+            instance.Enabled !==
+                true ||
+            !isInstanceInsideWorkspace(
+                instance
+            )
+        ) {
+            continue;
+        }
+
+        enabled.push(
+            instance
+        );
+    }
+
+    return enabled;
+}
+
+function choosePlayerSpawnPosition() {
+    const spawns =
+        getEnabledSpawnLocations();
+
+    if (
+        spawns.length ===
+        0
+    ) {
+        return {
+            x: PLAYER_SPAWN.x,
+            y: PLAYER_SPAWN.y,
+            z: PLAYER_SPAWN.z,
+            spawnLocation: null
+        };
+    }
+
+    const chosen =
+        spawns[
+            Math.floor(
+                Math.random() *
+                spawns.length
+            )
+        ];
+
+    return {
+        x:
+            Number(
+                chosen.Position?.X
+            ) || 0,
+
+        y:
+            (
+                Number(
+                    chosen.Position?.Y
+                ) || 0
+            ) +
+            SPAWN_LOCATION_Y_OFFSET,
+
+        z:
+            Number(
+                chosen.Position?.Z
+            ) || 0,
+
+        spawnLocation:
+            chosen
+    };
+}
+
+function movePlayerToChosenSpawn(
+    playSound = false
+) {
+    if (
+        !playerBody ||
+        !playerRoot
+    ) {
+        return null;
+    }
+
+    const spawnPosition =
+        choosePlayerSpawnPosition();
+
+    playerBody.setTranslation(
+        {
+            x: spawnPosition.x,
+            y: spawnPosition.y,
+            z: spawnPosition.z
+        },
+        true
+    );
+
+    playerBody.setLinvel(
+        { x: 0, y: 0, z: 0 },
+        true
+    );
+
+    playerBody.setAngvel(
+        { x: 0, y: 0, z: 0 },
+        true
+    );
+
+    playerStepRemaining =
+        0;
+
+    playerRoot.position.set(
+        spawnPosition.x,
+        spawnPosition.y -
+            PLAYER_HALF_H -
+            PLAYER_RADIUS,
+        spawnPosition.z
+    );
+
+    if (playSound)
+        playSpawnSound();
+
+    return spawnPosition;
+}
 
 function respawnPlayer() {
 
@@ -13218,44 +16055,10 @@ function respawnPlayer() {
         return;
     }
 
-    // Move player back to spawn
-    playerBody.setTranslation(
-        {
-            x: PLAYER_SPAWN.x,
-            y: PLAYER_SPAWN.y,
-            z: PLAYER_SPAWN.z
-        },
+    // Pick a random enabled SpawnLocation, or use (0,4,0) if there are none.
+    movePlayerToChosenSpawn(
         true
     );
-
-    // Stop all existing movement
-    playerBody.setLinvel(
-        {
-            x: 0,
-            y: 0,
-            z: 0
-        },
-        true
-    );
-
-    playerStepRemaining = 0;
-
-    playerBody.setAngvel(
-        {
-            x: 0,
-            y: 0,
-            z: 0
-        },
-        true
-    );
-
-    // Sync visual player immediately
-    playerRoot.position.set(
-        PLAYER_SPAWN.x,
-        PLAYER_SPAWN.y - PLAYER_HALF_H - PLAYER_RADIUS,
-        PLAYER_SPAWN.z
-    );
-    playSpawnSound();
     console.log("[Void] Player respawned.");
 }
 function destroyPhysicsPart(part) {
@@ -13456,11 +16259,15 @@ function updatePlayer(delta) {
 
     const movementDisabled =
         Boolean(
-            humanoid &&
+            physicsRagdoll.active ||
+            physicsRagdoll.recovering ||
             (
-                humanoid.__dead ||
-                humanoid.PlatformStand ||
-                humanoid.Sit
+                humanoid &&
+                (
+                    humanoid.__dead ||
+                    humanoid.PlatformStand ||
+                    humanoid.Sit
+                )
             )
         );
 
@@ -13518,6 +16325,8 @@ function updatePlayer(delta) {
     if (
         CAM.firstPerson &&
         !characterJointsBroken &&
+        !physicsRagdoll.active &&
+        !physicsRagdoll.recovering &&
         !humanoid?.Sit
     ) {
         const firstPersonBodyYaw =
@@ -13534,6 +16343,8 @@ function updatePlayer(delta) {
     const isWalking =
         dir.lengthSq() > 0 &&
         playerState.grounded &&
+        !physicsRagdoll.active &&
+        !physicsRagdoll.recovering &&
         !humanoid?.Sit;
 
     if (isWalking) {
@@ -13560,16 +16371,25 @@ function updatePlayer(delta) {
                     : curVel.y
             );
 
-    playerBody.setLinvel(
-        {
-            x: vx,
-            y: verticalVelocity,
-            z: vz
-        },
-        true
-    );
+    const ragdollPhysicsOwned =
+        physicsRagdoll.active ||
+        physicsRagdoll.recovering;
+
+    // During the temporary ragdoll Rapier owns the complete rigid body.
+    // Do not overwrite its linear velocity with the normal character controller.
+    if (!ragdollPhysicsOwned) {
+        playerBody.setLinvel(
+            {
+                x: vx,
+                y: verticalVelocity,
+                z: vz
+            },
+            true
+        );
+    }
 
     if (
+        !ragdollPhysicsOwned &&
         !movementDisabled &&
         jumpRequested &&
         (
@@ -13598,10 +16418,27 @@ function updatePlayer(delta) {
             humanoid.Jump = false;
     }
 
-    // Sync Three.js root to Rapier body
+    // Sync Three.js root to Rapier body.
     const t = playerBody.translation();
-    // Body centre is at capsule centre; player feet = centre - PLAYER_HALF_H - PLAYER_RADIUS
-    playerRoot.position.set(t.x, t.y - PLAYER_HALF_H - PLAYER_RADIUS, t.z);
+
+    if (
+        !physicsRagdoll.active &&
+        !physicsRagdoll.recovering
+    ) {
+        // Normal mode: root represents the standing foot/floor point.
+        playerRoot.position.set(
+            t.x,
+            t.y -
+                PLAYER_HALF_H -
+                PLAYER_RADIUS,
+            t.z
+        );
+    }
+
+    // During instability ragdoll the full Rapier rigid-body transform owns the
+    // visible R6. Animation code below still runs on the limb pivots.
+    updatePhysicsRagdollVisual(delta);
+
 // --- 2008-style procedural character animation ---
 if (limbs.leftArm && limbs.rightArm && limbs.leftLeg && limbs.rightLeg) {
 
@@ -14497,10 +17334,21 @@ function animate() {
 
     world.step();
 
+    // Inspect the raw post-physics result before updatePlayer() writes the next
+    // controlled movement velocity.
+    detectPhysicsInstability(delta);
+
     updateVoid();
 
     syncLuaValueObjects();
+    syncLuaSounds();
+
+    updateClassicHealthRegeneration(
+        delta
+    );
+
     syncHumanoids();
+    updateClassicHealthHud();
 
     updatePlayer(delta);
 
@@ -14520,6 +17368,7 @@ function animate() {
 
     updateTouchedEvents();
 
+    updateSpawnSelectionEffect();
     syncSelectionBoxes();
 
     // Keep Mouse.Hit/Target live even while the cursor is stationary and
