@@ -26,6 +26,9 @@ part2.Color = Color3.fromRGB(0,255,0)
 part2.Anchored = false
 part2.Parent = workspace
 
+local sparkles = Instance.new("Sparkles")
+sparkles.Parent = part2
+
 local weld = Instance.new("Weld")
 weld.Part0 = part1
 weld.Part1 = part2
@@ -40,18 +43,27 @@ touchPart.Anchored = true
 touchPart.Parent = workspace
 
 touchPart.Touched:connect(function(hit)
-    print("Touched by: " .. hit.Name)
+    local explosion = Instance.new("Explosion")
 
-    touchPart.BrickColor = BrickColor.new("Bright green")
+    explosion.Position =
+        hit.Position + Vector3.new(0, 2, 0)
+
+    explosion.BlastRadius = 12
+    explosion.BlastPressure = 500000
+    explosion.DestroyJointRadiusPercent = 1
+    explosion.Visible = true
+
+    explosion.Parent = workspace
+
+    local message = Instance.new("Message")
+    message.Text = "Touched by: " .. hit.Name
+    message.Parent = workspace
+
+    wait(1)
+
+    message:Remove()
 end)
 
-touchPart.TouchEnded:connect(function(hit)
-    print("Stopped touching: " .. hit.Name)
-
-    touchPart.BrickColor = BrickColor.new("Bright red")
-    
-    game.Players.LocalPlayer.Character:WaitForChild("Humanoid"):TakeDamage(25)
-end)
 local part4 = Instance.new("Part")
 part4.Name = "part"
 part4.Size = Vector3.new(5,5,5)
@@ -81,26 +93,14 @@ stare1.Position = Vector3.new(14,2,0)
 stare1.Anchored = true
 stare1.Parent = workspace
 
-local stare1 = Instance.new("Part")
-stare1.Name = "StarePart1"
-stare1.Size = Vector3.new(5,1,5)
-stare1.Position = Vector3.new(10,0,5)
-stare1.Anchored = true
-stare1.Parent = workspace
-
-local stare1 = Instance.new("Part")
-stare1.Name = "StarePart1"
-stare1.Size = Vector3.new(5,1,5)
-stare1.Position = Vector3.new(10.2,2,5)
-stare1.Anchored = true
-stare1.Parent = workspace
-
-local stare1 = Instance.new("Part")
-stare1.Name = "StarePart1"
-stare1.Size = Vector3.new(5,1,5)
-stare1.Position = Vector3.new(10.4,4,5)
-stare1.Anchored = true
-stare1.Parent = workspace
+for i = 1, 10 do
+    local stare1 = Instance.new("Part")
+    stare1.Name = "StarePart1"
+    stare1.Size = Vector3.new(5,1,5)
+    stare1.Position = Vector3.new(10,i*1.5,5)
+    stare1.Anchored = true
+    stare1.Parent = workspace
+end
 
 local RunService = game:GetService("RunService")
 
@@ -124,15 +124,6 @@ end)
 delay(2, function()
     print("delay worked")
 end)
-
-RunService.Heartbeat:connect(function(dt)
-    -- don't print every frame unless testing
-end)
-
-for i = 1, 3 do
-    print("main loop", i)
-    wait(1)
-end
 
 print("finished")
 
@@ -165,10 +156,6 @@ local combined = cf:Multiply(rot)
 
 print("CFrame position:", combined.X, combined.Y, combined.Z)
 
-humanoid.HealthChanged:connect(function(health)
-    print("Health:", health)
-end)
-
 humanoid.Died:connect(function()
     print("Player died")
 end)
@@ -179,3 +166,6 @@ seat.Size = Vector3.new(4, 1, 2)
 seat.Position = Vector3.new(0, 1, -10)
 seat.Anchored = true
 seat.Parent = workspace
+
+local HUM = Instance.new("Humanoid")
+HUM.Parent = seat
