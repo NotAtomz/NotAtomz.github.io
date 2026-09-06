@@ -259,7 +259,7 @@ canvas.style.cursor = emulatorCursor;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = false;
 
 // Softer classic-style shadow filtering.
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -774,7 +774,17 @@ function createLuaSignal(name, owner = null) {
 
         const entry = {
             callback,
-            connected: true
+            connected: true,
+
+            // luau-web callbacks may return a Promise backed by the same WASM
+            // state. Never invoke this exact Lua closure again while its previous
+            // call is still in flight.
+            running: false,
+            queued: false,
+
+            // Frame events use this to retain only the newest arguments while
+            // the single global Luau callback queue is busy.
+            pendingArgs: null
         };
 
         const disconnectImpl = () => {
@@ -861,39 +871,261 @@ function createLuaSignal(name, owner = null) {
     return signal;
 }
 
+function isFatalLuauWasmError(error) {
+    const message =
+        String(
+            error?.message ||
+            error ||
+            ""
+        ).toLowerCase();
+
+    return (
+        message.includes(
+            "memory access out of bounds"
+        ) ||
+        message.includes(
+            "unreachable"
+        )
+    );
+}
+
+function reportLuaSignalError(
+    state,
+    entry,
+    error
+) {
+    console.error(
+        `[Lua] Error in ${state.name}:`,
+        error
+    );
+
+    if (
+        isFatalLuauWasmError(
+            error
+        )
+    ) {
+        entry.connected =
+            false;
+
+        entry.pendingArgs =
+            null;
+
+        state.listeners.delete(
+            entry
+        );
+
+        if (
+            entry.connection
+        ) {
+            entry.connection.Connected =
+                false;
+        }
+
+        console.warn(
+            `[Lua] Disconnected ${state.name} listener after fatal WASM error.`
+        );
+    }
+}
+
+
+// -----------------------------------------------------------------------------
+// GLOBAL LUA CALLBACK SERIALIZER
+//
+// luau-web uses one WASM VM for this script. Calling two Lua closures through
+// JS at the same time (for example Part.Touched + RunService.Heartbeat in the
+// same browser frame) can re-enter that VM and corrupt Lua values.
+//
+// Only ONE JS -> Lua callback is therefore allowed to execute at a time.
+// Frame-style events are coalesced per listener while busy so Heartbeat,
+// Stepped, and RenderStepped cannot build an unlimited queue.
+// -----------------------------------------------------------------------------
+
+const luaCallbackQueue = [];
+let luaCallbackQueueRunning = false;
+
+function isCoalescedFrameSignalName(name) {
+    return (
+        name === "RunService.Stepped" ||
+        name === "RunService.Heartbeat" ||
+        name === "RunService.RenderStepped"
+    );
+}
+
+function queueLuaSignalEntry(
+    state,
+    entry,
+    args
+) {
+    if (!entry.connected)
+        return;
+
+    // For high-frequency frame events, keep only one queued invocation for
+    // this listener. Newer frame arguments replace older ones.
+    if (
+        isCoalescedFrameSignalName(
+            state.name
+        ) &&
+        entry.queued
+    ) {
+        entry.pendingArgs =
+            args;
+
+        return;
+    }
+
+    entry.queued =
+        true;
+
+    luaCallbackQueue.push({
+        state,
+        entry,
+        args
+    });
+
+    drainLuaCallbackQueue();
+}
+
+async function drainLuaCallbackQueue() {
+    if (luaCallbackQueueRunning)
+        return;
+
+    luaCallbackQueueRunning =
+        true;
+
+    try {
+        while (
+            luaCallbackQueue.length >
+            0
+        ) {
+            const job =
+                luaCallbackQueue.shift();
+
+            if (!job)
+                continue;
+
+            const {
+                state,
+                entry
+            } = job;
+
+            if (
+                !entry.connected
+            ) {
+                entry.queued =
+                    false;
+
+                entry.pendingArgs =
+                    null;
+
+                continue;
+            }
+
+            let args =
+                job.args;
+
+            // If this was a coalesced frame event, use the newest arguments
+            // that arrived while it was waiting in the global queue.
+            if (
+                entry.pendingArgs
+            ) {
+                args =
+                    entry.pendingArgs;
+
+                entry.pendingArgs =
+                    null;
+            }
+
+            entry.queued =
+                false;
+            entry.running =
+                true;
+
+            try {
+                const result =
+                    entry.callback(
+                        ...args
+                    );
+
+                if (
+                    result &&
+                    typeof result.then ===
+                        "function"
+                ) {
+                    await result;
+                }
+            } catch (error) {
+                reportLuaSignalError(
+                    state,
+                    entry,
+                    error
+                );
+            } finally {
+                entry.running =
+                    false;
+            }
+
+            // A frame may have arrived while this callback itself was running.
+            // Schedule exactly one newest frame rather than every missed frame.
+            if (
+                entry.connected &&
+                entry.pendingArgs &&
+                isCoalescedFrameSignalName(
+                    state.name
+                )
+            ) {
+                const newestArgs =
+                    entry.pendingArgs;
+
+                entry.pendingArgs =
+                    null;
+
+                queueLuaSignalEntry(
+                    state,
+                    entry,
+                    newestArgs
+                );
+            }
+        }
+    } finally {
+        luaCallbackQueueRunning =
+            false;
+
+        // A job can be added between the final loop check and this finally.
+        if (
+            luaCallbackQueue.length >
+            0
+        ) {
+            queueMicrotask(
+                drainLuaCallbackQueue
+            );
+        }
+    }
+}
+
 function fireLuaSignal(signal, ...args) {
     if (!signal)
         return;
 
-    const state = luaSignalInternals.get(signal);
+    const state =
+        luaSignalInternals.get(
+            signal
+        );
 
     if (!state)
         return;
 
-    for (const entry of [...state.listeners]) {
+    for (
+        const entry of
+        state.listeners
+    ) {
         if (!entry.connected)
             continue;
 
-        try {
-            const result = entry.callback(...args);
-
-            // Luau-web calls can be asynchronous depending on the selected
-            // WASM backend, so catch rejected callbacks without killing the
-            // render loop.
-            if (result && typeof result.catch === "function") {
-                result.catch(error => {
-                    console.error(
-                        `[Lua] Error in ${state.name}:`,
-                        error
-                    );
-                });
-            }
-        } catch (error) {
-            console.error(
-                `[Lua] Error in ${state.name}:`,
-                error
-            );
-        }
+        queueLuaSignalEntry(
+            state,
+            entry,
+            args
+        );
     }
 }
 
@@ -908,6 +1140,8 @@ function disconnectLuaSignal(signal) {
 
     for (const entry of state.listeners) {
         entry.connected = false;
+        entry.queued = false;
+        entry.pendingArgs = null;
 
         if (entry.connection) {
             entry.connection.Connected = false;
@@ -8213,7 +8447,9 @@ verifyPhase35Infrastructure();
 
 
 
-
+// add somewhere ABOVE executeLuauScript(), around line 8216
+let activeLuauState = null;
+let activeLuauChunk = null;
 
 async function executeLuauScript() {
 
@@ -8239,8 +8475,8 @@ async function executeLuauScript() {
 
     try {
 
-        const state =
-            await LuauState.createAsync({
+        activeLuauState =
+    await LuauState.createAsync({
 
                 game: gameApi,
 
@@ -8298,14 +8534,14 @@ async function executeLuauScript() {
 
             });
 
-        const chunk =
-            state.loadstring(
+        activeLuauChunk =
+            activeLuauState.loadstring(
                 source,
                 scriptName,
                 true
             );
 
-        await chunk();
+        await activeLuauChunk();
 
         console.log(
             `[Luau] Executed ${scriptName}`
