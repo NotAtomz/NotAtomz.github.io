@@ -186,12 +186,12 @@
         position: fixed;
         top: 0;
         left: 0;
-        height: 22px;
+        height: 25px;
         display: flex;
         align-items: stretch;
         z-index: 6;
         font-family: "BloxComicSans", "Comic Sans MS", cursive;
-        background: rgba(212, 208, 200, 0.82);
+        background: rgba(175, 175, 175, 0.75);
         box-sizing: border-box;
         user-select: none;
     }
@@ -8696,6 +8696,8 @@ const MouseApi =
         })
     );
 
+let currentMouseWorldHit = null;
+
 function updateMouseRay() {
     const rect =
         canvas.getBoundingClientRect();
@@ -8758,6 +8760,20 @@ function updateMouseRay() {
         );
 
     if (hit) {
+        currentMouseWorldHit = {
+            instance: hit.instance,
+            point: {
+                x: hit.point.x,
+                y: hit.point.y,
+                z: hit.point.z
+            },
+            normal: {
+                x: hit.normal.x,
+                y: hit.normal.y,
+                z: hit.normal.z
+            }
+        };
+
         MouseApi.Target =
             hit.instance;
 
@@ -8787,6 +8803,8 @@ function updateMouseRay() {
                     : "Front";
         }
     } else {
+        currentMouseWorldHit = null;
+
         MouseApi.Target = null;
 
         const p =
@@ -14035,6 +14053,154 @@ function playDeathSound() {
 // ─── Walk sound ──────────────────────────────────────────────────────────────
 const walkSound = new Audio("Sounds/bfsl-minifigfoots1.mp3");
 walkSound.loop = true;
+// ─── 2009/2010-style click-to-move markers ──────────────────────────────────
+//
+// Classic behavior:
+// 1. A green cylinder continuously follows the mouse over valid floor surfaces.
+// 2. Clicking creates/places a separate destination cylinder.
+// 3. The destination cylinder remains while the player walks toward it.
+// 4. Once the player reaches it, the destination cylinder disappears.
+//
+// Both markers are visual-only Three.js objects. They are not Workspace/Lua
+// Instances, Rapier bodies, or physObjects, so void/character cleanup cannot
+// accidentally destroy them.
+const CLASSIC_CLICK_MOVE_STOP_DISTANCE = 1.15;
+
+// Roblox-style Size = Vector3.new(2, 0.25, 2)
+const CLASSIC_CLICK_MARKER_SIZE_X = 2;
+const CLASSIC_CLICK_MARKER_SIZE_Y = 0.25;
+const CLASSIC_CLICK_MARKER_SIZE_Z = 2;
+
+const classicClickMove = {
+    active: false,
+    destination: new THREE.Vector3()
+};
+
+function createClassicClickCylinder() {
+    const marker =
+        new THREE.Mesh(
+            new THREE.CylinderGeometry(
+                CLASSIC_CLICK_MARKER_SIZE_X * 0.5,
+                CLASSIC_CLICK_MARKER_SIZE_Z * 0.5,
+                CLASSIC_CLICK_MARKER_SIZE_Y,
+                32,
+                1,
+                false
+            ),
+            new THREE.MeshStandardMaterial({
+                color: 0x00c800,
+
+                emissive: 0x00c800,
+                emissiveIntensity: 0.5,
+
+                roughness: 0.8,
+                metalness: 0,
+
+                transparent: false
+            })
+        );
+
+    marker.castShadow = false;
+    marker.receiveShadow = false;
+    marker.visible = false;
+
+    // Dedicated visual marker: not part of Lua/Rapier/physObjects.
+    marker.userData.bloxPersistentClickMarker = true;
+
+    scene.add(marker);
+
+    return marker;
+}
+
+// Mouse-following preview cylinder.
+const classicMouseMarker =
+    createClassicClickCylinder();
+
+// Clicked destination cylinder.
+const classicDestinationMarker =
+    createClassicClickCylinder();
+
+function hideClassicDestinationMarker() {
+    classicClickMove.active = false;
+    classicDestinationMarker.visible = false;
+}
+
+function updateClassicMouseMarker() {
+    const hit =
+        currentMouseWorldHit;
+
+    if (
+        !hit ||
+        !hit.point ||
+        !hit.normal ||
+        (Number(hit.normal.y) || 0) < 0.45
+    ) {
+        classicMouseMarker.visible = false;
+        return;
+    }
+
+    classicMouseMarker.position.set(
+        Number(hit.point.x) || 0,
+        (Number(hit.point.y) || 0) +
+            CLASSIC_CLICK_MARKER_SIZE_Y * 0.5 +
+            0.015,
+        Number(hit.point.z) || 0
+    );
+
+    classicMouseMarker.visible = true;
+}
+
+function placeClassicClickMoveDestination() {
+    const hit =
+        currentMouseWorldHit;
+
+    if (
+        !hit ||
+        !hit.point ||
+        !hit.normal
+    ) {
+        return false;
+    }
+
+    // Only floor-like upward surfaces are valid destinations.
+    if (
+        (Number(hit.normal.y) || 0) <
+        0.45
+    ) {
+        return false;
+    }
+
+    classicClickMove.destination.set(
+        Number(hit.point.x) || 0,
+        Number(hit.point.y) || 0,
+        Number(hit.point.z) || 0
+    );
+
+    classicClickMove.active = true;
+
+    classicDestinationMarker.position.set(
+        classicClickMove.destination.x,
+        classicClickMove.destination.y +
+            CLASSIC_CLICK_MARKER_SIZE_Y * 0.5 +
+            0.015,
+        classicClickMove.destination.z
+    );
+
+    classicDestinationMarker.visible = true;
+
+    return true;
+}
+
+function updateClassicClickMoveMarkers() {
+    // The preview follows the mouse every frame.
+    updateClassicMouseMarker();
+
+    // Destination visibility is owned by click-to-move state.
+    classicDestinationMarker.visible =
+        classicClickMove.active;
+}
+
+
 // ─── Input ───────────────────────────────────────────────────────────────────
 const keys = { w: false, a: false, s: false, d: false, space: false };
 
@@ -14200,10 +14366,18 @@ canvas.addEventListener(
             false
         );
 
-        if (e.button === 0)
+        if (e.button === 0) {
             fireLuaSignal(
                 MouseApi.Button1Down
             );
+
+            if (
+                !CAM.firstPerson &&
+                !CAM.orbiting
+            ) {
+                placeClassicClickMoveDestination();
+            }
+        }
 
         if (e.button === 2)
             fireLuaSignal(
@@ -16277,10 +16451,58 @@ function updatePlayer(delta) {
     const dir = new THREE.Vector3();
 
     if (!movementDisabled) {
+        const keyboardMoving =
+            keys.w ||
+            keys.a ||
+            keys.s ||
+            keys.d;
+
         if (keys.w) dir.sub(forward);
         if (keys.s) dir.add(forward);
         if (keys.d) dir.add(right);
         if (keys.a) dir.sub(right);
+
+        if (
+            keyboardMoving &&
+            classicClickMove.active
+        ) {
+            hideClassicDestinationMarker();
+        }
+
+        if (
+            dir.lengthSq() <= 0 &&
+            classicClickMove.active
+        ) {
+            const bodyPosition =
+                playerBody.translation();
+
+            const dx =
+                classicClickMove.destination.x -
+                bodyPosition.x;
+
+            const dz =
+                classicClickMove.destination.z -
+                bodyPosition.z;
+
+            const horizontalDistance =
+                Math.hypot(
+                    dx,
+                    dz
+                );
+
+            if (
+                horizontalDistance <=
+                CLASSIC_CLICK_MOVE_STOP_DISTANCE
+            ) {
+                hideClassicDestinationMarker();
+            } else {
+                dir.set(
+                    dx / horizontalDistance,
+                    0,
+                    dz / horizontalDistance
+                );
+            }
+        }
 
         if (
             dir.lengthSq() <= 0 &&
@@ -16292,6 +16514,10 @@ function updatePlayer(delta) {
                 Number(humanoid.MoveDirection.Z)||0
             );
         }
+    } else if (
+        classicClickMove.active
+    ) {
+        hideClassicDestinationMarker();
     }
 
     const curVel = playerBody.linvel();
@@ -17370,6 +17596,7 @@ function animate() {
 
     updateSpawnSelectionEffect();
     syncSelectionBoxes();
+    updateClassicClickMoveMarkers();
 
     // Keep Mouse.Hit/Target live even while the cursor is stationary and
     // objects move beneath it.
