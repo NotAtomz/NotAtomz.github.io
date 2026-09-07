@@ -317,6 +317,47 @@
         text-shadow: 0 1px 0 rgba(255,255,255,0.75);
     }
 
+    /* Late-2009 / early-2010 script GUI layer. */
+    #bloxGuiRoot {
+        position: fixed;
+        inset: 0;
+        z-index: 5;
+        overflow: hidden;
+        pointer-events: none;
+        user-select: none;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .blox-screen-gui {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+    }
+
+    .blox-gui-object {
+        position: absolute;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    .blox-gui-text {
+        display: flex;
+        overflow: hidden;
+    }
+
+    .blox-gui-button {
+        pointer-events: auto;
+        cursor: pointer;
+    }
+
+    .blox-gui-textbox {
+        pointer-events: auto;
+        resize: none;
+        outline: none;
+    }
+
 </style>
 </head>
 <body>
@@ -339,6 +380,7 @@
 </div>
 
 <canvas id="game"></canvas>
+<div id="bloxGuiRoot"></div>
 
 <div id="start">
     <div class="start-window">
@@ -1006,7 +1048,7 @@ function createPart(w, h, d, x, y, z, options = {}) {
         topMat.map.anisotropy = max;
     }
     const botMat  = new THREE.MeshStandardMaterial({
-        map: loadTex("Textures/bottom-stud.jpeg", w, d),
+        map: loadTex("Textures/bottom-stud.jpg", w, d),
         color, roughness: 0.3, metalness: 0.0, transparent: false, alphaTest: 0,
     });
     if (botMat.map) {
@@ -1679,12 +1721,40 @@ async function drainLuaCallbackQueue() {
             entry.running =
                 true;
 
+            const mouseSnapshot =
+                args?.__bloxMouseSnapshot ||
+                null;
+
+            const liveMouseState =
+                mouseSnapshot
+                    ? {
+                        Target:
+                            MouseApi.Target,
+                        Hit:
+                            MouseApi.Hit,
+                        TargetSurface:
+                            MouseApi.TargetSurface
+                    }
+                    : null;
+
+            if (mouseSnapshot) {
+                MouseApi.Target =
+                    mouseSnapshot.Target;
+
+                MouseApi.Hit =
+                    mouseSnapshot.Hit;
+
+                MouseApi.TargetSurface =
+                    mouseSnapshot.TargetSurface;
+            }
+
             try {
                 await runLuaVmSerialized(
                     state.name,
                     () =>
-                        entry.callback(
-                            ...args
+                        dispatchLuaCallbackThroughScheduler(
+                            entry.callback,
+                            args
                         )
                 );
             } catch (error) {
@@ -1694,6 +1764,22 @@ async function drainLuaCallbackQueue() {
                     error
                 );
             } finally {
+                // Restore the current/live mouse state after this one Lua click
+                // callback finishes. The snapshot never becomes permanent state.
+                if (
+                    mouseSnapshot &&
+                    liveMouseState
+                ) {
+                    MouseApi.Target =
+                        liveMouseState.Target;
+
+                    MouseApi.Hit =
+                        liveMouseState.Hit;
+
+                    MouseApi.TargetSurface =
+                        liveMouseState.TargetSurface;
+                }
+
                 entry.running =
                     false;
             }
@@ -1754,6 +1840,63 @@ function fireLuaSignal(signal, ...args) {
     ) {
         if (!entry.connected)
             continue;
+
+        queueLuaSignalEntry(
+            state,
+            entry,
+            args
+        );
+    }
+}
+
+// Mouse.Button1Down is queued through the same serialized Luau VM as every
+// other signal. That means the callback may execute a little later than the DOM
+// mousedown itself. Preserve the exact click-time Mouse.Target/Hit/TargetSurface
+// so scripts reading `mouse.Target` inside the callback always see the Part that
+// was under the cursor when the user clicked.
+function fireMouseButton1DownWithSnapshot() {
+    const signal =
+        MouseApi?.Button1Down;
+
+    if (!signal)
+        return;
+
+    const state =
+        luaSignalInternals.get(
+            signal
+        );
+
+    if (!state)
+        return;
+
+    const snapshot = {
+        Target:
+            MouseApi.Target,
+        Hit:
+            MouseApi.Hit,
+        TargetSurface:
+            MouseApi.TargetSurface
+    };
+
+    for (
+        const entry of
+        state.listeners
+    ) {
+        if (!entry.connected)
+            continue;
+
+        const args = [];
+
+        Object.defineProperty(
+            args,
+            "__bloxMouseSnapshot",
+            {
+                value:
+                    snapshot,
+                enumerable:
+                    false
+            }
+        );
 
         queueLuaSignalEntry(
             state,
@@ -2175,6 +2318,28 @@ const Color3Api = Mutable({
         );
     }
 
+});
+
+function createVector2(x = 0, y = 0) {
+    const vx = Number(x) || 0;
+    const vy = Number(y) || 0;
+    const magnitude = Math.hypot(vx, vy);
+
+    return Mutable({
+        X: vx,
+        Y: vy,
+        Magnitude: magnitude,
+        magnitude
+    });
+}
+
+const Vector2Api = Mutable({
+    new(...args) {
+        const n = args.filter(v => typeof v === "number");
+        return createVector2(n[0] || 0, n[1] || 0);
+    },
+    zero: createVector2(0, 0),
+    one: createVector2(1, 1)
 });
 
 
@@ -3319,6 +3484,13 @@ const luaDecals = new Set();
 const luaParticleEmitters = new Set();
 const luaBillboardGuis = new Set();
 const luaImageLabels = new Set();
+
+// Late-2009 / early-2010 screen GUI runtime.
+const luaScreenGuis = new Set();
+const luaGuiObjects = new Set();
+const luaTextBoxes = new Set();
+const starterGuiCloneMap = new Map();
+
 const luaExplosions = new Set();
 
 // Early-classic gameplay objects.
@@ -3367,8 +3539,18 @@ const CLASS_PARENTS = {
 
     Decal: ["Instance"],
     ParticleEmitter: ["Instance"],
+
+    PlayerGui: ["BasePlayerGui", "Instance"],
+    ScreenGui: ["LayerCollector", "GuiBase2d", "Instance"],
     BillboardGui: ["LayerCollector", "GuiBase2d", "Instance"],
+
+    Frame: ["GuiObject", "GuiBase2d", "Instance"],
+    TextLabel: ["GuiObject", "GuiBase2d", "Instance"],
+    TextButton: ["GuiButton", "GuiObject", "GuiBase2d", "Instance"],
+    TextBox: ["GuiObject", "GuiBase2d", "Instance"],
     ImageLabel: ["GuiObject", "GuiBase2d", "Instance"],
+    ImageButton: ["GuiButton", "GuiObject", "GuiBase2d", "Instance"],
+
     Explosion: ["Instance"],
 
     Terrain: ["Instance"],
@@ -4106,6 +4288,48 @@ function destroyLuaInstance(instance) {
     luaImageLabels.delete(
         instance
     );
+
+    luaScreenGuis.delete(
+        instance
+    );
+
+    if (
+        luaGuiObjects.has(
+            instance
+        )
+    ) {
+        disconnectClassicGuiSignals(
+            instance
+        );
+
+        luaGuiObjects.delete(
+            instance
+        );
+    }
+
+    luaTextBoxes.delete(
+        instance
+    );
+
+    if (
+        instance.__guiElement
+    ) {
+        instance.__guiElement.remove?.();
+        instance.__guiElement =
+            null;
+    }
+
+    const billboardRecord =
+        billboardGuiCanvasCache.get(
+            instance
+        );
+
+    if (billboardRecord) {
+        billboardRecord.texture?.dispose?.();
+        billboardGuiCanvasCache.delete(
+            instance
+        );
+    }
 
     luaParticleEmitters.delete(
         instance
@@ -7073,6 +7297,41 @@ function cloneLuaInstance(source) {
         ) {
             c[propertyName] =
                 source[propertyName];
+        }
+    } else if (
+        source.ClassName ===
+        "ScreenGui"
+    ) {
+        c.Enabled =
+            source.Enabled;
+    } else if (
+        isA(
+            source,
+            "GuiObject"
+        )
+    ) {
+        for (
+            const propertyName of
+            [
+                "Visible","Position","Size",
+                "BackgroundColor3","BackgroundTransparency",
+                "BorderColor3","BorderSizePixel",
+                "ZIndex","Active","Draggable","SizeConstraint","Style",
+                "Text","TextColor3","TextTransparency",
+                "TextStrokeColor3","TextStrokeTransparency",
+                "Font","FontSize","TextXAlignment","TextYAlignment",
+                "TextWrap","TextWrapped","TextScaled",
+                "ClearTextOnFocus","MultiLine",
+                "Image","ImageColor3","ImageTransparency"
+            ]
+        ) {
+            if (
+                propertyName in source &&
+                propertyName in c
+            ) {
+                c[propertyName] =
+                    source[propertyName];
+            }
         }
     } else if (
         source.ClassName ===
@@ -11683,6 +11942,440 @@ function syncLuaDecals() {
 }
 
 
+
+// ─── Late-2009 / early-2010 classic screen GUI stack ────────────────────────
+const bloxGuiRoot = document.getElementById("bloxGuiRoot");
+
+function color3ToCss(color, alpha = 1) {
+    const r = Math.round(THREE.MathUtils.clamp(Number(color?.R)||0,0,1)*255);
+    const g = Math.round(THREE.MathUtils.clamp(Number(color?.G)||0,0,1)*255);
+    const b = Math.round(THREE.MathUtils.clamp(Number(color?.B)||0,0,1)*255);
+    return `rgba(${r},${g},${b},${THREE.MathUtils.clamp(Number(alpha)||0,0,1)})`;
+}
+
+function udim2Css(v) {
+    return {
+        x:`calc(${(Number(v?.X?.Scale)||0)*100}% + ${Math.trunc(Number(v?.X?.Offset)||0)}px)`,
+        y:`calc(${(Number(v?.Y?.Scale)||0)*100}% + ${Math.trunc(Number(v?.Y?.Offset)||0)}px)`
+    };
+}
+
+function guiFontPx(value) {
+    const m=String(value||"Size14").match(/(\d+)/);
+    return Math.max(6,Number(m?.[1])||14);
+}
+
+function guiFontFamily(value) {
+    return String(value)==="Legacy"
+        ? '"BloxComicSans","Comic Sans MS",Arial,sans-serif'
+        : 'Arial,Helvetica,sans-serif';
+}
+
+function createClassicGuiSignals(o, className) {
+    o.MouseEnter=createLuaSignal(`${className}.MouseEnter`,o);
+    o.MouseLeave=createLuaSignal(`${className}.MouseLeave`,o);
+    o.MouseMoved=createLuaSignal(`${className}.MouseMoved`,o);
+
+    if (className==="TextButton" || className==="ImageButton") {
+        for (const n of [
+            "MouseButton1Click","MouseButton1Down","MouseButton1Up",
+            "MouseButton2Click","MouseButton2Down","MouseButton2Up"
+        ]) o[n]=createLuaSignal(`${className}.${n}`,o);
+    }
+
+    if (className==="TextBox") {
+        o.Focused=createLuaSignal("TextBox.Focused",o);
+        o.FocusLost=createLuaSignal("TextBox.FocusLost",o);
+    }
+}
+
+function addClassicGuiTweenMethods(o) {
+    function tween(prop,target,duration=1,callback=null) {
+        if (!target?.X || !target?.Y) return false;
+        const from=o[prop]||createUDim2();
+        const start=performance.now();
+        const seconds=Math.max(0,Number(duration)||0);
+        const token={};
+        o.__guiTweenTokens=o.__guiTweenTokens||{};
+        o.__guiTweenTokens[prop]=token;
+
+        const a0={
+            xs:Number(from.X?.Scale)||0,xo:Number(from.X?.Offset)||0,
+            ys:Number(from.Y?.Scale)||0,yo:Number(from.Y?.Offset)||0
+        };
+        const a1={
+            xs:Number(target.X?.Scale)||0,xo:Number(target.X?.Offset)||0,
+            ys:Number(target.Y?.Scale)||0,yo:Number(target.Y?.Offset)||0
+        };
+
+        const step=()=>{
+            if (o.__destroyed || o.__guiTweenTokens?.[prop]!==token) return;
+            const t=seconds<=0?1:THREE.MathUtils.clamp((performance.now()-start)/(seconds*1000),0,1);
+            const s=t*t*(3-2*t);
+            o[prop]=createUDim2(
+                a0.xs+(a1.xs-a0.xs)*s,
+                a0.xo+(a1.xo-a0.xo)*s,
+                a0.ys+(a1.ys-a0.ys)*s,
+                a0.yo+(a1.yo-a0.yo)*s
+            );
+            if (t<1) requestAnimationFrame(step);
+            else {
+                fireChanged(o,prop);
+                if (typeof callback==="function") {
+                    runLuaVmSerialized(`GuiObject.${prop}Tween`,()=>callback()).catch(()=>{});
+                }
+            }
+        };
+        requestAnimationFrame(step);
+        return true;
+    }
+
+    o.TweenPosition=(...args)=>{
+        const target=args.find(v=>v?.X&&v?.Y);
+        const nums=args.filter(v=>typeof v==="number");
+        const cb=[...args].reverse().find(v=>typeof v==="function");
+        return tween("Position",target,nums.length?nums[nums.length-1]:1,cb);
+    };
+    o.TweenSize=(...args)=>{
+        const target=args.find(v=>v?.X&&v?.Y);
+        const nums=args.filter(v=>typeof v==="number");
+        const cb=[...args].reverse().find(v=>typeof v==="function");
+        return tween("Size",target,nums.length?nums[nums.length-1]:1,cb);
+    };
+    o.TweenSizeAndPosition=(...args)=>{
+        const dims=args.filter(v=>v?.X&&v?.Y);
+        if (dims.length<2) return false;
+        const nums=args.filter(v=>typeof v==="number");
+        const d=nums.length?nums[nums.length-1]:1;
+        const cb=[...args].reverse().find(v=>typeof v==="function");
+        tween("Size",dims[0],d,null);
+        return tween("Position",dims[1],d,cb);
+    };
+    o.tweenPosition=o.TweenPosition;
+    o.tweenSize=o.TweenSize;
+    o.tweenSizeAndPosition=o.TweenSizeAndPosition;
+}
+
+function createLuaScreenGui() {
+    const g=finalizeLuaInstance(Mutable({
+        Name:"ScreenGui",ClassName:"ScreenGui",Parent:null,Archivable:true,Enabled:true
+    }));
+    luaScreenGuis.add(g);
+    return g;
+}
+
+function createLuaGuiObject(className) {
+    const p={
+        Name:className,ClassName:className,Parent:null,Archivable:true,
+        Visible:true,
+        Position:createUDim2(0,0,0,0),
+        Size:createUDim2(0,100,0,100),
+        AbsolutePosition:createVector2(),
+        AbsoluteSize:createVector2(),
+        BackgroundColor3:createColor3(1,1,1),
+        BackgroundTransparency:0,
+        BorderColor3:createColor3(0,0,0),
+        BorderSizePixel:1,
+        ZIndex:1,
+        Active:false,
+        Draggable:false,
+        SizeConstraint:"RelativeXY"
+    };
+
+    if (["TextLabel","TextButton","TextBox"].includes(className)) {
+        Object.assign(p,{
+            Text:"",
+            TextColor3:createColor3(0,0,0),
+            TextTransparency:0,
+            TextStrokeColor3:createColor3(0,0,0),
+            TextStrokeTransparency:1,
+            Font:"Legacy",
+            FontSize:"Size14",
+            TextXAlignment:"Center",
+            TextYAlignment:"Center",
+            TextWrap:false,
+            TextWrapped:false,
+            TextScaled:false,
+            TextFits:true,
+            TextBounds:createVector2()
+        });
+    }
+
+    if (["ImageLabel","ImageButton"].includes(className)) {
+        Object.assign(p,{
+            Image:"",
+            ImageColor3:createColor3(1,1,1),
+            ImageTransparency:0
+        });
+    }
+
+    if (className==="Frame") p.Style="Custom";
+    if (className==="TextButton" || className==="ImageButton") p.Style="Custom";
+    if (className==="TextBox") {
+        p.ClearTextOnFocus=true;
+        p.MultiLine=false;
+    }
+    if (className==="ImageLabel") {
+        p.BackgroundTransparency=1;
+        p.Size=createUDim2(1,0,1,0);
+    }
+
+    const o=finalizeLuaInstance(Mutable(p));
+    createClassicGuiSignals(o,className);
+    addClassicGuiTweenMethods(o);
+
+    if (className==="TextBox") {
+        o.CaptureFocus=(...args)=>{syncLuaScreenGuis();o.__guiElement?.focus?.();};
+        o.ReleaseFocus=(...args)=>o.__guiElement?.blur?.();
+        o.captureFocus=o.CaptureFocus;
+        o.releaseFocus=o.ReleaseFocus;
+        luaTextBoxes.add(o);
+    }
+
+    luaGuiObjects.add(o);
+    if (className==="ImageLabel") luaImageLabels.add(o);
+    return o;
+}
+
+function createGuiDomElement(o) {
+    if (!o || o.__destroyed) return null;
+    if (o.__guiElement) return o.__guiElement;
+
+    let e;
+    if (o.ClassName==="ScreenGui") {
+        e=document.createElement("div");
+        e.className="blox-screen-gui";
+    } else if (o.ClassName==="TextBox") {
+        e=document.createElement("textarea");
+        e.className="blox-gui-object blox-gui-text blox-gui-textbox";
+        e.spellcheck=false;
+        e.addEventListener("input",()=>{
+            const v=String(e.value??"");
+            if (o.Text!==v){o.Text=v;fireChanged(o,"Text");}
+        });
+        e.addEventListener("focus",()=>{
+            if (o.ClearTextOnFocus){e.value="";o.Text="";fireChanged(o,"Text");}
+            fireLuaSignal(o.Focused);
+        });
+        e.addEventListener("blur",()=>fireLuaSignal(o.FocusLost,false));
+        e.addEventListener("keydown",ev=>{
+            ev.stopPropagation();
+            if (!o.MultiLine && ev.key==="Enter") {
+                ev.preventDefault();
+                e.blur();
+                fireLuaSignal(o.FocusLost,true);
+            }
+        });
+        e.addEventListener("keyup",ev=>ev.stopPropagation());
+    } else if (o.ClassName==="ImageLabel" || o.ClassName==="ImageButton") {
+        e=document.createElement("img");
+        e.className="blox-gui-object";
+        e.draggable=false;
+    } else {
+        e=document.createElement("div");
+        e.className="blox-gui-object";
+        if (o.ClassName==="TextLabel" || o.ClassName==="TextButton") e.classList.add("blox-gui-text");
+    }
+
+    if (o.ClassName==="TextButton" || o.ClassName==="ImageButton") {
+        e.classList.add("blox-gui-button");
+    }
+
+    if (o.ClassName!=="ScreenGui") {
+        e.addEventListener("mouseenter",ev=>fireLuaSignal(o.MouseEnter,ev.offsetX||0,ev.offsetY||0));
+        e.addEventListener("mouseleave",ev=>fireLuaSignal(o.MouseLeave,ev.offsetX||0,ev.offsetY||0));
+        e.addEventListener("mousemove",ev=>fireLuaSignal(o.MouseMoved,ev.offsetX||0,ev.offsetY||0));
+    }
+
+    if (o.ClassName==="TextButton" || o.ClassName==="ImageButton") {
+        e.addEventListener("pointerdown",ev=>{
+            ev.preventDefault();ev.stopPropagation();
+            if (ev.button===0) fireLuaSignal(o.MouseButton1Down,ev.offsetX||0,ev.offsetY||0);
+            if (ev.button===2) fireLuaSignal(o.MouseButton2Down,ev.offsetX||0,ev.offsetY||0);
+        });
+        e.addEventListener("pointerup",ev=>{
+            ev.preventDefault();ev.stopPropagation();
+            if (ev.button===0) {
+                fireLuaSignal(o.MouseButton1Up,ev.offsetX||0,ev.offsetY||0);
+                fireLuaSignal(o.MouseButton1Click);
+            }
+            if (ev.button===2) {
+                fireLuaSignal(o.MouseButton2Up,ev.offsetX||0,ev.offsetY||0);
+                fireLuaSignal(o.MouseButton2Click);
+            }
+        });
+        e.addEventListener("contextmenu",ev=>{ev.preventDefault();ev.stopPropagation();});
+    }
+
+    Object.defineProperty(o,"__guiElement",{value:e,writable:true,enumerable:false,configurable:true});
+    return e;
+}
+
+function getGuiDomParent(o) {
+    const p=o?.Parent;
+    if (!p) return null;
+    if (o.ClassName==="ScreenGui") return p===PlayerGuiApi?bloxGuiRoot:null;
+    if (p.ClassName==="ScreenGui" || isA(p,"GuiObject")) return createGuiDomElement(p);
+    return null;
+}
+
+function syncTextGui(o,e) {
+    if (!["TextLabel","TextButton","TextBox"].includes(o.ClassName)) return;
+
+    if (o.ClassName==="TextBox") {
+        if (document.activeElement!==e && e.value!==String(o.Text??"")) e.value=String(o.Text??"");
+    } else e.textContent=String(o.Text??"");
+
+    e.style.color=color3ToCss(o.TextColor3,1-THREE.MathUtils.clamp(Number(o.TextTransparency)||0,0,1));
+    e.style.fontFamily=guiFontFamily(o.Font);
+    e.style.fontWeight=String(o.Font)==="ArialBold"?"bold":"normal";
+    const px=guiFontPx(o.FontSize);
+    e.style.fontSize=`${px}px`;
+
+    const xa=String(o.TextXAlignment);
+    const ya=String(o.TextYAlignment);
+    e.style.justifyContent=xa==="Left"?"flex-start":xa==="Right"?"flex-end":"center";
+    e.style.alignItems=ya==="Top"?"flex-start":ya==="Bottom"?"flex-end":"center";
+
+    const wrapped=Boolean(o.TextWrapped||o.TextWrap);
+    e.style.whiteSpace=wrapped?"normal":"nowrap";
+    e.style.wordBreak=wrapped?"break-word":"normal";
+
+    const sa=1-THREE.MathUtils.clamp(Number(o.TextStrokeTransparency)||0,0,1);
+    if (sa>0.001) {
+        const c=color3ToCss(o.TextStrokeColor3,sa);
+        e.style.textShadow=`-1px 0 ${c},1px 0 ${c},0 -1px ${c},0 1px ${c}`;
+    } else e.style.textShadow="none";
+
+    if (o.TextScaled) e.style.fontSize=`${Math.max(6,Math.floor((e.clientHeight||px)*0.55))}px`;
+
+    o.TextBounds=createVector2(e.scrollWidth||0,e.scrollHeight||0);
+    o.TextFits=e.scrollWidth<=e.clientWidth+1 && e.scrollHeight<=e.clientHeight+1;
+}
+
+function syncImageGui(o,e) {
+    if (!["ImageLabel","ImageButton"].includes(o.ClassName)) return;
+
+    const id=normalizeLocalTextureId(o.Image);
+    if (id!==o.Image) o.Image=id;
+    const path=id?getLocalTexturePath(id):"";
+    if (e.__bloxImagePath!==path) {
+        e.__bloxImagePath=path;
+        if (path) e.src=path;
+        else e.removeAttribute("src");
+    }
+    e.style.objectFit="fill";
+    e.style.opacity=String(1-THREE.MathUtils.clamp(Number(o.ImageTransparency)||0,0,1));
+}
+
+function syncLuaGuiObject(o) {
+    const e=createGuiDomElement(o);
+    if (!e) return;
+    const dp=getGuiDomParent(o);
+
+    if (dp && e.parentNode!==dp) dp.appendChild(e);
+    else if (!dp && e.parentNode) e.remove();
+
+    if (o.ClassName==="ScreenGui") {
+        e.style.display=(o.Enabled!==false && o.Parent===PlayerGuiApi)?"block":"none";
+        return;
+    }
+
+    e.style.display=(o.Visible!==false && dp)?(o.ClassName==="TextBox"?"block":"flex"):"none";
+
+    const pos=udim2Css(o.Position);
+    const size=udim2Css(o.Size);
+    e.style.left=pos.x;e.style.top=pos.y;e.style.width=size.x;e.style.height=size.y;
+    e.style.zIndex=String(Math.trunc(Number(o.ZIndex)||1));
+    e.style.backgroundColor=color3ToCss(o.BackgroundColor3,1-THREE.MathUtils.clamp(Number(o.BackgroundTransparency)||0,0,1));
+
+    const bs=Math.max(0,Math.trunc(Number(o.BorderSizePixel)||0));
+    e.style.border=bs?`${bs}px solid ${color3ToCss(o.BorderColor3,1)}`:"none";
+
+    e.style.pointerEvents=(
+        o.ClassName==="TextButton"||o.ClassName==="ImageButton"||
+        o.ClassName==="TextBox"||o.Active
+    )?"auto":"none";
+
+    if (o.ClassName==="TextBox") {
+        e.rows=o.MultiLine?4:1;
+        e.style.overflowY=o.MultiLine?"auto":"hidden";
+        e.style.userSelect="text";
+    }
+
+    syncTextGui(o,e);
+    syncImageGui(o,e);
+
+    if (e.isConnected) {
+        const r=e.getBoundingClientRect();
+        o.AbsolutePosition=createVector2(r.left,r.top);
+        o.AbsoluteSize=createVector2(r.width,r.height);
+    }
+}
+
+function syncStarterGuiToPlayerGui() {
+    if (typeof StarterGuiApi==="undefined" || typeof PlayerGuiApi==="undefined") return;
+
+    for (const source of getLuaChildren(StarterGuiApi)) {
+        if (source.ClassName!=="ScreenGui" || source.__destroyed) continue;
+        let clone=starterGuiCloneMap.get(source);
+        if (!clone || clone.__destroyed) {
+            clone=cloneLuaInstance(source);
+            if (clone) {
+                clone.Parent=PlayerGuiApi;
+                starterGuiCloneMap.set(source,clone);
+            }
+        }
+    }
+
+    for (const [source,clone] of [...starterGuiCloneMap]) {
+        if (!source || source.__destroyed || source.Parent!==StarterGuiApi) {
+            if (clone && !clone.__destroyed) clone.Destroy();
+            starterGuiCloneMap.delete(source);
+        }
+    }
+}
+
+function resetPlayerGuiFromStarterGui() {
+    if (typeof PlayerGuiApi==="undefined") return;
+    for (const child of [...getLuaChildren(PlayerGuiApi)]) child.Destroy();
+    starterGuiCloneMap.clear();
+}
+
+function syncLuaScreenGuis() {
+    syncStarterGuiToPlayerGui();
+
+    for (const gui of [...luaScreenGuis]) {
+        if (gui && !gui.__destroyed) syncLuaGuiObject(gui);
+    }
+
+    for (const o of [...luaGuiObjects]) {
+        if (!o || o.__destroyed) continue;
+
+        let p=o.Parent,inBillboard=false;
+        while (p) {
+            if (p.ClassName==="BillboardGui"){inBillboard=true;break;}
+            p=p.Parent;
+        }
+
+        if (inBillboard) {
+            o.__guiElement?.remove?.();
+            continue;
+        }
+
+        syncLuaGuiObject(o);
+    }
+}
+
+function disconnectClassicGuiSignals(o) {
+    for (const n of [
+        "MouseEnter","MouseLeave","MouseMoved",
+        "MouseButton1Click","MouseButton1Down","MouseButton1Up",
+        "MouseButton2Click","MouseButton2Down","MouseButton2Up",
+        "Focused","FocusLost"
+    ]) disconnectLuaSignal(o?.[n]);
+}
+
 // ─── BillboardGui + ImageLabel ───────────────────────────────────────────────
 //
 // This is a compact classic billboard implementation. ImageLabel is included
@@ -11797,63 +12490,7 @@ function createLuaBillboardGui() {
 }
 
 function createLuaImageLabel() {
-    const label =
-        finalizeLuaInstance(
-            Mutable({
-                Name:
-                    "ImageLabel",
-
-                ClassName:
-                    "ImageLabel",
-
-                Parent:
-                    null,
-
-                Archivable:
-                    true,
-
-                Image:
-                    "",
-
-                ImageColor3:
-                    createColor3(
-                        1,
-                        1,
-                        1
-                    ),
-
-                ImageTransparency:
-                    0,
-
-                BackgroundTransparency:
-                    1,
-
-                Visible:
-                    true,
-
-                Size:
-                    createUDim2(
-                        1,
-                        0,
-                        1,
-                        0
-                    ),
-
-                Position:
-                    createUDim2(
-                        0,
-                        0,
-                        0,
-                        0
-                    )
-            })
-        );
-
-    luaImageLabels.add(
-        label
-    );
-
-    return label;
+    return createLuaGuiObject("ImageLabel");
 }
 
 function getBillboardImageLabel(gui) {
@@ -11969,6 +12606,111 @@ function udim2ToWorldScale(
     };
 }
 
+
+const billboardGuiCanvasCache=new WeakMap();
+const billboardImageCache=new Map();
+
+function billboardCanvas(gui){
+    let r=billboardGuiCanvasCache.get(gui);
+    if(r)return r;
+    const canvas=document.createElement("canvas");
+    canvas.width=256;canvas.height=256;
+    const texture=new THREE.CanvasTexture(canvas);
+    texture.colorSpace=THREE.SRGBColorSpace;
+    texture.minFilter=THREE.LinearFilter;
+    texture.magFilter=THREE.LinearFilter;
+    r={canvas,texture};
+    billboardGuiCanvasCache.set(gui,r);
+    return r;
+}
+
+function billboardImage(path){
+    if(!path)return null;
+    let r=billboardImageCache.get(path);
+    if(r)return r;
+    const image=new Image();
+    r={image,loaded:false};
+    image.onload=()=>r.loaded=true;
+    image.src=path;
+    billboardImageCache.set(path,r);
+    return r;
+}
+
+function billboardExtended(gui){
+    return getLuaDescendants(gui).some(c=>c && !c.__destroyed && c.ClassName!=="ImageLabel");
+}
+
+function billboardRect(o,p){
+    const pos=o.Position||createUDim2(), size=o.Size||createUDim2(1,0,1,0);
+    return {
+        x:p.x+p.w*(Number(pos.X?.Scale)||0)+(Number(pos.X?.Offset)||0),
+        y:p.y+p.h*(Number(pos.Y?.Scale)||0)+(Number(pos.Y?.Offset)||0),
+        w:Math.max(0,p.w*(Number(size.X?.Scale)||0)+(Number(size.X?.Offset)||0)),
+        h:Math.max(0,p.h*(Number(size.Y?.Scale)||0)+(Number(size.Y?.Offset)||0))
+    };
+}
+
+function drawBillboardGuiObject(ctx,o,parentRect){
+    if(!o||o.__destroyed||o.Visible===false)return;
+    const r=billboardRect(o,parentRect);
+    const ba=1-THREE.MathUtils.clamp(Number(o.BackgroundTransparency)||0,0,1);
+    if(ba>0.001){
+        ctx.fillStyle=color3ToCss(o.BackgroundColor3,ba);
+        ctx.fillRect(r.x,r.y,r.w,r.h);
+    }
+    const bs=Math.max(0,Math.trunc(Number(o.BorderSizePixel)||0));
+    if(bs>0){
+        ctx.strokeStyle=color3ToCss(o.BorderColor3,1);
+        ctx.lineWidth=bs;
+        ctx.strokeRect(r.x+bs/2,r.y+bs/2,Math.max(0,r.w-bs),Math.max(0,r.h-bs));
+    }
+
+    if(o.ClassName==="ImageLabel"||o.ClassName==="ImageButton"){
+        const id=normalizeLocalTextureId(o.Image);
+        const path=id?getLocalTexturePath(id):"";
+        const ir=billboardImage(path);
+        if(ir?.loaded){
+            ctx.save();
+            ctx.globalAlpha=1-THREE.MathUtils.clamp(Number(o.ImageTransparency)||0,0,1);
+            ctx.drawImage(ir.image,r.x,r.y,r.w,r.h);
+            ctx.restore();
+        }
+    }
+
+    if(o.ClassName==="TextLabel"||o.ClassName==="TextButton"||o.ClassName==="TextBox"){
+        ctx.save();
+        const px=guiFontPx(o.FontSize);
+        ctx.font=`${String(o.Font)==="ArialBold"?"bold ":""}${px}px Arial`;
+        ctx.textBaseline="middle";
+        const xa=String(o.TextXAlignment);
+        ctx.textAlign=xa==="Left"?"left":xa==="Right"?"right":"center";
+        const x=xa==="Left"?r.x+2:xa==="Right"?r.x+r.w-2:r.x+r.w/2;
+        ctx.fillStyle=color3ToCss(o.TextColor3,1-THREE.MathUtils.clamp(Number(o.TextTransparency)||0,0,1));
+        ctx.fillText(String(o.Text??""),x,r.y+r.h/2,Math.max(0,r.w-4));
+        ctx.restore();
+    }
+
+    const children=getLuaChildren(o)
+        .filter(c=>isA(c,"GuiObject"))
+        .sort((a,b)=>(Number(a.ZIndex)||1)-(Number(b.ZIndex)||1));
+    for(const c of children)drawBillboardGuiObject(ctx,c,r);
+}
+
+function renderExtendedBillboardGui(gui,material){
+    const rec=billboardCanvas(gui),ctx=rec.canvas.getContext("2d");
+    ctx.clearRect(0,0,rec.canvas.width,rec.canvas.height);
+    const children=getLuaChildren(gui)
+        .filter(c=>isA(c,"GuiObject"))
+        .sort((a,b)=>(Number(a.ZIndex)||1)-(Number(b.ZIndex)||1));
+    for(const c of children)drawBillboardGuiObject(ctx,c,{x:0,y:0,w:rec.canvas.width,h:rec.canvas.height});
+    rec.texture.needsUpdate=true;
+    material.map=rec.texture;
+    material.color.setHex(0xffffff);
+    material.opacity=1;
+    material.needsUpdate=true;
+    return children.length>0;
+}
+
 function syncLuaBillboardGuis() {
     for (
         const gui of
@@ -12003,6 +12745,11 @@ function syncLuaBillboardGuis() {
                 gui
             );
 
+        const hasExtendedGui =
+            billboardExtended(
+                gui
+            );
+
         const worldPosition =
             getBillboardWorldPosition(
                 gui
@@ -12010,12 +12757,55 @@ function syncLuaBillboardGuis() {
 
         if (
             !gui.Enabled ||
-            !image ||
-            image.Visible === false ||
-            !worldPosition
+            !worldPosition ||
+            (
+                !hasExtendedGui &&
+                (
+                    !image ||
+                    image.Visible === false
+                )
+            )
         ) {
             sprite.visible =
                 false;
+
+            continue;
+        }
+
+        if (hasExtendedGui) {
+            const rendered =
+                renderExtendedBillboardGui(
+                    gui,
+                    material
+                );
+
+            material.depthTest =
+                !Boolean(
+                    gui.AlwaysOnTop
+                );
+
+            sprite.renderOrder =
+                gui.AlwaysOnTop
+                    ? 100
+                    : 4;
+
+            sprite.position.copy(
+                worldPosition
+            );
+
+            const scale =
+                udim2ToWorldScale(
+                    gui.Size
+                );
+
+            sprite.scale.set(
+                scale.x,
+                scale.y,
+                1
+            );
+
+            sprite.visible =
+                rendered;
 
             continue;
         }
@@ -15829,6 +16619,22 @@ const InstanceApi = Mutable({
             instance =
                 createLuaParticleEmitter();
         } else if (
+            className === "ScreenGui"
+        ) {
+            instance =
+                createLuaScreenGui();
+        } else if (
+            className === "Frame" ||
+            className === "TextLabel" ||
+            className === "TextButton" ||
+            className === "TextBox" ||
+            className === "ImageButton"
+        ) {
+            instance =
+                createLuaGuiObject(
+                    className
+                );
+        } else if (
             className === "BillboardGui"
         ) {
             instance =
@@ -16798,7 +17604,77 @@ workspaceApi.GetPartBoundsInBox =
 const CLASSIC_WAIT_QUANTUM = 1 / 30;
 
 // Timestamp used by time()/elapsedTime().
+
 const SCRIPT_RUNTIME_START_MS = performance.now();
+
+// Bridge populated by the pure-Luau scheduler in CLASSIC_DATATYPE_BOOTSTRAP.
+// JS never resumes a suspended user callback directly; it only calls the
+// scheduler's short-lived Dispatch/Tick entrypoints.
+const LuaSchedulerBridge = Mutable({
+    Dispatch: null,
+    Tick: null
+});
+
+let luaSchedulerTickQueued = false;
+
+function dispatchLuaCallbackThroughScheduler(
+    callback,
+    args = []
+) {
+    const dispatch =
+        LuaSchedulerBridge.Dispatch;
+
+    if (
+        typeof dispatch ===
+        "function"
+    ) {
+        return dispatch(
+            callback,
+            ...args
+        );
+    }
+
+    // Bootstrap/main-chunk fallback. Normally no user signal is connected
+    // before the scheduler bridge is installed.
+    return callback(
+        ...args
+    );
+}
+
+function tickLuaCoroutineScheduler() {
+    const tick =
+        LuaSchedulerBridge.Tick;
+
+    if (
+        typeof tick !==
+            "function" ||
+        luaSchedulerTickQueued
+    ) {
+        return;
+    }
+
+    luaSchedulerTickQueued =
+        true;
+
+    runLuaVmSerialized(
+        "Luau coroutine scheduler tick",
+        () =>
+            tick(
+                classicTick()
+            )
+    )
+        .catch(error => {
+            console.error(
+                "[Lua Scheduler]",
+                error
+            );
+        })
+        .finally(() => {
+            luaSchedulerTickQueued =
+                false;
+        });
+}
+
 
 function normalizeWaitSeconds(value, defaultSeconds = CLASSIC_WAIT_QUANTUM) {
     const n = Number(value);
@@ -17454,6 +18330,23 @@ const localPlayerApi = Mutable({
 
 });
 
+const PlayerGuiApi =
+    finalizeLuaInstance(
+        Mutable({
+            Name: "PlayerGui",
+            ClassName: "PlayerGui",
+            Parent: localPlayerApi,
+            Archivable: false
+        })
+    );
+
+localPlayerApi.PlayerGui =
+    PlayerGuiApi;
+
+refreshChildAliases(
+    localPlayerApi
+);
+
 
 const MouseApi =
     addCommonInstanceApi(
@@ -17542,6 +18435,12 @@ function updateMouseRay() {
 
     const raycaster =
         new THREE.Raycaster();
+
+    // Script/mouse picking only ever considers normal world layer 0.
+    // Engine-only click markers live on layer 31.
+    raycaster.layers.set(
+        0
+    );
 
     raycaster.setFromCamera(
         ndc,
@@ -17778,10 +18677,13 @@ function fireContextActions(
             runLuaVmSerialized(
                 `ContextActionService.${name}`,
                 () =>
-                    binding.callback(
-                        name,
-                        state,
-                        inputObject
+                    dispatchLuaCallbackThroughScheduler(
+                        binding.callback,
+                        [
+                            name,
+                            state,
+                            inputObject
+                        ]
                     )
             ).catch(error => {
                 console.error(
@@ -18058,6 +18960,55 @@ const EnumApi = Mutable({
     ExplosionType: Mutable({
         Craters: "Craters",
         NoCraters: "NoCraters"
+    }),
+
+    Font: Mutable({
+        Legacy: "Legacy",
+        Arial: "Arial",
+        ArialBold: "ArialBold"
+    }),
+
+    FontSize: Mutable({
+        Size8: "Size8", Size9: "Size9", Size10: "Size10",
+        Size11: "Size11", Size12: "Size12", Size14: "Size14",
+        Size18: "Size18", Size24: "Size24", Size36: "Size36",
+        Size48: "Size48"
+    }),
+
+    TextXAlignment: Mutable({
+        Left: "Left", Center: "Center", Right: "Right"
+    }),
+
+    TextYAlignment: Mutable({
+        Top: "Top", Center: "Center", Bottom: "Bottom"
+    }),
+
+    FrameStyle: Mutable({
+        Custom: "Custom",
+        ChatBlue: "ChatBlue",
+        RobloxSquare: "RobloxSquare",
+        RobloxRound: "RobloxRound"
+    }),
+
+    ButtonStyle: Mutable({
+        Custom: "Custom",
+        RobloxButton: "RobloxButton",
+        RobloxRoundButton: "RobloxRoundButton",
+        RobloxRoundDropdownButton: "RobloxRoundDropdownButton"
+    }),
+
+    SizeConstraint: Mutable({
+        RelativeXY: "RelativeXY",
+        RelativeXX: "RelativeXX",
+        RelativeYY: "RelativeYY"
+    }),
+
+    EasingDirection: Mutable({
+        In: "In", Out: "Out", InOut: "InOut"
+    }),
+
+    EasingStyle: Mutable({
+        Linear: "Linear", Sine: "Sine", Quad: "Quad"
     })
 });
 
@@ -18988,6 +19939,282 @@ local HostInstance = Instance
 local HostGame = game
 local HostIpairs = ipairs
 local HostPairs = pairs
+local HostTick = tick
+local HostWarn = warn
+local BloxSchedulerBridge = __BloxSchedulerBridge
+
+-- ---------------------------------------------------------------------------
+-- Cooperative Roblox-style thread scheduler
+-- ---------------------------------------------------------------------------
+-- luau-web does NOT safely support parallel JS -> Lua calls into one LuauState.
+-- Therefore wait/spawn/delay/task are implemented entirely with native Luau
+-- coroutines. A coroutine yields back to this scheduler at wait(), leaving the
+-- WASM state completely idle so mouse/UIS/other event callbacks can run.
+local scheduledThreads = {}
+local schedulerSequence = 0
+local DEFAULT_WAIT = 1 / 30
+
+local function schedulerNow()
+    return HostTick()
+end
+
+local function scheduleThread(thread, wakeTime, sequence)
+    schedulerSequence = schedulerSequence + 1
+
+    scheduledThreads[#scheduledThreads + 1] = {
+        Thread = thread,
+        WakeTime = wakeTime or schedulerNow(),
+        Sequence = sequence or schedulerSequence
+    }
+
+    return thread
+end
+
+local function reportThreadError(message)
+    HostWarn("[Blox Scheduler] " .. tostring(message))
+end
+
+local function resumeManagedThread(thread, ...)
+    if coroutine.status(thread) == "dead" then
+        return
+    end
+
+    local ok, yielded =
+        coroutine.resume(
+            thread,
+            ...
+        )
+
+    if not ok then
+        reportThreadError(yielded)
+        return
+    end
+
+    if coroutine.status(thread) == "dead" then
+        return
+    end
+
+    local seconds = 0
+
+    if type(yielded) == "table"
+       and yielded.__bloxWait == true then
+
+        seconds =
+            tonumber(yielded.Seconds)
+            or DEFAULT_WAIT
+
+    elseif type(yielded) == "number" then
+        seconds = yielded
+    end
+
+    if seconds < 0 then
+        seconds = 0
+    end
+
+    scheduleThread(
+        thread,
+        schedulerNow() + seconds
+    )
+end
+
+local function wait(seconds)
+    seconds =
+        tonumber(seconds)
+        or DEFAULT_WAIT
+
+    if seconds < 0 then
+        seconds = 0
+    end
+
+    local started =
+        schedulerNow()
+
+    coroutine.yield({
+        __bloxWait = true,
+        Seconds = seconds
+    })
+
+    return schedulerNow() - started
+end
+
+local function spawn(callback)
+    if type(callback) ~= "function" then
+        error("spawn expected a function", 2)
+    end
+
+    local thread =
+        coroutine.create(
+            callback
+        )
+
+    -- Roblox spawn is deferred; do not execute the function inline.
+    return scheduleThread(
+        thread,
+        schedulerNow()
+    )
+end
+
+local function delay(seconds, callback)
+    if type(callback) ~= "function" then
+        error("delay expected a function", 2)
+    end
+
+    seconds =
+        tonumber(seconds)
+        or 0
+
+    if seconds < 0 then
+        seconds = 0
+    end
+
+    local thread =
+        coroutine.create(
+            callback
+        )
+
+    return scheduleThread(
+        thread,
+        schedulerNow() + seconds
+    )
+end
+
+local task = {}
+
+task.wait = wait
+task.spawn = spawn
+
+task.defer = function(callback, ...)
+    if type(callback) ~= "function" then
+        error("task.defer expected a function", 2)
+    end
+
+    local packed = table.pack(...)
+    local thread = coroutine.create(function()
+        callback(table.unpack(packed, 1, packed.n))
+    end)
+
+    return scheduleThread(
+        thread,
+        schedulerNow()
+    )
+end
+
+task.delay = function(seconds, callback, ...)
+    if type(callback) ~= "function" then
+        error("task.delay expected a function", 2)
+    end
+
+    local packed = table.pack(...)
+    local thread = coroutine.create(function()
+        callback(table.unpack(packed, 1, packed.n))
+    end)
+
+    seconds =
+        tonumber(seconds)
+        or 0
+
+    if seconds < 0 then
+        seconds = 0
+    end
+
+    return scheduleThread(
+        thread,
+        schedulerNow() + seconds
+    )
+end
+
+task.cancel = function(thread)
+    for i = #scheduledThreads, 1, -1 do
+        if scheduledThreads[i].Thread == thread then
+            table.remove(
+                scheduledThreads,
+                i
+            )
+        end
+    end
+
+    if coroutine.close
+       and coroutine.status(thread) ~= "dead" then
+        pcall(
+            coroutine.close,
+            thread
+        )
+    end
+end
+
+local function schedulerDispatch(callback, ...)
+    if type(callback) ~= "function" then
+        return false
+    end
+
+    local thread =
+        coroutine.create(
+            callback
+        )
+
+    -- Event callbacks begin immediately, matching Roblox signals. If the
+    -- callback calls wait(), resumeManagedThread stores the suspended coroutine
+    -- and returns to JS immediately.
+    resumeManagedThread(
+        thread,
+        ...
+    )
+
+    return true
+end
+
+local function schedulerTick(now)
+    now =
+        tonumber(now)
+        or schedulerNow()
+
+    if #scheduledThreads == 0 then
+        return 0
+    end
+
+    local due = {}
+    local remaining = {}
+
+    for i = 1, #scheduledThreads do
+        local item =
+            scheduledThreads[i]
+
+        if item.WakeTime <= now then
+            due[#due + 1] = item
+        else
+            remaining[#remaining + 1] = item
+        end
+    end
+
+    scheduledThreads = remaining
+
+    table.sort(
+        due,
+        function(a, b)
+            if a.WakeTime == b.WakeTime then
+                return a.Sequence < b.Sequence
+            end
+
+            return a.WakeTime < b.WakeTime
+        end
+    )
+
+    for i = 1, #due do
+        resumeManagedThread(
+            due[i].Thread
+        )
+    end
+
+    return #due
+end
+
+-- Export only two short-lived VM entrypoints back to JavaScript.
+-- They never remain suspended on a Promise.
+BloxSchedulerBridge.Dispatch =
+    schedulerDispatch
+
+BloxSchedulerBridge.Tick =
+    schedulerTick
 
 -- Yieldable protected-call compatibility used by many old Roblox scripts.
 -- luau-web already supplies pcall; for this emulator ypcall is the classic alias.
@@ -19497,6 +20724,7 @@ async function executeLuauScript() {
                 Instance: InstanceApi,
 
                 Vector3: Vector3Api,
+                Vector2: Vector2Api,
 
                 CFrame: CFrameApi,
 
@@ -19522,7 +20750,12 @@ async function executeLuauScript() {
                 UserInputService: UserInputServiceApi,
                 ContextActionService: ContextActionServiceApi,
 
-                // Yielding + scheduling.
+                // Pure-Luau coroutine scheduler bridge.
+                __BloxSchedulerBridge: LuaSchedulerBridge,
+
+                // Host versions remain available only as bootstrap inputs.
+                // CLASSIC_DATATYPE_BOOTSTRAP shadows these with native Luau
+                // coroutine-based wait/spawn/delay/task implementations.
                 wait: classicWait,
                 spawn: classicSpawn,
                 delay: classicDelay,
@@ -19576,7 +20809,7 @@ async function executeLuauScript() {
         console.log(
             "[Phase 1] Core scripting ready:",
             "native Luau control flow/functions/coroutines/math/string/table;",
-            "stable serialized wait/spawn/delay/task + bounded/coalesced RunService frame events."
+            "native coroutine-scheduled wait/spawn/delay/task + serialized JS→Luau entry + bounded/coalesced RunService frame events."
         );
 
     } catch (error) {
@@ -24785,6 +26018,15 @@ const CLASSIC_CLICK_MARKER_SIZE_X = 2;
 const CLASSIC_CLICK_MARKER_SIZE_Y = 0.1;
 const CLASSIC_CLICK_MARKER_SIZE_Z = 2;
 
+// Dedicated Three.js layer reserved for engine-only click markers.
+// Ordinary Raycaster instances remain on layer 0 and therefore cannot hit it.
+const CLASSIC_CLICK_MARKER_RENDER_LAYER = 31;
+
+// Keep the marker visible to the actual game camera.
+camera.layers.enable(
+    CLASSIC_CLICK_MARKER_RENDER_LAYER
+);
+
 const classicClickMove = {
     active: false,
     destination: new THREE.Vector3()
@@ -24820,6 +26062,25 @@ function createClassicClickCylinder() {
 
     // Dedicated visual marker: not part of Lua/Rapier/physObjects.
     marker.userData.bloxPersistentClickMarker = true;
+    marker.userData.bloxIgnoreMouseRay = true;
+
+    // Engine-only visual. Keep rendering/depth exactly as-is while making all
+    // THREE.Raycaster instances pass through the cylinder.
+    marker.raycast = () => {};
+
+    // Put click-to-move markers on a rendering-only Three.js layer.
+    //
+    // - Camera explicitly renders this layer, so the green cylinders stay visible.
+    // - THREE.Raycaster defaults to layer 0, so normal visual/picking rays can
+    //   never hit these markers.
+    // - Rapier/Luau rays already ignore them because the cylinders have no
+    //   collider and are not Lua BaseParts.
+    //
+    // This is cleaner than disabling marker.raycast() or depthWrite, both of
+    // which can interfere with how the marker itself is displayed.
+    marker.layers.set(
+        CLASSIC_CLICK_MARKER_RENDER_LAYER
+    );
 
     scene.add(marker);
 
@@ -24916,9 +26177,21 @@ function updateClassicClickMoveMarkers() {
 
 
 // ─── Input ───────────────────────────────────────────────────────────────────
+window.__bloxInputDebug = {
+    keydown: 0,
+    keyup: 0,
+    mousedown: 0,
+    mouseup: 0,
+    mousemove: 0,
+    lastKeyCode: null,
+    lastMouseButton: null
+};
+
 const keys = { w: false, a: false, s: false, d: false, space: false };
 
 window.addEventListener("keydown", e => {
+    window.__bloxInputDebug.keydown++;
+    window.__bloxInputDebug.lastKeyCode = e.code;
     switch (e.code) {
         case "KeyW":   keys.w     = true;  break;
         case "KeyA":   keys.a     = true;  break;
@@ -24964,6 +26237,8 @@ window.addEventListener("keydown", e => {
     );
 });
 window.addEventListener("keyup", e => {
+    window.__bloxInputDebug.keyup++;
+    window.__bloxInputDebug.lastKeyCode = e.code;
     switch (e.code) {
         case "KeyW":   keys.w     = false; break;
         case "KeyA":   keys.a     = false; break;
@@ -25015,6 +26290,7 @@ window.addEventListener("keyup", e => {
 canvas.addEventListener(
     "mousemove",
     e => {
+        window.__bloxInputDebug.mousemove++;
         MouseApi.X = e.clientX;
         MouseApi.Y = e.clientY;
 
@@ -25049,6 +26325,8 @@ canvas.addEventListener(
 canvas.addEventListener(
     "mousedown",
     e => {
+        window.__bloxInputDebug.mousedown++;
+        window.__bloxInputDebug.lastMouseButton = e.button;
         MouseApi.X = e.clientX;
         MouseApi.Y = e.clientY;
 
@@ -25081,9 +26359,10 @@ canvas.addEventListener(
         );
 
         if (e.button === 0) {
-            fireLuaSignal(
-                MouseApi.Button1Down
-            );
+            // Snapshot Mouse.Target at the exact physical click. This guarantees
+            // click-to-move's visual cylinder can never change what a queued Lua
+            // Mouse.Button1Down callback observes.
+            fireMouseButton1DownWithSnapshot();
 
             const clickDetectorActivated =
                 fireClickDetectorsForCurrentTarget();
@@ -25107,6 +26386,8 @@ canvas.addEventListener(
 canvas.addEventListener(
     "mouseup",
     e => {
+        window.__bloxInputDebug.mouseup++;
+        window.__bloxInputDebug.lastMouseButton = e.button;
         const type =
             e.button === 0
                 ? "MouseButton1"
@@ -25391,7 +26672,7 @@ function makeCharacterMaterialSet(w, d, color) {
     const bottomMat =
         new THREE.MeshStandardMaterial({
             map: loadTex(
-                "Textures/bottom-stud.jpeg",
+                "Textures/bottom-stud.jpg",
                 w,
                 d
             ),
@@ -26565,6 +27846,8 @@ function scheduleCharacterRespawn() {
 function rebuildLocalPlayerCharacter(
     playSpawn = true
 ) {
+    resetPlayerGuiFromStarterGui();
+
     if (characterRespawnTimer) {
         clearTimeout(
             characterRespawnTimer
@@ -29366,6 +30649,7 @@ function animate() {
 
     // Scripted visual effects.
     syncLuaDecals();
+    syncLuaScreenGuis();
     syncLuaBillboardGuis();
     syncLuaParticleEmitters(delta);
     syncLuaSparkles(delta);
@@ -29415,6 +30699,11 @@ function animate() {
     // Keep Mouse.Hit/Target live even while the cursor is stationary and
     // objects move beneath it.
     updateMouseRay();
+
+    // Resume any Luau coroutines whose wait()/delay() has expired.
+    // The scheduler itself completes synchronously; no suspended JS Promise
+    // remains inside the LuauState.
+    tickLuaCoroutineScheduler();
 
     // Heartbeat runs after physics/update and receives delta time.
     fireLuaSignal(
