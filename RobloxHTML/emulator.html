@@ -25515,6 +25515,10 @@ const CAM = {
     firstPerson: false,
 };
 
+// Classic discrete arrow-key camera steps.
+const CAMERA_ARROW_YAW_STEP = THREE.MathUtils.degToRad(15);
+const CAMERA_ARROW_PITCH_STEP = THREE.MathUtils.degToRad(10);
+
 // First person now begins only when the camera is almost touching the
 // outside of the head instead of several studs away.
 const FIRST_PERSON_ZOOM_DISTANCE = 0.60;
@@ -25843,6 +25847,46 @@ window.addEventListener("keydown", e => {
         case "KeyS":   keys.s     = true;  break;
         case "KeyD":   keys.d     = true;  break;
         case "Space":  keys.space = true;  e.preventDefault(); break;
+
+        case "ArrowLeft":
+            if (!e.repeat) {
+                CAM.yaw += CAMERA_ARROW_YAW_STEP;
+                playZoomSound();
+            }
+            e.preventDefault();
+            break;
+
+        case "ArrowRight":
+            if (!e.repeat) {
+                CAM.yaw -= CAMERA_ARROW_YAW_STEP;
+                playZoomSound();
+            }
+            e.preventDefault();
+            break;
+
+        case "ArrowUp":
+            if (!e.repeat) {
+                CAM.pitch = THREE.MathUtils.clamp(
+                    CAM.pitch - CAMERA_ARROW_PITCH_STEP,
+                    -1,
+                    Math.PI / 2 - 0.08
+                );
+                playZoomSound();
+            }
+            e.preventDefault();
+            break;
+
+        case "ArrowDown":
+            if (!e.repeat) {
+                CAM.pitch = THREE.MathUtils.clamp(
+                    CAM.pitch + CAMERA_ARROW_PITCH_STEP,
+                    -1,
+                    Math.PI / 2 - 0.08
+                );
+                playZoomSound();
+            }
+            e.preventDefault();
+            break;
     }
 
     const keyCode =
