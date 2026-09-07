@@ -828,8 +828,11 @@ class Scheduler {
         return task;
     }
     sleepTask(task, seconds) {
+        const duration = Math.max(0, Number(seconds) || 0);
         task.state = "sleeping";
-        task.wakeTime = nowSeconds() + Math.max(0, Number(seconds) || 0);
+        task.sleepStarted = nowSeconds();
+        task.sleepSeconds = duration;
+        task.wakeTime = task.sleepStarted + duration;
         this.sleeping.push(task);
     }
     waitSignal(task, signal) {
@@ -944,6 +947,18 @@ class Scheduler {
         }
     }
     tick(now = nowSeconds()) {
+        // Sleeping tasks are scheduled from performance.now()-style monotonic
+        // seconds. Some legacy HTML code passes classic tick() here, which is
+        // Date.now()/1000 (Unix epoch seconds). Never compare those two clock
+        // domains directly or every wait() becomes due on the next frame.
+        const monotonicNow = nowSeconds();
+        const requestedNow = Number(now);
+        now =
+            Number.isFinite(requestedNow) &&
+            Math.abs(requestedNow - monotonicNow) < 365 * 24 * 60 * 60
+                ? requestedNow
+                : monotonicNow;
+
         const due = [];
         const remaining = [];
         for (const task of this.sleeping) {
@@ -1099,7 +1114,12 @@ class InterpreterRuntime {
         const bridge = initialEnv?.__BloxSchedulerBridge;
         if (bridge && typeof bridge === "object") {
             bridge.Dispatch = (callback, ...args) => this.dispatchExternal(callback, args, "host signal");
-            bridge.Tick = (now) => this.scheduler.tick(Number(now) || nowSeconds());
+            // IMPORTANT: all scheduler wake times are measured with nowSeconds(),
+            // which is based on performance.now() in the browser. The HTML host's
+            // classic tick() returns Unix/epoch seconds (Date.now()/1000), so using
+            // that value here makes every sleeping thread appear instantly overdue.
+            // Keep the scheduler entirely on its own monotonic clock.
+            bridge.Tick = () => this.scheduler.tick(nowSeconds());
             bridge.RunServicePhase = (phase, ...args) => {
                 const signal = this.runService[phase];
                 if (signal instanceof RuntimeSignal) { signal.fire(...args); return true; }
@@ -1563,8 +1583,8 @@ function getLuauRuntimeInfo() {
         imports: 0,
         asyncify: false,
         jspi: false,
-        version: "0.3.1-classic",
-        runtimeId: "BLOX_PURE_JS_VM_031",
+        version: "0.3.2-classic-waitfix",
+        runtimeId: "BLOX_PURE_JS_VM_032_WAITFIX",
     };
 }
 
