@@ -1412,7 +1412,7 @@ class BloxClassicWebGLRenderer {
 
     _meshVertexShader() {
         return `#version 300 es
-precision mediump float;
+precision highp float;
 
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
@@ -1432,17 +1432,6 @@ uniform float uShininess;
 uniform float uSpecularStrength;
 uniform mat4 uLightViewProjection;
 
-// Player-only shadow map.
-//
-// Unlike the previous version, visibility is evaluated here PER VERTEX and is
-// interpolated across the triangle. This intentionally gives the shadow the
-// same Gouraud-era character as the rest of the lighting.
-uniform float uShadowEnabled;
-uniform sampler2D uShadowMap;
-uniform vec2 uShadowTexelSize;
-uniform float uShadowBias;
-uniform float uShadowStrength;
-
 out vec2 vUv;
 out vec3 vAmbient;
 out vec3 vDirect;
@@ -1450,291 +1439,100 @@ out float vSpecular;
 out vec3 vWorldPosition;
 out vec4 vShadowPosition;
 
-// IMPORTANT FOR WEBGL/ANGLE PORTABILITY:
-// Do NOT sample uShadowMap in the vertex shader. Some browser/GPU/ANGLE paths
-// can compile the shader but then lose the WebGL context while linking a program
-// that performs multiple vertex-stage texture fetches. We still keep all classic
-// ambient/diffuse/specular lighting Gouraud/per-vertex; only the depth comparison
-// is deferred to the fragment shader.
-
 void main() {
-    vec4 world =
-        uModel *
-        vec4(
-            aPosition,
-            1.0
-        );
+    vec4 world = uModel * vec4(aPosition, 1.0);
+    vec3 worldPos = world.xyz;
 
-    vWorldPosition =
-        world.xyz;
-
-    vUv =
-        aUv;
-
-    vec4 shadowPosition =
-        uLightViewProjection *
-        world;
+    vUv = aUv;
+    vWorldPosition = worldPos;
+    vShadowPosition = uLightViewProjection * world;
 
     if (uLit > 0.5) {
-        vec3 N =
-            normalize(
-                uNormalMatrix *
-                aNormal
-            );
+        vec3 N = normalize(uNormalMatrix * aNormal);
+        vec3 L = normalize(uSunDirection);
+        vec3 V = normalize(uCameraPosition - worldPos);
 
-        // Only a small top/bottom ambient difference is retained. Classic
-        // Lighting.Ambient ~= OutdoorAmbient therefore looks almost flat.
-        float hemi =
-            clamp(
-                N.y *
-                    0.18 +
-                    0.50,
-                0.0,
-                1.0
-            );
+        float hemi = clamp(N.y * 0.18 + 0.50, 0.0, 1.0);
+        vAmbient = mix(uAmbientColor, uOutdoorAmbient, hemi);
 
-        vAmbient =
-            mix(
-                uAmbientColor,
-                uOutdoorAmbient,
-                hemi
-            );
+        float ndl = max(dot(N, L), 0.0);
+        vDirect = uSunColor * (ndl * uSunStrength);
 
-        float ndl =
-            max(
-                dot(
-                    N,
-                    normalize(
-                        uSunDirection
-                    )
-                ),
-                0.0
-            );
-
-        vDirect =
-            uSunColor *
-            (
-                ndl *
-                uSunStrength
-            );
-
-        // Phong-family highlight evaluated PER VERTEX. With low-poly
-        // primitives this intentionally smears/interpolates across the face.
-        vec3 V =
-            normalize(
-                uCameraPosition -
-                world.xyz
-            );
-
-        vec3 H =
-            normalize(
-                normalize(
-                    uSunDirection
-                ) +
-                V
-            );
-
-        float ndh =
-            max(
-                dot(
-                    N,
-                    H
-                ),
-                0.0
-            );
-
+        // ANGLE-safe classic broad specular: polynomial only, no dynamic pow().
+        vec3 H = normalize(L + V);
+        float ndh = max(dot(N, H), 0.0);
+        float ndh2 = ndh * ndh;
+        float spec4 = ndh2 * ndh2;
+        float spec8 = spec4 * spec4;
+        float glossMix = clamp((uShininess - 4.0) / 20.0, 0.0, 1.0);
         float classicSpecular =
-            pow(
-                ndh,
-                max(
-                    1.0,
-                    uShininess
-                )
-            ) *
+            mix(spec4, spec8, glossMix) *
             uSpecularStrength *
             uSunStrength;
 
-        // Old Roblox baseplates often showed a long stretched sun streak rather
-        // than a compact circular hotspot. Preserve the broad classic highlight,
-        // then add a planar reflection streak on upward-facing surfaces.
-        vec3 reflected =
-            normalize(
-                reflect(
-                    -normalize(
-                        uSunDirection
-                    ),
-                    N
-                )
-            );
+        // Long old-client-style top-face sun streak.
+        // This intentionally avoids reflect(), cross(), fractional pow(), and
+        // vertex-stage texture reads because those combinations can trip some
+        // Chromium/ANGLE GPU drivers during shader linking.
+        float topFace = clamp(N.y, 0.0, 1.0);
+        topFace = topFace * topFace;
 
-        vec3 reflectedPlanar =
-            reflected -
-            N *
-                dot(
-                    reflected,
-                    N
-                );
+        vec2 sunXZ = L.xz;
+        vec2 viewXZ = V.xz;
 
-        vec3 viewPlanar =
-            V -
-            N *
-                dot(
-                    V,
-                    N
-                );
+        float sunLen2 = max(dot(sunXZ, sunXZ), 0.00001);
+        float viewLen2 = max(dot(viewXZ, viewXZ), 0.00001);
 
-        float topFaceMask =
-            pow(
-                max(
-                    N.y,
-                    0.0
-                ),
-                2.1
-            );
+        sunXZ *= inversesqrt(sunLen2);
+        viewXZ *= inversesqrt(viewLen2);
+
+        float along = max(dot(viewXZ, sunXZ), 0.0);
+        float across = abs(
+            viewXZ.x * sunXZ.y -
+            viewXZ.y * sunXZ.x
+        );
+
+        float width = clamp(1.0 - across, 0.0, 1.0);
+        float width2 = width * width;
+        float width4 = width2 * width2;
+
+        // A thick core + broad feather, tuned from the previous streak.
+        float streakCore =
+            width4 *
+            (0.35 + 0.65 * along) *
+            (0.30 + 0.70 * ndh);
+
+        float streakFeather =
+            width2 *
+            (0.20 + 0.80 * along) *
+            0.20;
 
         float streakSpecular =
-            0.0;
+            (streakCore + streakFeather) *
+            uSpecularStrength *
+            uSunStrength *
+            0.42 *
+            topFace;
 
-        float reflectedPlanarLength =
-            length(
-                reflectedPlanar
-            );
-
-        float viewPlanarLength =
-            length(
-                viewPlanar
-            );
-
-        if (
-            reflectedPlanarLength >
-                0.0001 &&
-            viewPlanarLength >
-                0.0001 &&
-            topFaceMask >
-                0.001
-        ) {
-            reflectedPlanar /=
-                reflectedPlanarLength;
-
-            viewPlanar /=
-                viewPlanarLength;
-
-            vec3 streakAcrossDirection =
-                normalize(
-                    cross(
-                        N,
-                        reflectedPlanar
-                    )
-                );
-
-            float streakAlong =
-                max(
-                    dot(
-                        viewPlanar,
-                        reflectedPlanar
-                    ),
-                    0.0
-                );
-
-            float streakAcross =
-                abs(
-                    dot(
-                        viewPlanar,
-                        streakAcrossDirection
-                    )
-                );
-
-            // Build an anisotropic highlight: narrow across the band, much more
-            // permissive along the band. This gives the old stretched baseplate
-            // sun streak rather than a compact circular hotspot.
-            float streakCore =
-                pow(
-                    max(
-                        1.0 -
-                            streakAcross,
-                        0.0
-                    ),
-                    5.0
-                ) *
-                pow(
-                    streakAlong,
-                    0.95
-                ) *
-                pow(
-                    ndh,
-                    0.42
-                );
-
-            float streakFeather =
-                pow(
-                    max(
-                        1.0 -
-                            streakAcross,
-                        0.0
-                    ),
-                    6.0
-                ) *
-                pow(
-                    streakAlong,
-                    0.55
-                ) *
-                pow(
-                    ndh,
-                    0.18
-                ) *
-                0.28;
-
-            // Slightly dimmer classic sun streak: preserve the elongated shape
-            // while reducing the washed-out white intensity.
-            streakSpecular =
-                (
-                    streakCore +
-                    streakFeather
-                ) *
-                uSpecularStrength *
-                uSunStrength *
-                0.5 *
-                topFaceMask;
-        }
-
-        // Damp the circular classic hotspot on strongly upward-facing surfaces
-        // so the anisotropic streak becomes the dominant baseplate highlight.
-        float classicSpecularFade =
+        // Suppress the circular hotspot on upward-facing surfaces.
+        float classicFade =
             mix(
                 1.0,
-                0.28,
-                topFaceMask
+                0.30,
+                topFace
             );
 
         vSpecular =
             classicSpecular *
-            classicSpecularFade +
+            classicFade +
             streakSpecular;
-
-        vShadowPosition =
-            shadowPosition;
     } else {
-        vAmbient =
-            vec3(1.0);
-
-        vDirect =
-            vec3(0.0);
-
-        vSpecular =
-            0.0;
-
-        vShadowPosition =
-            vec4(
-                0.0,
-                0.0,
-                0.0,
-                1.0
-            );
+        vAmbient = vec3(1.0);
+        vDirect = vec3(0.0);
+        vSpecular = 0.0;
     }
 
-    gl_Position =
-        uViewProjection *
-        world;
+    gl_Position = uViewProjection * world;
 }`;
     }
 
@@ -1768,13 +1566,12 @@ uniform float uRetroGrade;
 
 uniform float uShadowEnabled;
 uniform sampler2D uShadowMap;
-uniform vec2 uShadowTexelSize;
 uniform float uShadowBias;
 uniform float uShadowStrength;
 
 out vec4 outColor;
 
-float samplePlayerShadowPortable() {
+float samplePlayerShadowSafe() {
     if (
         uShadowEnabled < 0.5 ||
         uLit < 0.5
@@ -1784,14 +1581,9 @@ float samplePlayerShadowPortable() {
 
     vec3 p =
         vShadowPosition.xyz /
-        max(
-            vShadowPosition.w,
-            0.00001
-        );
+        max(vShadowPosition.w, 0.00001);
 
-    p =
-        p * 0.5 +
-        0.5;
+    p = p * 0.5 + 0.5;
 
     if (
         p.x <= 0.0 ||
@@ -1804,78 +1596,31 @@ float samplePlayerShadowPortable() {
         return 1.0;
     }
 
-    float receiver =
-        p.z -
-        uShadowBias;
+    float stored = texture(uShadowMap, p.xy).r;
+    float receiver = p.z - uShadowBias;
 
-    // Conventional 5-tap cross PCF. This keeps the shadow edge lightly softened
-    // while avoiding the 9 vertex-texture fetches that can upset some ANGLE/GPU
-    // combinations.
-    float visible =
-        0.0;
-
-    float center =
-        texture(
-            uShadowMap,
-            p.xy
-        ).r;
-
-    visible +=
-        receiver <= center
+    float rawVisibility =
+        receiver <= stored
             ? 1.0
             : 0.0;
 
-    vec2 dx =
-        vec2(
-            uShadowTexelSize.x * 0.65,
-            0.0
-        );
-
-    vec2 dy =
-        vec2(
-            0.0,
-            uShadowTexelSize.y * 0.65
-        );
-
-    float s0 = texture(uShadowMap, p.xy + dx).r;
-    float s1 = texture(uShadowMap, p.xy - dx).r;
-    float s2 = texture(uShadowMap, p.xy + dy).r;
-    float s3 = texture(uShadowMap, p.xy - dy).r;
-
-    visible += receiver <= s0 ? 1.0 : 0.0;
-    visible += receiver <= s1 ? 1.0 : 0.0;
-    visible += receiver <= s2 ? 1.0 : 0.0;
-    visible += receiver <= s3 ? 1.0 : 0.0;
-
-    float rawVisibility =
-        visible /
-        5.0;
-
+    // Keep the classic light-gray shadow instead of a black cutout.
     return mix(
         1.0,
         rawVisibility,
-        clamp(
-            uShadowStrength,
-            0.0,
-            1.0
-        )
+        clamp(uShadowStrength, 0.0, 1.0)
     );
 }
 
 void main() {
-    vec4 texel =
-        vec4(1.0);
+    vec4 texel = vec4(1.0);
 
-    if (
-        uUseTexture >
-        0.5
-    ) {
+    if (uUseTexture > 0.5) {
         texel =
             texture(
                 uMap,
-                vUv *
-                    uUvRepeat +
-                    uUvOffset
+                vUv * uUvRepeat +
+                uUvOffset
             );
     }
 
@@ -1883,10 +1628,7 @@ void main() {
         texel.a *
         uOpacity;
 
-    if (
-        alpha <=
-        uAlphaTest
-    ) {
+    if (alpha <= uAlphaTest) {
         discard;
     }
 
@@ -1896,16 +1638,10 @@ void main() {
 
     vec3 color;
 
-    if (
-        uLit >
-        0.5
-    ) {
-        // Lighting itself is still Gouraud/per-vertex. Only the depth-map lookup
-        // is sampled here for wider WebGL2/ANGLE compatibility.
+    if (uLit > 0.5) {
         float visibility =
-            samplePlayerShadowPortable();
+            samplePlayerShadowSafe();
 
-        // Quantise ONLY lighting. Surface textures keep their full detail.
         vec3 ambient =
             floor(
                 vAmbient *
@@ -1930,13 +1666,12 @@ void main() {
             ) /
             uBandSteps;
 
-        // Shadows reduce direct/specular light but keep ambient illumination.
         color =
             base *
             (
                 ambient +
                 direct *
-                    visibility
+                visibility
             );
 
         color +=
@@ -1948,10 +1683,7 @@ void main() {
         color +=
             uEmissive;
 
-        if (
-            uRetroGrade >
-            0.5
-        ) {
+        if (uRetroGrade > 0.5) {
             float y =
                 dot(
                     color,
@@ -1990,10 +1722,7 @@ void main() {
             1.0
         );
 
-    if (
-        uFogEnabled >
-        0.5
-    ) {
+    if (uFogEnabled > 0.5) {
         float d =
             distance(
                 vWorldPosition,
@@ -2005,7 +1734,7 @@ void main() {
                 uFogNear,
                 max(
                     uFogNear +
-                        0.001,
+                    0.001,
                     uFogFar
                 ),
                 d
@@ -4027,11 +3756,11 @@ window.__bloxClassicRendererInfo = {
     threeWebGLRenderer:
         false,
     shading:
-        "Gouraud / per-vertex classic ambient + diffuse + anisotropic stretched sun-streak specular",
+        "ANGLE-safe Gouraud / per-vertex classic ambient + diffuse + polynomial stretched sun-streak specular",
     colorMath:
         "gamma-space-inspired, no PBR / no filmic tone mapping",
     shadows:
-        "1024 player-only portable directional depth shadow",
+        "1024 player-only ANGLE-safe single-sample directional depth shadow",
     textureFiltering:
         "linear + simple nearest mip transition, anisotropy disabled"
 };
