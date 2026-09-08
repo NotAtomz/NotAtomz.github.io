@@ -28367,10 +28367,20 @@ playerBody.setAdditionalSolverIterations?.(
 
 const playerCollider = world.createCollider(
     RAPIER.ColliderDesc.capsule(PLAYER_HALF_H, PLAYER_RADIUS)
-        .setFriction(0.4)
+        // The controlled character does not need physical friction to walk.
+        // Zero friction prevents the capsule from sticking to vertical walls.
+        .setFriction(0.0)
+        .setFrictionCombineRule(
+            RAPIER.CoefficientCombineRule.Min
+        )
         .setRestitution(0.0),
     playerBody
 );
+
+// Current physical surface supporting the player. This may be a fixed floor
+// OR an unanchored/dynamic Part.
+let playerGroundCollider = null;
+let playerGroundBody = null;
 
 const playerState = {
     grounded: false,
@@ -28410,7 +28420,7 @@ const physicsRagdoll = {
     recovering: false,
     recoverAt: 0,
     recoveryStartedAt: 0,
-    recoveryDuration: 0.65,
+    recoveryDuration: 0.05,
     recoveryStartRotation: new THREE.Quaternion(),
     recoveryTargetRotation: new THREE.Quaternion(),
     jitterHits: 0,
@@ -28543,7 +28553,7 @@ function triggerPhysicsRagdoll(reason = "physics instability") {
     ) {
         return false;
     }
-
+    playSplatSound();
     const now =
         performance.now();
 
@@ -31685,52 +31695,299 @@ buildLocalPlayerCharacterModel();
 // ─── Update ──────────────────────────────────────────────────────────────────
 const clock = new THREE.Clock();
 
-// Ground check via ray cast downward from player centre
-// Ground check via a short ray starting just below the player's feet
-// Ground check — ignores the player's own capsule
+// ─── Player ground/support detection ─────────────────────────────────────────
+//
+// Prefer actual Rapier contact manifolds instead of relying only on a tiny ray.
+// This is important for unanchored Parts: the support itself can move slightly
+// between simulation ticks while still being physically in contact with the
+// player capsule.
+//
+// A short center ray remains as a fallback for tiny solver separations.
+const PLAYER_GROUND_PROBE_DISTANCE = 0.32;
+const PLAYER_GROUND_MIN_NORMAL_Y = 0.42;
+
+function rememberPlayerGround(
+    collider
+) {
+    playerGroundCollider =
+        collider ||
+        null;
+
+    playerGroundBody =
+        collider?.parent?.() ||
+        null;
+}
+
 function checkGrounded() {
-    const pos = playerBody.translation();
+    playerGroundCollider =
+        null;
 
-    // Bottom of the player's capsule
-    const feetY = pos.y - PLAYER_HALF_H - PLAYER_RADIUS;
+    playerGroundBody =
+        null;
 
-    const ray = new RAPIER.Ray(
-        {
-            x: pos.x,
-            y: feetY + 0.05,
-            z: pos.z
-        },
-        {
+    const pos =
+        playerBody.translation();
+
+    const velocity =
+        playerBody.linvel();
+
+    // Once a jump is clearly travelling upward, contacts left over from the
+    // launch frame must not immediately mark the Humanoid as grounded again.
+    if (
+        velocity.y >
+        2.0
+    ) {
+        return false;
+    }
+
+    // First use real collision contacts. This works for fixed AND dynamic
+    // rigid-bodies and avoids treating a nearby wall as a floor.
+    let groundedByContact =
+        false;
+
+    try {
+        world.contactPairsWith(
+            playerCollider,
+            otherCollider => {
+                if (
+                    groundedByContact ||
+                    !otherCollider ||
+                    otherCollider ===
+                        playerCollider ||
+                    otherCollider.isSensor?.()
+                ) {
+                    return;
+                }
+
+                world.contactPair(
+                    playerCollider,
+                    otherCollider,
+                    manifold => {
+                        if (
+                            groundedByContact ||
+                            !manifold
+                        ) {
+                            return;
+                        }
+
+                        const normal =
+                            manifold.normal?.();
+
+                        if (
+                            !normal ||
+                            Math.abs(
+                                Number(
+                                    normal.y
+                                ) || 0
+                            ) <
+                                PLAYER_GROUND_MIN_NORMAL_Y
+                        ) {
+                            // Mostly-horizontal normal = wall contact.
+                            return;
+                        }
+
+                        let contactIsBelowPlayer =
+                            false;
+
+                        const solverContactCount =
+                            Number(
+                                manifold.numSolverContacts?.()
+                            ) || 0;
+
+                        // Solver contact points are world-space. A floor/support
+                        // contact must occur on the lower half of the capsule.
+                        for (
+                            let i = 0;
+                            i < solverContactCount;
+                            i++
+                        ) {
+                            const point =
+                                manifold.solverContactPoint?.(
+                                    i
+                                );
+
+                            if (
+                                point &&
+                                Number(
+                                    point.y
+                                ) <=
+                                    pos.y -
+                                    PLAYER_HALF_H *
+                                        0.35
+                            ) {
+                                contactIsBelowPlayer =
+                                    true;
+                                break;
+                            }
+                        }
+
+                        // Some contact manifolds may temporarily have no solver
+                        // contact points. Fall back to the other collider's world
+                        // center so moving supports still remain usable.
+                        if (
+                            !contactIsBelowPlayer &&
+                            solverContactCount ===
+                                0
+                        ) {
+                            const otherPosition =
+                                otherCollider.translation?.();
+
+                            contactIsBelowPlayer =
+                                Boolean(
+                                    otherPosition &&
+                                    Number(
+                                        otherPosition.y
+                                    ) <
+                                        pos.y
+                                );
+                        }
+
+                        if (
+                            !contactIsBelowPlayer
+                        ) {
+                            return;
+                        }
+
+                        rememberPlayerGround(
+                            otherCollider
+                        );
+
+                        groundedByContact =
+                            true;
+                    }
+                );
+            }
+        );
+    } catch {
+        // Keep the ray fallback below for compatibility if a browser/Rapier
+        // build ever fails to expose narrow-phase contact iteration.
+    }
+
+    if (
+        groundedByContact
+    ) {
+        return true;
+    }
+
+    // Fallback: probe a little farther than the old 0.15-stud ray so a dynamic
+    // support can move a small amount without making the character enter the
+    // falling state for a frame.
+    const feetY =
+        pos.y -
+        PLAYER_HALF_H -
+        PLAYER_RADIUS;
+
+    const ray =
+        new RAPIER.Ray(
+            {
+                x: pos.x,
+                y: feetY + 0.08,
+                z: pos.z
+            },
+            {
+                x: 0,
+                y: -1,
+                z: 0
+            }
+        );
+
+    const hit =
+        world.castRay(
+            ray,
+            PLAYER_GROUND_PROBE_DISTANCE,
+            true,
+
+            RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
+
+            undefined,
+            undefined,
+            playerBody,
+
+            collider =>
+                !collider.isSensor()
+        );
+
+    if (
+        !hit ||
+        hit.collider?.isSensor?.()
+    ) {
+        return false;
+    }
+
+    rememberPlayerGround(
+        hit.collider
+    );
+
+    return true;
+}
+
+// Velocity of the Part currently under the player's feet.
+//
+// This lets the controlled capsule ride unanchored/moving Parts instead of
+// overwriting its X/Z velocity with zero every render frame.
+function getPlayerGroundVelocity() {
+    if (
+        !playerState.grounded ||
+        !playerGroundBody ||
+        playerGroundBody ===
+            playerBody
+    ) {
+        return {
             x: 0,
-            y: -1,
+            y: 0,
             z: 0
+        };
+    }
+
+    try {
+        const pos =
+            playerBody.translation();
+
+        const footPoint = {
+            x:
+                pos.x,
+
+            y:
+                pos.y -
+                PLAYER_HALF_H -
+                PLAYER_RADIUS,
+
+            z:
+                pos.z
+        };
+
+        // velocityAtPoint also includes motion caused by a rotating platform.
+        const velocity =
+            playerGroundBody.velocityAtPoint?.(
+                footPoint
+            ) ||
+            playerGroundBody.linvel?.();
+
+        if (velocity) {
+            return {
+                x:
+                    Number(
+                        velocity.x
+                    ) || 0,
+
+                y:
+                    Number(
+                        velocity.y
+                    ) || 0,
+
+                z:
+                    Number(
+                        velocity.z
+                    ) || 0
+            };
         }
-    );
+    } catch {}
 
-    // Check only slightly below the feet.
-    // The final argument excludes the player's rigid body.
-    const hit = world.castRay(
-        ray,
-        0.15,
-        true,
-
-        // CanCollide=false Parts are Rapier sensors. They should still be
-        // detectable by Touched, but must never count as physical ground.
-        RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
-
-        undefined,   // filterGroups
-        undefined,   // excludeCollider
-        playerBody,  // excludeRigidBody
-
-        // Hard fallback: never let a sensor be considered ground.
-        collider =>
-            !collider.isSensor()
-    );
-
-    return (
-        hit !== null &&
-        !hit.collider?.isSensor?.()
-    );
+    return {
+        x: 0,
+        y: 0,
+        z: 0
+    };
 }
 
 // ─── Classic Roblox-style step-up helper ─────────────────────────────────────
@@ -32800,9 +33057,24 @@ function updatePlayer(delta) {
             0;
     }
 
-    const curVel = playerBody.linvel();
+    const curVel =
+        playerBody.linvel();
 
-    let vx = 0, vz = 0;
+    const groundVelocity =
+        getPlayerGroundVelocity();
+
+    // Standing still on an unanchored/moving Part should carry the character
+    // with that Part instead of forcing world-space X/Z velocity back to zero.
+    let vx =
+        playerState.grounded
+            ? groundVelocity.x
+            : 0;
+
+    let vz =
+        playerState.grounded
+            ? groundVelocity.z
+            : 0;
+
     let steppingUp = false;
     let climbing = false;
 
@@ -32835,11 +33107,21 @@ function updatePlayer(delta) {
                 : 1;
 
         vx =
+            (
+                playerState.grounded
+                    ? groundVelocity.x
+                    : 0
+            ) +
             dir.x *
             playerState.moveSpeed *
             horizontalScale;
 
         vz =
+            (
+                playerState.grounded
+                    ? groundVelocity.z
+                    : 0
+            ) +
             dir.z *
             playerState.moveSpeed *
             horizontalScale;
@@ -32969,7 +33251,16 @@ function updatePlayer(delta) {
         playerBody.setLinvel(
             {
                 x: vx,
-                y: playerState.jumpPower,
+
+                // Jump relative to an upward-moving support instead of losing
+                // the platform's existing upward momentum.
+                y:
+                    playerState.jumpPower +
+                    Math.max(
+                        0,
+                        groundVelocity.y
+                    ),
+
                 z: vz
             },
             true
