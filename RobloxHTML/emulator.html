@@ -1041,15 +1041,7 @@ class BloxClassicWebGLRenderer {
         // browser/ANGLE backend rejects one of the requested attributes.
         // Try progressively more conservative profiles before giving up.
         const webgl2Profiles = [
-            {
-                alpha: false,
-                antialias: true,
-                depth: true,
-                stencil: false,
-                premultipliedAlpha: false,
-                preserveDrawingBuffer: false,
-                powerPreference: "high-performance"
-            },
+            // Start conservatively for Chromium/ANGLE portability.
             {
                 alpha: false,
                 antialias: false,
@@ -1066,6 +1058,15 @@ class BloxClassicWebGLRenderer {
                 stencil: false,
                 premultipliedAlpha: false,
                 preserveDrawingBuffer: false
+            },
+            {
+                alpha: false,
+                antialias: true,
+                depth: true,
+                stencil: false,
+                premultipliedAlpha: false,
+                preserveDrawingBuffer: false,
+                powerPreference: "default"
             },
             {}
         ];
@@ -1421,116 +1422,75 @@ layout(location = 2) in vec2 aUv;
 uniform mat4 uModel;
 uniform mat4 uViewProjection;
 uniform mat3 uNormalMatrix;
+
 uniform vec3 uCameraPosition;
 uniform vec3 uSunDirection;
 uniform vec3 uSunColor;
 uniform float uSunStrength;
 uniform vec3 uAmbientColor;
 uniform vec3 uOutdoorAmbient;
-uniform float uLit;
-uniform float uShininess;
 uniform float uSpecularStrength;
-uniform mat4 uLightViewProjection;
 
 out vec2 vUv;
-out vec3 vAmbient;
-out vec3 vDirect;
-out float vSpecular;
-out vec3 vWorldPosition;
-out vec4 vShadowPosition;
+out vec3 vClassicLight;
+out float vClassicSpecular;
+out float vFogDistance;
 
 void main() {
     vec4 world = uModel * vec4(aPosition, 1.0);
-    vec3 worldPos = world.xyz;
+    vec3 N = normalize(uNormalMatrix * aNormal);
+    vec3 L = normalize(uSunDirection);
+    vec3 V = normalize(uCameraPosition - world.xyz);
+
+    float hemi = clamp(N.y * 0.18 + 0.50, 0.0, 1.0);
+    vec3 ambient = mix(uAmbientColor, uOutdoorAmbient, hemi);
+
+    float ndl = max(dot(N, L), 0.0);
+    vec3 direct = uSunColor * ndl * uSunStrength;
+
+    // Very conservative old-client specular. All exponents are implemented with
+    // multiplication, avoiding pow()/reflect()/cross()/texture() in this stage.
+    vec3 H = normalize(L + V);
+    float ndh = max(dot(N, H), 0.0);
+    float ndh2 = ndh * ndh;
+    float ndh4 = ndh2 * ndh2;
+
+    // Simple stretched top-face highlight.
+    vec2 s = L.xz;
+    vec2 q = V.xz;
+    float sl = max(length(s), 0.0001);
+    float ql = max(length(q), 0.0001);
+    s /= sl;
+    q /= ql;
+
+    float across = abs(q.x * s.y - q.y * s.x);
+    float width = clamp(1.0 - across, 0.0, 1.0);
+    float width2 = width * width;
+    float width4 = width2 * width2;
+    float along = max(dot(q, s), 0.0);
+
+    float top = max(N.y, 0.0);
+    top *= top;
+
+    float streak =
+        width4 *
+        (0.35 + 0.65 * along) *
+        (0.30 + 0.70 * ndh) *
+        top *
+        0.42;
+
+    float ordinarySpec =
+        ndh4 *
+        mix(1.0, 0.30, top);
+
+    vClassicLight = ambient + direct;
+    vClassicSpecular =
+        (ordinarySpec + streak) *
+        uSpecularStrength *
+        uSunStrength;
 
     vUv = aUv;
-    vWorldPosition = worldPos;
-    vShadowPosition = uLightViewProjection * world;
-
-    if (uLit > 0.5) {
-        vec3 N = normalize(uNormalMatrix * aNormal);
-        vec3 L = normalize(uSunDirection);
-        vec3 V = normalize(uCameraPosition - worldPos);
-
-        float hemi = clamp(N.y * 0.18 + 0.50, 0.0, 1.0);
-        vAmbient = mix(uAmbientColor, uOutdoorAmbient, hemi);
-
-        float ndl = max(dot(N, L), 0.0);
-        vDirect = uSunColor * (ndl * uSunStrength);
-
-        // ANGLE-safe classic broad specular: polynomial only, no dynamic pow().
-        vec3 H = normalize(L + V);
-        float ndh = max(dot(N, H), 0.0);
-        float ndh2 = ndh * ndh;
-        float spec4 = ndh2 * ndh2;
-        float spec8 = spec4 * spec4;
-        float glossMix = clamp((uShininess - 4.0) / 20.0, 0.0, 1.0);
-        float classicSpecular =
-            mix(spec4, spec8, glossMix) *
-            uSpecularStrength *
-            uSunStrength;
-
-        // Long old-client-style top-face sun streak.
-        // This intentionally avoids reflect(), cross(), fractional pow(), and
-        // vertex-stage texture reads because those combinations can trip some
-        // Chromium/ANGLE GPU drivers during shader linking.
-        float topFace = clamp(N.y, 0.0, 1.0);
-        topFace = topFace * topFace;
-
-        vec2 sunXZ = L.xz;
-        vec2 viewXZ = V.xz;
-
-        float sunLen2 = max(dot(sunXZ, sunXZ), 0.00001);
-        float viewLen2 = max(dot(viewXZ, viewXZ), 0.00001);
-
-        sunXZ *= inversesqrt(sunLen2);
-        viewXZ *= inversesqrt(viewLen2);
-
-        float along = max(dot(viewXZ, sunXZ), 0.0);
-        float across = abs(
-            viewXZ.x * sunXZ.y -
-            viewXZ.y * sunXZ.x
-        );
-
-        float width = clamp(1.0 - across, 0.0, 1.0);
-        float width2 = width * width;
-        float width4 = width2 * width2;
-
-        // A thick core + broad feather, tuned from the previous streak.
-        float streakCore =
-            width4 *
-            (0.35 + 0.65 * along) *
-            (0.30 + 0.70 * ndh);
-
-        float streakFeather =
-            width2 *
-            (0.20 + 0.80 * along) *
-            0.20;
-
-        float streakSpecular =
-            (streakCore + streakFeather) *
-            uSpecularStrength *
-            uSunStrength *
-            0.42 *
-            topFace;
-
-        // Suppress the circular hotspot on upward-facing surfaces.
-        float classicFade =
-            mix(
-                1.0,
-                0.30,
-                topFace
-            );
-
-        vSpecular =
-            classicSpecular *
-            classicFade +
-            streakSpecular;
-    } else {
-        vAmbient = vec3(1.0);
-        vDirect = vec3(0.0);
-        vSpecular = 0.0;
-    }
+    vFogDistance = distance(world.xyz, uCameraPosition);
 
     gl_Position = uViewProjection * world;
 }`;
@@ -1538,14 +1498,12 @@ void main() {
 
     _meshFragmentShader() {
         return `#version 300 es
-precision highp float;
+precision mediump float;
 
 in vec2 vUv;
-in vec3 vAmbient;
-in vec3 vDirect;
-in float vSpecular;
-in vec3 vWorldPosition;
-in vec4 vShadowPosition;
+in vec3 vClassicLight;
+in float vClassicSpecular;
+in float vFogDistance;
 
 uniform vec3 uMaterialColor;
 uniform vec3 uEmissive;
@@ -1554,205 +1512,74 @@ uniform float uUseTexture;
 uniform sampler2D uMap;
 uniform vec2 uUvRepeat;
 uniform vec2 uUvOffset;
+
 uniform float uLit;
 uniform float uBandSteps;
 uniform float uFogEnabled;
 uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
-uniform vec3 uCameraPosition;
 uniform float uAlphaTest;
 uniform float uRetroGrade;
 
-uniform float uShadowEnabled;
-uniform sampler2D uShadowMap;
-uniform float uShadowBias;
-uniform float uShadowStrength;
-
 out vec4 outColor;
-
-float samplePlayerShadowSafe() {
-    if (
-        uShadowEnabled < 0.5 ||
-        uLit < 0.5
-    ) {
-        return 1.0;
-    }
-
-    vec3 p =
-        vShadowPosition.xyz /
-        max(vShadowPosition.w, 0.00001);
-
-    p = p * 0.5 + 0.5;
-
-    if (
-        p.x <= 0.0 ||
-        p.x >= 1.0 ||
-        p.y <= 0.0 ||
-        p.y >= 1.0 ||
-        p.z <= 0.0 ||
-        p.z >= 1.0
-    ) {
-        return 1.0;
-    }
-
-    float stored = texture(uShadowMap, p.xy).r;
-    float receiver = p.z - uShadowBias;
-
-    float rawVisibility =
-        receiver <= stored
-            ? 1.0
-            : 0.0;
-
-    // Keep the classic light-gray shadow instead of a black cutout.
-    return mix(
-        1.0,
-        rawVisibility,
-        clamp(uShadowStrength, 0.0, 1.0)
-    );
-}
 
 void main() {
     vec4 texel = vec4(1.0);
 
     if (uUseTexture > 0.5) {
-        texel =
-            texture(
-                uMap,
-                vUv * uUvRepeat +
-                uUvOffset
-            );
+        texel = texture(
+            uMap,
+            vUv * uUvRepeat + uUvOffset
+        );
     }
 
-    float alpha =
-        texel.a *
-        uOpacity;
+    float alpha = texel.a * uOpacity;
 
     if (alpha <= uAlphaTest) {
         discard;
     }
 
-    vec3 base =
-        texel.rgb *
-        uMaterialColor;
-
+    vec3 base = texel.rgb * uMaterialColor;
     vec3 color;
 
     if (uLit > 0.5) {
-        float visibility =
-            samplePlayerShadowSafe();
-
-        vec3 ambient =
-            floor(
-                vAmbient *
-                uBandSteps +
-                0.5
-            ) /
-            uBandSteps;
-
-        vec3 direct =
-            floor(
-                vDirect *
-                uBandSteps +
-                0.5
-            ) /
+        vec3 light =
+            floor(vClassicLight * uBandSteps + 0.5) /
             uBandSteps;
 
         float spec =
-            floor(
-                vSpecular *
-                uBandSteps +
-                0.5
-            ) /
+            floor(vClassicSpecular * uBandSteps + 0.5) /
             uBandSteps;
 
-        color =
-            base *
-            (
-                ambient +
-                direct *
-                visibility
-            );
-
-        color +=
-            vec3(
-                spec *
-                visibility
-            );
-
-        color +=
-            uEmissive;
+        color = base * light + vec3(spec) + uEmissive;
 
         if (uRetroGrade > 0.5) {
-            float y =
-                dot(
-                    color,
-                    vec3(
-                        0.299,
-                        0.587,
-                        0.114
-                    )
-                );
+            float y = dot(
+                color,
+                vec3(0.299, 0.587, 0.114)
+            );
 
-            color =
-                mix(
-                    vec3(y),
-                    color,
-                    0.93
-                );
-
-            color =
-                (
-                    color -
-                    0.5
-                ) *
-                1.075 +
-                0.5;
+            color = mix(vec3(y), color, 0.93);
+            color = (color - 0.5) * 1.075 + 0.5;
         }
     } else {
-        color =
-            base +
-            uEmissive;
+        color = base + uEmissive;
     }
 
-    color =
-        clamp(
-            color,
-            0.0,
-            1.0
-        );
+    color = clamp(color, 0.0, 1.0);
 
     if (uFogEnabled > 0.5) {
-        float d =
-            distance(
-                vWorldPosition,
-                uCameraPosition
-            );
+        float fog = smoothstep(
+            uFogNear,
+            max(uFogNear + 0.001, uFogFar),
+            vFogDistance
+        );
 
-        float fog =
-            smoothstep(
-                uFogNear,
-                max(
-                    uFogNear +
-                    0.001,
-                    uFogFar
-                ),
-                d
-            );
-
-        color =
-            mix(
-                color,
-                uFogColor,
-                fog
-            );
+        color = mix(color, uFogColor, fog);
     }
 
-    outColor =
-        vec4(
-            color,
-            alpha
-        );
+    outColor = vec4(color, alpha);
 }`;
     }
 
@@ -3484,11 +3311,10 @@ void main() {
         const lighting =
             this._lightingState();
 
+        // GitHub/ANGLE-safe mode: the mesh program intentionally avoids shadow-map
+        // sampling because that was one of the GPU-driver crash paths.
         const shadowActive =
-            this._renderPlayerShadow(
-                scene,
-                lighting
-            );
+            false;
 
         gl.bindFramebuffer(
             gl.FRAMEBUFFER,
@@ -3756,11 +3582,11 @@ window.__bloxClassicRendererInfo = {
     threeWebGLRenderer:
         false,
     shading:
-        "ANGLE-safe Gouraud / per-vertex classic ambient + diffuse + polynomial stretched sun-streak specular",
+        "GitHub-safe compact Gouraud / per-vertex classic ambient + diffuse + stretched sun-streak specular",
     colorMath:
         "gamma-space-inspired, no PBR / no filmic tone mapping",
     shadows:
-        "1024 player-only ANGLE-safe single-sample directional depth shadow",
+        "disabled in GitHub-safe mode to avoid ANGLE driver resets",
     textureFiltering:
         "linear + simple nearest mip transition, anisotropy disabled"
 };
