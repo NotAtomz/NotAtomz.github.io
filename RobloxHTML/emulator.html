@@ -1036,25 +1036,180 @@ class BloxClassicWebGLRenderer {
         } = {}
     ) {
         this.domElement = canvas;
+
+        // WebGL2 context creation can fail on otherwise-capable GPUs when a
+        // browser/ANGLE backend rejects one of the requested attributes.
+        // Try progressively more conservative profiles before giving up.
+        const webgl2Profiles = [
+            {
+                alpha: false,
+                antialias: true,
+                depth: true,
+                stencil: false,
+                premultipliedAlpha: false,
+                preserveDrawingBuffer: false,
+                powerPreference: "high-performance"
+            },
+            {
+                alpha: false,
+                antialias: false,
+                depth: true,
+                stencil: false,
+                premultipliedAlpha: false,
+                preserveDrawingBuffer: false,
+                powerPreference: "default"
+            },
+            {
+                alpha: false,
+                antialias: false,
+                depth: true,
+                stencil: false,
+                premultipliedAlpha: false,
+                preserveDrawingBuffer: false
+            },
+            {}
+        ];
+
         this.gl =
-            canvas.getContext(
-                "webgl2",
-                {
-                    alpha: false,
-                    antialias: true,
-                    depth: true,
-                    stencil: false,
-                    premultipliedAlpha: false,
-                    preserveDrawingBuffer: false,
-                    powerPreference: "high-performance"
+            null;
+
+        let webgl2ProfileIndex =
+            -1;
+
+        for (
+            let i = 0;
+            i < webgl2Profiles.length;
+            i++
+        ) {
+            try {
+                const candidate =
+                    canvas.getContext(
+                        "webgl2",
+                        webgl2Profiles[i]
+                    );
+
+                if (candidate) {
+                    this.gl =
+                        candidate;
+
+                    webgl2ProfileIndex =
+                        i;
+
+                    break;
                 }
-            );
+            } catch (error) {
+                console.warn(
+                    `[Graphics] WebGL2 context profile ${i + 1} failed:`,
+                    error
+                );
+            }
+        }
+
+        // A few older Chromium/ANGLE builds accepted this legacy alias.
+        if (!this.gl) {
+            try {
+                this.gl =
+                    canvas.getContext(
+                        "experimental-webgl2"
+                    );
+            } catch {}
+        }
 
         if (!this.gl) {
+            let webgl1Available =
+                false;
+
+            try {
+                const probe =
+                    document.createElement(
+                        "canvas"
+                    );
+
+                webgl1Available =
+                    Boolean(
+                        probe.getContext(
+                            "webgl"
+                        ) ||
+                        probe.getContext(
+                            "experimental-webgl"
+                        )
+                    );
+            } catch {}
+
+            const message =
+                webgl1Available
+                    ? (
+                        "WebGL is available, but WebGL2 is disabled/unavailable. " +
+                        "This renderer requires WebGL2. Enable browser hardware acceleration, " +
+                        "restart the browser/GPU process, or try another browser."
+                    )
+                    : (
+                        "Neither WebGL2 nor WebGL is available. Enable browser hardware " +
+                        "acceleration and make sure WebGL is not disabled by browser/GPU settings."
+                    );
+
+            console.error(
+                "[Graphics] " +
+                message
+            );
+
+            // Put the problem directly on-screen instead of leaving a blank page.
+            const errorBox =
+                document.createElement(
+                    "div"
+                );
+
+            errorBox.style.cssText =
+                "position:fixed;left:20px;right:20px;top:45px;z-index:99999;" +
+                "padding:14px 16px;background:#f3f3f3;border:1px solid #777;" +
+                "font:12px Verdana,Arial,sans-serif;color:#222;white-space:pre-wrap;";
+
+            errorBox.textContent =
+                "Blox Emulation graphics could not start.\n\n" +
+                message +
+                "\n\nQuick test: open DevTools Console and run:\n" +
+                'document.createElement("canvas").getContext("webgl2")';
+
+            document.body.appendChild(
+                errorBox
+            );
+
             throw new Error(
-                "Blox Classic renderer requires WebGL2."
+                "Blox Classic renderer requires WebGL2. " +
+                message
             );
         }
+
+        console.log(
+            "[Graphics] WebGL2 context created with profile",
+            webgl2ProfileIndex >= 0
+                ? webgl2ProfileIndex + 1
+                : "experimental-webgl2"
+        );
+
+        // Make future GPU resets easier to diagnose.
+        canvas.addEventListener(
+            "webglcontextlost",
+            event => {
+                event.preventDefault();
+
+                console.error(
+                    "[Graphics] WebGL context lost. " +
+                    "The browser/GPU reset the rendering context."
+                );
+            },
+            false
+        );
+
+        canvas.addEventListener(
+            "webglcontextrestored",
+            () => {
+                console.warn(
+                    "[Graphics] WebGL context restored; reload the page to rebuild renderer resources."
+                );
+            },
+            false
+        );
 
         this.getLightingState =
             getLightingState ||
