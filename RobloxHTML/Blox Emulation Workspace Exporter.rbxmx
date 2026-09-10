@@ -1,0 +1,1776 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+	<External>null</External>
+	<External>nil</External>
+	<Item class="Script" referent="RBX8ACBE78F73584C44AA5C4ACC9A6F04C8">
+		<Properties>
+			<ProtectedString name="Source"><![CDATA[--[[
+    Blox Emulation Workspace Exporter
+
+    Exports the current Roblox Studio Workspace into Luau code intended
+    for the Blox Emulation browser runtime.
+
+    OUTPUT:
+        ServerStorage
+        └── BloxEmulationExport (ModuleScript)
+
+    Copy the generated ModuleScript source into a .lua file and upload
+    it to Blox Emulation.
+]]
+
+local Selection = game:GetService("Selection")
+local ServerStorage = game:GetService("ServerStorage")
+
+local toolbar = plugin:CreateToolbar("Blox Emulation")
+
+local exportButton = toolbar:CreateButton(
+	"Export Workspace",
+	"Convert Workspace into Blox Emulation Luau code",
+	""
+)
+
+exportButton.ClickableWhenViewportHidden = true
+
+
+-- ============================================================
+-- SETTINGS
+-- ============================================================
+
+local OUTPUT_NAME = "BloxEmulationExport"
+
+local EXPORT_SCRIPTS = true
+
+local ADD_CONVERSION_COMMENTS = true
+
+-- Anything inside a Model with this name is ignored.
+local BLACKLISTED_MODEL_NAMES = {
+	SpawnRig = true,
+}
+
+
+-- ============================================================
+-- HELPERS
+-- ============================================================
+
+local function number(n)
+
+	n = tonumber(n) or 0
+
+	if math.abs(n) < 0.000001 then
+		n = 0
+	end
+
+	return string.format("%.6f", n)
+		:gsub("0+$", "")
+		:gsub("%.$", "")
+
+end
+
+
+local function quote(str)
+
+	return string.format(
+		"%q",
+		tostring(str)
+	)
+
+end
+
+
+local function sanitizeName(name)
+
+	name = tostring(name)
+
+	name = name:gsub(
+		"[^%w_]",
+		"_"
+	)
+
+	if name:match("^%d") then
+		name = "_" .. name
+	end
+
+	if name == "" then
+		name = "Object"
+	end
+
+	return name
+
+end
+
+
+local function vector3(v)
+
+	return string.format(
+		"Vector3.new(%s, %s, %s)",
+		number(v.X),
+		number(v.Y),
+		number(v.Z)
+	)
+
+end
+
+
+local function color3(c)
+
+	return string.format(
+		"Color3.fromRGB(%d, %d, %d)",
+		math.floor(
+			c.R * 255 + 0.5
+		),
+		math.floor(
+			c.G * 255 + 0.5
+		),
+		math.floor(
+			c.B * 255 + 0.5
+		)
+	)
+
+end
+
+
+-- CFrame is still needed for things such as Weld.C0/C1 and BodyGyro.
+-- Normal Parts themselves are exported using Position + Orientation.
+local function cframe(cf)
+
+	local position =
+		cf.Position
+
+	local rx, ry, rz =
+		cf:ToOrientation()
+
+	return string.format(
+		"CFrame.new(%s, %s, %s):Multiply(CFrame.Angles(%s, %s, %s))",
+		number(position.X),
+		number(position.Y),
+		number(position.Z),
+
+		number(rx),
+		number(ry),
+		number(rz)
+	)
+
+end
+
+
+local function add(lines, text)
+
+	table.insert(
+		lines,
+		text
+	)
+
+end
+
+
+-- ============================================================
+-- BLACKLIST
+-- ============================================================
+
+local function isBlacklisted(instance)
+
+	if not instance then
+		return false
+	end
+
+	-- Terrain is always ignored.
+	if instance:IsA("Terrain") then
+		return true
+	end
+
+	local current =
+		instance
+
+	while current and current ~= workspace do
+
+		if
+			current:IsA("Model") and
+			BLACKLISTED_MODEL_NAMES[current.Name]
+		then
+
+			return true
+
+		end
+
+		current =
+			current.Parent
+
+	end
+
+	return false
+
+end
+
+
+-- ============================================================
+-- CLASS CONVERSION
+-- ============================================================
+
+local DIRECT_CLASSES = {
+
+	Part = true,
+	Seat = true,
+	SpawnLocation = true,
+
+	Model = true,
+	Folder = true,
+
+	Humanoid = true,
+
+	StringValue = true,
+	BoolValue = true,
+	IntValue = true,
+	NumberValue = true,
+	ObjectValue = true,
+
+	Weld = true,
+	ManualWeld = true,
+	Snap = true,
+	Glue = true,
+	Motor = true,
+	Rotate = true,
+
+	BodyVelocity = true,
+	BodyPosition = true,
+	BodyGyro = true,
+	BodyForce = true,
+	BodyAngularVelocity = true,
+	BodyThrust = true,
+
+	SelectionBox = true,
+
+	RemoteEvent = true,
+	RemoteFunction = true,
+
+	BindableEvent = true,
+	BindableFunction = true,
+
+}
+
+
+local function convertedClass(instance)
+
+	if isBlacklisted(instance) then
+		return nil
+	end
+
+	if DIRECT_CLASSES[instance.ClassName] then
+		return instance.ClassName
+	end
+
+	-- ========================================================
+	-- MODERN BASEPART -> CLASSIC PART
+	-- ========================================================
+
+	if instance:IsA("BasePart") then
+
+		if instance:IsA("Seat") then
+			return "Seat"
+		end
+
+		return "Part"
+
+	end
+
+	-- Modern constraint converted to classic joint.
+	if instance:IsA("WeldConstraint") then
+		return "Weld"
+	end
+
+	return nil
+
+end
+
+
+-- ============================================================
+-- VARIABLE NAMES
+-- ============================================================
+
+local variableNames = {}
+
+local nextObjectId = 0
+
+
+local function getVariable(instance)
+
+	if variableNames[instance] then
+		return variableNames[instance]
+	end
+
+	nextObjectId += 1
+
+	local variable =
+		string.format(
+			"part%d",
+			nextObjectId
+		)
+
+	variableNames[instance] =
+		variable
+
+	return variable
+
+end
+
+
+-- ============================================================
+-- BASEPART EXPORT
+-- ============================================================
+
+local function exportBasePart(
+	instance,
+	variable,
+	lines
+)
+
+	add(
+		lines,
+		variable ..
+			".Size = " ..
+			vector3(instance.Size)
+	)
+
+	-- --------------------------------------------------------
+	-- Position
+	-- --------------------------------------------------------
+
+	add(
+		lines,
+		variable ..
+			".Position = " ..
+			vector3(instance.Position)
+	)
+
+	-- --------------------------------------------------------
+	-- Orientation
+	-- --------------------------------------------------------
+
+	add(
+		lines,
+		variable ..
+			".Orientation = " ..
+			vector3(instance.Orientation)
+	)
+
+	-- --------------------------------------------------------
+	-- Color
+	-- --------------------------------------------------------
+
+	add(
+		lines,
+		variable ..
+			".Color = " ..
+			color3(instance.Color)
+	)
+
+	-- --------------------------------------------------------
+	-- Physics
+	-- --------------------------------------------------------
+
+	add(
+		lines,
+		variable ..
+			".Anchored = " ..
+			tostring(instance.Anchored)
+	)
+
+	add(
+		lines,
+		variable ..
+			".CanCollide = " ..
+			tostring(instance.CanCollide)
+	)
+
+	-- --------------------------------------------------------
+	-- Only export these when changed from Roblox defaults.
+	-- --------------------------------------------------------
+
+	if instance.Transparency ~= 0 then
+
+		add(
+			lines,
+			variable ..
+				".Transparency = " ..
+				number(instance.Transparency)
+		)
+
+	end
+
+	if instance.Reflectance ~= 0 then
+
+		add(
+			lines,
+			variable ..
+				".Reflectance = " ..
+				number(instance.Reflectance)
+		)
+
+	end
+
+end
+
+
+-- ============================================================
+-- SPAWNLOCATION EXPORT
+-- ============================================================
+
+local function exportSpawnLocation(
+	instance,
+	variable,
+	lines
+)
+
+	add(
+		lines,
+		variable ..
+			".Enabled = " ..
+			tostring(instance.Enabled)
+	)
+
+	add(
+		lines,
+		variable ..
+			".Neutral = " ..
+			tostring(instance.Neutral)
+	)
+
+	add(
+		lines,
+		variable ..
+			".TeamColor = BrickColor.new(" ..
+			quote(instance.TeamColor.Name) ..
+			")"
+	)
+
+	add(
+		lines,
+		variable ..
+			".AllowTeamChangeOnTouch = " ..
+			tostring(
+				instance.AllowTeamChangeOnTouch
+			)
+	)
+
+	add(
+		lines,
+		variable ..
+			".Duration = " ..
+			number(instance.Duration)
+	)
+
+end
+
+
+-- ============================================================
+-- HUMANOID EXPORT
+-- ============================================================
+
+local function exportHumanoid(
+	humanoid,
+	variable,
+	lines
+)
+
+	add(
+		lines,
+		variable ..
+			".MaxHealth = " ..
+			number(humanoid.MaxHealth)
+	)
+
+	add(
+		lines,
+		variable ..
+			".Health = " ..
+			number(humanoid.Health)
+	)
+
+	add(
+		lines,
+		variable ..
+			".WalkSpeed = " ..
+			number(humanoid.WalkSpeed)
+	)
+
+	if humanoid.UseJumpPower then
+
+		add(
+			lines,
+			variable ..
+				".JumpPower = " ..
+				number(humanoid.JumpPower)
+		)
+
+	else
+
+		-- Convert modern JumpHeight into an approximate JumpPower.
+		local approximateJumpPower =
+			math.sqrt(
+				math.max(
+					0,
+					humanoid.JumpHeight *
+					workspace.Gravity *
+					2
+				)
+			)
+
+		add(
+			lines,
+			variable ..
+				".JumpPower = " ..
+				number(
+					approximateJumpPower
+				)
+		)
+
+	end
+
+	add(
+		lines,
+		variable ..
+			".AutoRotate = " ..
+			tostring(
+				humanoid.AutoRotate
+			)
+	)
+
+end
+
+
+-- ============================================================
+-- VALUE OBJECT EXPORT
+-- ============================================================
+
+local function exportValue(
+	instance,
+	variable,
+	lines
+)
+
+	if instance:IsA("StringValue") then
+
+		add(
+			lines,
+			variable ..
+				".Value = " ..
+				quote(instance.Value)
+		)
+
+	elseif instance:IsA("BoolValue") then
+
+		add(
+			lines,
+			variable ..
+				".Value = " ..
+				tostring(instance.Value)
+		)
+
+	elseif
+		instance:IsA("IntValue") or
+		instance:IsA("NumberValue")
+	then
+
+		add(
+			lines,
+			variable ..
+				".Value = " ..
+				number(instance.Value)
+		)
+
+	end
+
+end
+
+
+-- ============================================================
+-- BODYMOVER EXPORT
+-- ============================================================
+
+local function exportBodyMover(
+	instance,
+	variable,
+	lines
+)
+
+	if instance:IsA("BodyVelocity") then
+
+		add(
+			lines,
+			variable ..
+				".Velocity = " ..
+				vector3(instance.Velocity)
+		)
+
+		add(
+			lines,
+			variable ..
+				".MaxForce = " ..
+				vector3(instance.MaxForce)
+		)
+
+		add(
+			lines,
+			variable ..
+				".P = " ..
+				number(instance.P)
+		)
+
+
+	elseif instance:IsA("BodyPosition") then
+
+		add(
+			lines,
+			variable ..
+				".Position = " ..
+				vector3(instance.Position)
+		)
+
+		add(
+			lines,
+			variable ..
+				".MaxForce = " ..
+				vector3(instance.MaxForce)
+		)
+
+		add(
+			lines,
+			variable ..
+				".P = " ..
+				number(instance.P)
+		)
+
+		add(
+			lines,
+			variable ..
+				".D = " ..
+				number(instance.D)
+		)
+
+
+	elseif instance:IsA("BodyGyro") then
+
+		add(
+			lines,
+			variable ..
+				".CFrame = " ..
+				cframe(instance.CFrame)
+		)
+
+		add(
+			lines,
+			variable ..
+				".MaxTorque = " ..
+				vector3(instance.MaxTorque)
+		)
+
+		add(
+			lines,
+			variable ..
+				".P = " ..
+				number(instance.P)
+		)
+
+		add(
+			lines,
+			variable ..
+				".D = " ..
+				number(instance.D)
+		)
+
+
+	elseif instance:IsA("BodyForce") then
+
+		add(
+			lines,
+			variable ..
+				".Force = " ..
+				vector3(instance.Force)
+		)
+
+
+	elseif instance:IsA("BodyAngularVelocity") then
+
+		add(
+			lines,
+			variable ..
+				".AngularVelocity = " ..
+				vector3(
+					instance.AngularVelocity
+				)
+		)
+
+		add(
+			lines,
+			variable ..
+				".MaxTorque = " ..
+				vector3(instance.MaxTorque)
+		)
+
+		add(
+			lines,
+			variable ..
+				".P = " ..
+				number(instance.P)
+		)
+
+
+	elseif instance:IsA("BodyThrust") then
+
+		add(
+			lines,
+			variable ..
+				".Force = " ..
+				vector3(instance.Force)
+		)
+
+		local ok, location =
+			pcall(function()
+
+				return instance.Location
+
+			end)
+
+		if ok and location then
+
+			add(
+				lines,
+				variable ..
+					".Location = " ..
+					vector3(location)
+			)
+
+		end
+
+	end
+
+end
+
+
+-- ============================================================
+-- SCRIPT CONVERSION
+-- ============================================================
+
+local function convertSource(
+	source,
+	parentVariable
+)
+
+	-- --------------------------------------------------------
+	-- Modern task library -> classic functions
+	-- --------------------------------------------------------
+
+	source =
+		source:gsub(
+			"task%.wait%s*%(",
+			"wait("
+		)
+
+	source =
+		source:gsub(
+			"task%.spawn%s*%(",
+			"spawn("
+		)
+
+	source =
+		source:gsub(
+			"task%.delay%s*%(",
+			"delay("
+		)
+
+	source =
+		source:gsub(
+			"task%.defer%s*%(",
+			"spawn("
+		)
+
+
+	-- --------------------------------------------------------
+	-- script.Parent -> actual exported object
+	--
+	-- Example:
+	--
+	-- script.Parent.Touched
+	--
+	-- becomes:
+	--
+	-- part5.Touched
+	-- --------------------------------------------------------
+
+	if parentVariable then
+
+		source =
+			source:gsub(
+				"script%.Parent",
+				parentVariable
+			)
+
+	end
+
+	return source
+
+end
+
+
+local function indentSource(
+	source,
+	tabs
+)
+
+	local prefix =
+		string.rep(
+			"    ",
+			tabs
+		)
+
+	local result = {}
+
+	for line in (
+		source .. "\n"
+		):gmatch("(.-)\n") do
+
+		table.insert(
+			result,
+			prefix .. line
+		)
+
+	end
+
+	return table.concat(
+		result,
+		"\n"
+	)
+
+end
+
+
+-- ============================================================
+-- GENERATE EXPORT
+-- ============================================================
+
+local function generateExport()
+
+	variableNames = {}
+
+	nextObjectId = 0
+
+	local lines = {}
+
+	local scripts = {}
+
+	local exported = {}
+
+
+	-- ========================================================
+	-- HEADER
+	-- ========================================================
+
+	add(
+		lines,
+		"-- Blox Emulation Workspace Export"
+	)
+
+	add(
+		lines,
+		"-- Generated from Roblox Studio"
+	)
+
+	add(
+		lines,
+		"--"
+	)
+
+	add(
+		lines,
+		"-- Converted for the Blox Emulation Luau VM."
+	)
+
+	add(lines, "")
+
+	add(
+		lines,
+		'print("Loading exported Workspace...")'
+	)
+
+	add(lines, "")
+
+
+	-- ========================================================
+	-- FIRST PASS
+	--
+	-- Create every supported object first.
+	-- ========================================================
+
+	add(
+		lines,
+		"-- =================================================="
+	)
+
+	add(
+		lines,
+		"-- Objects"
+	)
+
+	add(
+		lines,
+		"-- =================================================="
+	)
+
+	add(lines, "")
+
+
+	local descendants =
+		workspace:GetDescendants()
+
+
+	for _, instance in ipairs(descendants) do
+
+		-- ----------------------------------------------------
+		-- BLACKLIST
+		-- ----------------------------------------------------
+
+		if isBlacklisted(instance) then
+			continue
+		end
+
+
+		-- ----------------------------------------------------
+		-- SCRIPTS
+		-- ----------------------------------------------------
+
+		if instance:IsA("LuaSourceContainer") then
+
+			if EXPORT_SCRIPTS then
+
+				table.insert(
+					scripts,
+					instance
+				)
+
+			end
+
+			continue
+
+		end
+
+
+		-- ----------------------------------------------------
+		-- CONVERT CLASS
+		-- ----------------------------------------------------
+
+		local className =
+			convertedClass(instance)
+
+		if not className then
+
+			if ADD_CONVERSION_COMMENTS then
+
+				add(
+					lines,
+					string.format(
+						"-- Skipped unsupported class: %s (%s)",
+						instance.ClassName,
+						instance:GetFullName()
+					)
+				)
+
+			end
+
+			continue
+
+		end
+
+
+		local variable =
+			getVariable(instance)
+
+
+		exported[instance] =
+			true
+
+
+		-- ----------------------------------------------------
+		-- COMMENT
+		-- ----------------------------------------------------
+
+		add(
+			lines,
+			string.format(
+				"-- %s",
+				instance:GetFullName()
+			)
+		)
+
+
+		-- ----------------------------------------------------
+		-- INSTANCE.NEW
+		-- ----------------------------------------------------
+
+		add(
+			lines,
+			string.format(
+				"local %s = Instance.new(%s)",
+				variable,
+				quote(className)
+			)
+		)
+
+
+		-- ----------------------------------------------------
+		-- NAME
+		-- ----------------------------------------------------
+
+		add(
+			lines,
+			variable ..
+				".Name = " ..
+				quote(instance.Name)
+		)
+
+
+		-- ----------------------------------------------------
+		-- BASEPART
+		-- ----------------------------------------------------
+
+		if instance:IsA("BasePart") then
+
+			exportBasePart(
+				instance,
+				variable,
+				lines
+			)
+
+		end
+
+
+		-- ----------------------------------------------------
+		-- SPAWNLOCATION
+		-- ----------------------------------------------------
+
+		if instance:IsA("SpawnLocation") then
+
+			exportSpawnLocation(
+				instance,
+				variable,
+				lines
+			)
+
+		end
+
+
+		-- ----------------------------------------------------
+		-- HUMANOID
+		-- ----------------------------------------------------
+
+		if instance:IsA("Humanoid") then
+
+			exportHumanoid(
+				instance,
+				variable,
+				lines
+			)
+
+		end
+
+
+		-- ----------------------------------------------------
+		-- VALUES
+		-- ----------------------------------------------------
+
+		if instance:IsA("ValueBase") then
+
+			exportValue(
+				instance,
+				variable,
+				lines
+			)
+
+		end
+
+
+		-- ----------------------------------------------------
+		-- BODYMOVERS
+		-- ----------------------------------------------------
+
+		if instance:IsA("BodyMover") then
+
+			exportBodyMover(
+				instance,
+				variable,
+				lines
+			)
+
+		end
+
+
+		add(lines, "")
+
+	end
+
+
+	-- ========================================================
+	-- SECOND PASS
+	--
+	-- Parent objects after every object exists.
+	-- ========================================================
+
+	add(
+		lines,
+		"-- =================================================="
+	)
+
+	add(
+		lines,
+		"-- Parenting"
+	)
+
+	add(
+		lines,
+		"-- =================================================="
+	)
+
+	add(lines, "")
+
+
+	for _, instance in ipairs(descendants) do
+
+		if not exported[instance] then
+			continue
+		end
+
+		local variable =
+			getVariable(instance)
+
+		local parent =
+			instance.Parent
+
+
+		if parent == workspace then
+
+			add(
+				lines,
+				variable ..
+					".Parent = workspace"
+			)
+
+
+		elseif
+			parent and
+			exported[parent]
+		then
+
+			add(
+				lines,
+				variable ..
+					".Parent = " ..
+					getVariable(parent)
+			)
+
+
+		else
+
+			-- If its original parent was unsupported,
+			-- place it directly under Workspace.
+			add(
+				lines,
+				variable ..
+					".Parent = workspace"
+			)
+
+		end
+
+	end
+
+
+	add(lines, "")
+
+
+	-- ========================================================
+	-- THIRD PASS
+	--
+	-- Joints and object references
+	-- ========================================================
+
+	add(
+		lines,
+		"-- =================================================="
+	)
+
+	add(
+		lines,
+		"-- Joints / References"
+	)
+
+	add(
+		lines,
+		"-- =================================================="
+	)
+
+	add(lines, "")
+
+
+	for _, instance in ipairs(descendants) do
+
+		if not exported[instance] then
+			continue
+		end
+
+
+		local variable =
+			getVariable(instance)
+
+
+		-- ====================================================
+		-- CLASSIC JOINTS
+		-- ====================================================
+
+		if instance:IsA("JointInstance") then
+
+			if
+				instance.Part0 and
+				exported[instance.Part0]
+			then
+
+				add(
+					lines,
+					variable ..
+						".Part0 = " ..
+						getVariable(
+							instance.Part0
+						)
+				)
+
+			end
+
+
+			if
+				instance.Part1 and
+				exported[instance.Part1]
+			then
+
+				add(
+					lines,
+					variable ..
+						".Part1 = " ..
+						getVariable(
+							instance.Part1
+						)
+				)
+
+			end
+
+
+			local ok0, C0 =
+				pcall(function()
+
+					return instance.C0
+
+				end)
+
+
+			if ok0 then
+
+				add(
+					lines,
+					variable ..
+						".C0 = " ..
+						cframe(C0)
+				)
+
+			end
+
+
+			local ok1, C1 =
+				pcall(function()
+
+					return instance.C1
+
+				end)
+
+
+			if ok1 then
+
+				add(
+					lines,
+					variable ..
+						".C1 = " ..
+						cframe(C1)
+				)
+
+			end
+
+
+			-- ====================================================
+			-- WELDCONSTRAINT -> WELD
+			-- ====================================================
+
+		elseif instance:IsA("WeldConstraint") then
+
+			local p0 =
+				instance.Part0
+
+			local p1 =
+				instance.Part1
+
+
+			if
+				p0 and
+				p1 and
+				exported[p0] and
+				exported[p1]
+			then
+
+				add(
+					lines,
+					variable ..
+						".Part0 = " ..
+						getVariable(p0)
+				)
+
+				add(
+					lines,
+					variable ..
+						".Part1 = " ..
+						getVariable(p1)
+				)
+
+
+				-- Preserve the current relative pose.
+				local relative =
+					p1.CFrame:ToObjectSpace(
+						p0.CFrame
+					)
+
+
+				add(
+					lines,
+					variable ..
+						".C0 = CFrame.new()"
+				)
+
+
+				add(
+					lines,
+					variable ..
+						".C1 = " ..
+						cframe(relative)
+				)
+
+			end
+
+
+			-- ====================================================
+			-- OBJECTVALUE
+			-- ====================================================
+
+		elseif instance:IsA("ObjectValue") then
+
+			if
+				instance.Value and
+				exported[instance.Value]
+			then
+
+				add(
+					lines,
+					variable ..
+						".Value = " ..
+						getVariable(
+							instance.Value
+						)
+				)
+
+			end
+
+
+			-- ====================================================
+			-- SELECTIONBOX
+			-- ====================================================
+
+		elseif instance:IsA("SelectionBox") then
+
+			if
+				instance.Adornee and
+				exported[instance.Adornee]
+			then
+
+				add(
+					lines,
+					variable ..
+						".Adornee = " ..
+						getVariable(
+							instance.Adornee
+						)
+				)
+
+			end
+
+		end
+
+	end
+
+
+	add(lines, "")
+
+
+	-- ========================================================
+	-- EMBEDDED SCRIPTS
+	-- ========================================================
+
+	add(
+		lines,
+		"-- =================================================="
+	)
+
+	add(
+		lines,
+		"-- Embedded Scripts"
+	)
+
+	add(
+		lines,
+		"-- =================================================="
+	)
+
+	add(
+		lines,
+		"-- Scripts are started after the Workspace has loaded."
+	)
+
+	add(lines, "")
+
+
+	for _, scriptObject in ipairs(scripts) do
+
+		if isBlacklisted(scriptObject) then
+			continue
+		end
+
+
+		-- ====================================================
+		-- MODULESCRIPTS
+		-- ====================================================
+
+		if scriptObject:IsA("ModuleScript") then
+
+			add(
+				lines,
+				string.format(
+					"-- ModuleScript skipped: %s",
+					scriptObject:GetFullName()
+				)
+			)
+
+			add(
+				lines,
+				"-- require()/ModuleScript conversion is not implemented yet."
+			)
+
+			add(lines, "")
+
+			continue
+
+		end
+
+
+		-- ====================================================
+		-- FIND SCRIPT PARENT
+		-- ====================================================
+
+		local parent =
+			scriptObject.Parent
+
+		local parentVariable =
+			nil
+
+
+		if
+			parent and
+			exported[parent]
+		then
+
+			parentVariable =
+				getVariable(parent)
+
+		elseif parent == workspace then
+
+			parentVariable =
+				"workspace"
+
+		end
+
+
+		-- If the script belongs to something that wasn't exported,
+		-- don't export the script either.
+		if not parentVariable then
+
+			add(
+				lines,
+				string.format(
+					"-- Script skipped because parent wasn't exported: %s",
+					scriptObject:GetFullName()
+				)
+			)
+
+			add(lines, "")
+
+			continue
+
+		end
+
+
+		-- ====================================================
+		-- READ SOURCE
+		-- ====================================================
+
+		local source
+
+		local ok, result =
+			pcall(function()
+
+				return scriptObject.Source
+
+			end)
+
+
+		if ok then
+			source = result
+		else
+			source = nil
+		end
+
+
+		if not source then
+
+			add(
+				lines,
+				string.format(
+					"-- Could not read script: %s",
+					scriptObject:GetFullName()
+				)
+			)
+
+			add(lines, "")
+
+			continue
+
+		end
+
+
+		-- ====================================================
+		-- CONVERT SOURCE
+		-- ====================================================
+
+		source =
+			convertSource(
+				source,
+				parentVariable
+			)
+
+
+		-- ====================================================
+		-- SCRIPT HEADER
+		-- ====================================================
+
+		add(
+			lines,
+			"-- --------------------------------------------------"
+		)
+
+		add(
+			lines,
+			string.format(
+				"-- Script: %s",
+				scriptObject:GetFullName()
+			)
+		)
+
+		add(
+			lines,
+			string.format(
+				"-- Original parent: %s",
+				parent:GetFullName()
+			)
+		)
+
+
+		-- ====================================================
+		-- EXECUTE
+		-- ====================================================
+
+		add(
+			lines,
+			"spawn(function()"
+		)
+
+		add(lines, "")
+
+
+		add(
+			lines,
+			indentSource(
+				source,
+				1
+			)
+		)
+
+
+		add(lines, "")
+
+		add(
+			lines,
+			"end)"
+		)
+
+		add(lines, "")
+
+	end
+
+
+	-- ========================================================
+	-- FINISHED
+	-- ========================================================
+
+	add(
+		lines,
+		'print("Workspace export loaded successfully.")'
+	)
+
+
+	return table.concat(
+		lines,
+		"\n"
+	)
+
+end
+
+
+-- ============================================================
+-- WRITE OUTPUT
+-- ============================================================
+
+local function writeOutput(source)
+
+	local old =
+		ServerStorage:FindFirstChild(
+			OUTPUT_NAME
+		)
+
+
+	if old then
+
+		old:Destroy()
+
+	end
+
+
+	local output =
+		Instance.new(
+			"ModuleScript"
+		)
+
+
+	output.Name =
+		OUTPUT_NAME
+
+
+	output.Parent =
+		ServerStorage
+
+
+	local success, errorMessage =
+		pcall(function()
+
+			output.Source =
+			source
+
+		end)
+
+
+	if not success then
+
+		warn(
+			"[Blox Exporter] Couldn't write ModuleScript.Source:"
+		)
+
+		warn(
+			errorMessage
+		)
+
+		output:Destroy()
+
+		return
+
+	end
+
+
+	Selection:Set({
+		output
+	})
+
+
+	print(
+		"[Blox Exporter] Export complete."
+	)
+
+
+	print(
+		"[Blox Exporter] Generated:",
+		output:GetFullName()
+	)
+
+
+	print(
+		"[Blox Exporter] Characters:",
+		#source
+	)
+
+end
+
+
+-- ============================================================
+-- BUTTON
+-- ============================================================
+
+exportButton.Click:Connect(function()
+
+	print(
+		"[Blox Exporter] Reading Workspace..."
+	)
+
+
+	local success, result =
+		pcall(
+			generateExport
+		)
+
+
+	if not success then
+
+		warn(
+			"[Blox Exporter] Export failed:"
+		)
+
+		warn(result)
+
+		return
+
+	end
+
+
+	writeOutput(result)
+
+end)]]></ProtectedString>
+			<bool name="Disabled">false</bool>
+			<Content name="LinkedSource"><null></null></Content>
+			<token name="RunContext">3</token>
+			<string name="ScriptGuid">{B1A15172-2802-4497-B503-97D3631148E3}</string>
+			<BinaryString name="AttributesSerialize"></BinaryString>
+			<SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+			<bool name="DefinesCapabilities">false</bool>
+			<string name="Name">Blox Emulation Workspace Exporter</string>
+			<int64 name="SourceAssetId">-1</int64>
+			<SharedString name="Tags">yuZpQdnvvUBOTYh1jqZ2cA==</SharedString>
+		</Properties>
+	</Item>
+	<SharedStrings>
+		<SharedString md5="yuZpQdnvvUBOTYh1jqZ2cA=="></SharedString>
+	</SharedStrings>
+</roblox>
