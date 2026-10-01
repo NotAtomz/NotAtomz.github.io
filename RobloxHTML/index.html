@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Replace this value with your raw.githubusercontent.com games.json URL. -->
+    <meta name="blox-games-manifest" content="https://raw.githubusercontent.com/NotAtomz/BloxMaps/refs/heads/main/games.json">
+    <link rel="icon" type="image/png" href="Textures/Website/O.png">
+    <title>Blox</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js",
+            "native-r6-meshes": "./native-r6-meshes.js"
+        }
+    }
+    </script>
+    <style>
+        @font-face {
+            font-family: "Source Sans Pro";
+            src:
+                url("Textures/Website/source-sans-pro-v9-latin-regular.woff2") format("woff2"),
+                url("Textures/Fonts/SourceSans-Regular.ttf") format("truetype");
+            font-style: normal;
+            font-weight: 300 500;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: "Source Sans Pro";
+            src: url("Textures/Fonts/SourceSansBold.ttf") format("truetype");
+            font-style: normal;
+            font-weight: 600 700;
+            font-display: swap;
+        }
+        :root {
+            --blox-blue: #0074bd;
+            --blox-link: #00a2ff;
+            --blox-blue-dark: #005f9e;
+            --blox-green: #02b757;
+            --line: #454a50;
+            --panel: #25282d;
+            --panel-soft: #2d3136;
+            --panel-deep: #191b1f;
+            --page: #17191c;
+            --text: #edf0f3;
+            --muted: #a9afb7;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { width: 100%; min-height: 100%; margin: 0; }
+        body {
+            color: var(--text);
+            background: var(--page);
+            font-family: "Source Sans Pro", Arial, Helvetica, sans-serif;
+            font-size: 16px;
+            font-weight: 300;
+        }
+        button, input { font: inherit; }
+        button, a, label { -webkit-tap-highlight-color: transparent; }
+        button:focus-visible, input:focus-visible, a:focus-visible {
+            outline: 2px solid #00a2ff;
+            outline-offset: 1px;
+        }
+
+        .topbar {
+            position: sticky;
+            z-index: 1030;
+            top: 0;
+            height: 40px;
+            color: #fff;
+            background: var(--blox-blue);
+            border-bottom: 0;
+            box-shadow: 0 1px 3px rgba(25,25,25,.3);
+        }
+        .topbar-inner {
+            width: 100%;
+            height: 100%;
+            margin: auto;
+            display: flex;
+            align-items: stretch;
+        }
+        .announcement-bar {
+            display: none;
+            width: 100%;
+            min-height: 34px;
+            padding: 7px 14px;
+            color: #fff;
+            background: #e87512;
+            border-bottom: 1px solid #b95608;
+            box-shadow: 0 1px 3px rgba(0,0,0,.35);
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 20px;
+            white-space: pre-wrap;
+        }
+        .announcement-bar.visible { display: block; }
+        .brand {
+            width: 175px;
+            padding: 5px 18px 5px 12px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            border: 0;
+            background: transparent;
+        }
+        .brand img { display: block; width: 100px; height: 30px; object-fit: contain; object-position: left center; }
+        .topnav { display: flex; align-items: stretch; }
+        .topnav-button {
+            min-width: 82px;
+            padding: 0 14px;
+            color: #fff;
+            border: 0;
+            border-left: 1px solid rgba(255,255,255,.08);
+            border-right: 0;
+            background: transparent;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 400;
+        }
+        .topnav-button:hover, .topnav-button.active { background: rgba(25,25,25,.18); }
+        .upload-wrap { position: relative; display: flex; }
+        .upload-menu {
+            position: absolute;
+            display: none;
+            top: 40px;
+            left: 0;
+            width: 158px;
+            padding: 5px 0;
+            color: var(--text);
+            background: var(--panel-soft);
+            border: 1px solid var(--line);
+            box-shadow: 0 2px 7px rgba(0,0,0,.28);
+        }
+        .upload-wrap.open .upload-menu { display: block; }
+        .upload-choice {
+            display: block;
+            width: 100%;
+            padding: 9px 13px;
+            border: 0;
+            color: var(--text);
+            background: var(--panel-soft);
+            text-align: left;
+            cursor: pointer;
+        }
+        .upload-choice:hover { color: #fff; background: var(--blox-link); }
+        .hidden-file { display: none; }
+        .search-wrap {
+            flex: 1;
+            max-width: 420px;
+            height: 28px;
+            margin: 6px 14px;
+            display: flex;
+            background: var(--panel-deep);
+            border: 1px solid #005f9e;
+            border-radius: 3px;
+        }
+        .search-wrap input {
+            min-width: 0;
+            flex: 1;
+            padding: 4px 8px;
+            border: 0;
+            outline: 0;
+            color: var(--text);
+            background: transparent;
+        }
+        .search-button {
+            width: 31px;
+            border: 0;
+            color: var(--muted);
+            background: var(--panel-deep);
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .site-shell {
+            width: 100%;
+            min-height: calc(100vh - 40px);
+            margin: auto;
+            display: grid;
+            grid-template-columns: 175px minmax(0, 1fr);
+        }
+        .sidebar {
+            z-index: 5;
+            padding: 10px;
+            background: #202328;
+            border-right: 0;
+            box-shadow: 1px 0 5px rgba(0,0,0,.55);
+        }
+        .user-editor { padding: 0 3px 11px; border-bottom: 1px solid var(--line); }
+        .user-label { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; font-weight: 400; }
+        .username-row { display: flex; }
+        #usernameInput {
+            width: 100%;
+            min-width: 0;
+            height: 25px;
+            padding: 3px 5px;
+            border: 1px solid var(--line);
+            background: var(--panel-deep);
+            color: var(--text);
+            font-weight: 400;
+        }
+        #saveUsername {
+            width: 32px;
+            margin-left: 3px;
+            border: 1px solid var(--line);
+            color: var(--text);
+            background: linear-gradient(#3b3f45,#2b2e33);
+            cursor: pointer;
+        }
+        #nameStatus { min-height: 14px; padding-top: 3px; color: #16873b; font-size: 10px; }
+        .side-nav { margin-top: 8px; }
+        .side-button {
+            width: 100%;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 0;
+            color: var(--text);
+            background: transparent;
+            cursor: pointer;
+            text-align: left;
+        }
+        .side-button:hover, .side-button.active { color: var(--blox-link); background: #30343a; }
+        .side-icon { width: 18px; text-align: center; font-size: 18px; color: var(--muted); }
+
+        main { min-width: 0; padding: 12px 24px 50px; }
+        .page { display: none; }
+        .page.active { display: block; }
+        .content-width { max-width: 970px; margin: 0 auto; }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 3px;
+            box-shadow: 0 1px 5px rgba(0,0,0,.5);
+        }
+        .section-title {
+            margin: 0 0 8px;
+            color: var(--text);
+            font-size: 20px;
+            font-weight: 300;
+            text-transform: uppercase;
+        }
+
+        .help-panel {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 24px 28px 28px;
+        }
+        .help-panel h1 {
+            margin: 0 0 17px;
+            color: var(--text);
+            font-size: 25px;
+            font-weight: normal;
+        }
+        .upload-help-step {
+            display: grid;
+            grid-template-columns: 28px minmax(0, 1fr);
+            gap: 10px;
+            margin: 0 0 15px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+        .upload-help-number {
+            width: 25px;
+            height: 25px;
+            color: #fff;
+            background: var(--blox-blue);
+            border-radius: 50%;
+            font-weight: bold;
+            line-height: 25px;
+            text-align: center;
+        }
+        .upload-help-step p { margin: 3px 0 0; }
+        .upload-help-note {
+            margin: 19px 0 0;
+            padding: 10px 12px;
+            color: var(--muted);
+            background: var(--panel-deep);
+            border: 1px solid var(--line);
+            line-height: 1.45;
+        }
+
+        .welcome {
+            min-height: 132px;
+            display: flex;
+            align-items: center;
+            padding: 0;
+        }
+        .profile-avatar { position: relative; width: 120px; height: 120px; margin-right: 24px; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; }
+        .profile-avatar canvas, #characterAvatar canvas { display: block; width: 100%; height: 100%; }
+        .welcome h1 { margin: 0 0 6px; font-size: 32px; font-weight: 300; color: var(--text); }
+        .welcome p { margin: 0; color: var(--muted); font-size: 16px; }
+        .games-section { margin-top: 12px; }
+        .games-heading-row { display: flex; align-items: center; justify-content: space-between; }
+        .home-games-link {
+            margin-top: 18px;
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+        }
+        .home-games-link h2 { margin: 0 0 4px; font-size: 21px; font-weight: 400; }
+        .home-games-link p { margin: 0; color: var(--muted); }
+        .recent-games-section { margin-top: 18px; }
+        .recent-games-section .game-grid { grid-template-columns: repeat(auto-fill, 150px); }
+        .games-browser { max-width: 1060px; margin: 0 auto; }
+        .games-browser-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .games-browser-header h1 { margin: 0; font-size: 26px; font-weight: 400; }
+        .catalog-status { min-height: 18px; margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+        .small-blue {
+            height: 27px;
+            padding: 0 13px;
+            border: 1px solid #0470ab;
+            border-radius: 2px;
+            color: #fff;
+            background: linear-gradient(#0aa2e8,#0784c3);
+            cursor: pointer;
+        }
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 150px);
+            gap: 12px 11px;
+            padding: 0;
+        }
+        .game-grid.panel {
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+        }
+        .game-card {
+            min-width: 0;
+            min-height: 187px;
+            padding: 6px;
+            border: 0;
+            border-radius: 3px;
+            background: var(--panel);
+            box-shadow: 0 1px 5px rgba(0,0,0,.5);
+            color: var(--text);
+            text-align: left;
+            cursor: pointer;
+            transition: box-shadow .2s ease;
+        }
+        .game-card-link { display: block; color: inherit; text-decoration: none; }
+        .game-card-thumb-container { display: block; width: 100%; aspect-ratio: 1 / 1; overflow: hidden; background: var(--panel-deep); }
+        .game-card-thumb-container .game-thumb { width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; }
+        .game-card:hover { background: var(--panel-soft); box-shadow: 0 2px 9px rgba(0,0,0,.8); }
+        .game-thumb {
+            display: block;
+            width: 100%;
+            aspect-ratio: 16 / 10;
+            object-fit: cover;
+            background: var(--panel-deep);
+            border: 0;
+        }
+        .game-name {
+            display: block;
+            margin-top: 5px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 14px;
+            font-weight: 400;
+        }
+        .game-kind { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+        .empty-games { grid-column: 1 / -1; padding: 25px; color: var(--muted); text-align: center; }
+
+        .game-detail { max-width: 970px; margin: 12px auto; padding: 0; background: transparent; border: 0; box-shadow: none; }
+        .game-main-content { display: grid; grid-template-columns: minmax(320px, 62%) minmax(220px, 1fr); gap: 24px; padding: 18px; background: var(--panel); border: 1px solid var(--line); }
+        .game-thumb-container { min-width: 0; }
+        .detail-image { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border: 1px solid var(--line); }
+        .game-calls-to-action { display: flex; min-width: 0; flex-direction: column; justify-content: space-between; }
+        .detail-name { margin: 0 0 5px; font-size: 27px; font-weight: normal; overflow-wrap: anywhere; }
+        .detail-kind { color: var(--muted); font-size: 13px; }
+        .play-button {
+            width: 100%;
+            height: 52px;
+            border: 1px solid #009044;
+            border-radius: 4px;
+            color: #fff;
+            background: linear-gradient(#08c963,#00ad50);
+            box-shadow: inset 0 1px rgba(255,255,255,.35);
+            font-size: 21px;
+            cursor: pointer;
+        }
+        .play-button:hover { background: linear-gradient(#13d66f,#00ba58); }
+        .play-button:disabled { opacity: .6; cursor: wait; }
+        .back-link { margin-bottom: 12px; border: 0; color: var(--blox-link); background: none; cursor: pointer; }
+        .game-about-container { margin-top: 14px; padding: 18px 20px 22px; background: var(--panel); border: 1px solid var(--line); }
+        .game-about-container h2 { margin: 0 0 10px; font-size: 21px; font-weight: 400; }
+        .game-description { margin: 0; color: var(--muted); line-height: 1.55; white-space: pre-wrap; }
+
+        .game-loading-overlay {
+            position: fixed;
+            z-index: 2000;
+            inset: 0;
+            display: none;
+            place-items: center;
+            padding: 20px;
+            background: rgba(8,10,13,.9);
+        }
+        .game-loading-overlay.visible { display: grid; }
+        .game-loading-card { width: min(520px,100%); padding: 18px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 8px 35px rgba(0,0,0,.7); }
+        .game-loading-hero { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--panel-deep); }
+        .game-loading-title { margin: 13px 0 8px; font-size: 22px; font-weight: 400; }
+        .game-loading-status { margin: 0 0 10px; color: var(--muted); }
+        .game-loading-track { height: 8px; overflow: hidden; background: var(--panel-deep); border: 1px solid var(--line); }
+        .game-loading-fill { width: 0; height: 100%; background: var(--blox-link); transition: width .12s linear; }
+        .game-loading-track.indeterminate .game-loading-fill { width: 35%; animation: game-loading-slide 1s ease-in-out infinite alternate; }
+        .game-loading-close { display: none; margin-top: 13px; }
+        .game-loading-close.visible { display: inline-block; }
+        @keyframes game-loading-slide { from { transform: translateX(-100%); } to { transform: translateX(285%); } }
+
+        .character-panel { max-width: 1120px; margin: auto; padding: 24px 28px 30px; }
+        .character-page-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 14px; }
+        .character-page-header h1 { margin: 0; font-size: 28px; font-weight: 400; }
+        .character-shop-note { margin: 0; color: var(--muted); font-size: 14px; }
+        .character-shop-note strong { display: inline-block; margin-left: 8px; padding: 5px 12px; color: #fff; background: var(--blox-green); font-weight: 400; }
+        .character-layout { display: grid; grid-template-columns: 255px minmax(0,1fr); gap: 40px; }
+        .preview-column { min-width: 0; }
+        .preview-title { margin: 0 0 10px; color: var(--text); font-size: 22px; font-weight: 300; }
+        .preview-toolbar { height: 31px; display: flex; justify-content: flex-end; gap: 0; margin-top: 7px; }
+        .mode-button {
+            min-width: 43px;
+            border: 1px solid var(--line);
+            color: var(--text);
+            background: linear-gradient(#3b3f45,#2b2e33);
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .mode-button + .mode-button { border-left: 0; }
+        .mode-button.active { color: #fff; background: var(--blox-blue); border-color: #07689c; }
+        .avatar-stage {
+            height: 285px;
+            position: relative;
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+            border: 0;
+            background: radial-gradient(ellipse at 50% 84%, rgba(0,0,0,.48), transparent 29%);
+            cursor: grab;
+            user-select: none;
+        }
+        #characterAvatar { position: absolute; inset: 0; }
+        .avatar-stage.dragging { cursor: grabbing; }
+        .avatar-stage.two-d { cursor: default; }
+        .spin-note { margin: 6px 0 0; color: var(--muted); text-align: center; font-size: 11px; }
+
+        .editor-heading { margin: 0 0 4px; font-size: 24px; font-weight: normal; }
+        .wardrobe-column { min-width: 0; padding-top: 38px; }
+        .wardrobe-tabs { display: flex; gap: 0; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+        .wardrobe-tabs button { min-width: 112px; padding: 10px 20px; border: 1px solid var(--line); border-bottom: 0; color: var(--muted); background: var(--panel-deep); cursor: pointer; }
+        .wardrobe-tabs button + button { border-left: 0; }
+        .wardrobe-tabs button[aria-selected="true"] { color: #fff; background: var(--panel-soft); box-shadow: inset 0 3px var(--blox-link); }
+        .clothing-category-tabs { margin: -4px 0 13px; padding: 0 8px 9px; border-bottom: 1px solid var(--line); }
+        .clothing-category-tabs button { min-width: 82px; padding: 4px 12px; border: 0; color: var(--blox-link); background: transparent; }
+        .clothing-category-tabs button[aria-selected="true"] { color: var(--text); background: var(--panel-soft); box-shadow: none; }
+        .wardrobe-panel[hidden], .clothing-section[hidden] { display: none; }
+        .clothing-catalog { display: grid; grid-template-columns: repeat(auto-fill,minmax(112px,1fr)); gap: 20px 13px; max-height: 430px; overflow-y: auto; padding: 4px 5px 12px; align-items: start; }
+        .clothing-card { position: relative; min-width: 0; padding: 31px 4px 5px; border: 1px solid transparent; background: transparent; color: var(--text); cursor: pointer; text-align: left; }
+        .clothing-card::before { content: "Wear"; position: absolute; top: 1px; left: 50%; transform: translateX(-50%); padding: 3px 10px; color: #fff; background: linear-gradient(#168ee0,#0074bd); border: 1px solid #0064a4; font-size: 12px; line-height: 18px; }
+        .clothing-card[aria-pressed="true"] { border-color: transparent; background: rgba(0,162,255,.09); }
+        .clothing-card[aria-pressed="true"]::before { content: "Wearing"; background: linear-gradient(#555b62,#3c4147); border-color: #555b62; }
+        .clothing-card img { display: block; width: 100%; height: 92px; object-fit: contain; }
+        .clothing-card span { display: block; min-height: 34px; overflow: hidden; margin-top: 7px; color: var(--blox-link); font-size: 13px; line-height: 17px; text-align: center; }
+        .editor-copy { margin: 0 0 17px; color: var(--muted); line-height: 1.45; }
+        .color-grid { display: grid; grid-template-columns: repeat(3,minmax(105px,1fr)); gap: 10px 12px; }
+        .color-row { display: flex; align-items: center; justify-content: space-between; min-width: 0; padding: 7px 9px; border: 1px solid var(--line); background: var(--panel-deep); }
+        .color-row input { width: 43px; height: 29px; padding: 1px; border: 1px solid var(--line); background: var(--panel-deep); }
+        .editor-subtitle { margin: 20px 0 8px; padding-bottom: 5px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 15px; }
+        .asset-row { display: grid; grid-template-columns: 112px minmax(0,1fr) 60px; gap: 7px; margin-bottom: 10px; align-items: center; }
+        .grey-button {
+            min-height: 29px;
+            border: 1px solid var(--line);
+            border-radius: 2px;
+            color: var(--text);
+            background: linear-gradient(#3b3f45,#2b2e33);
+            cursor: pointer;
+            text-align: center;
+            line-height: 27px;
+        }
+        .asset-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+        .template-note { color: var(--muted); font-size: 10px; line-height: 1.4; }
+        .save-avatar {
+            width: 100%; height: 40px; margin-top: 18px;
+            border: 1px solid #0470ab; border-radius: 3px;
+            color: #fff; background: linear-gradient(#13a4e6,#087fc0); cursor: pointer; font-weight: bold;
+        }
+        #avatarSaveStatus { height: 18px; padding-top: 4px; color: #198944; text-align: center; }
+
+        .toast {
+            position: fixed; z-index: 60; left: 50%; bottom: 24px;
+            max-width: calc(100vw - 30px); padding: 10px 16px;
+            color: #fff; background: rgba(25,25,25,.9); border-radius: 3px;
+            opacity: 0; transform: translate(-50%, 12px); pointer-events: none;
+            transition: .2s;
+        }
+        .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+        @media (max-width: 760px) {
+            .brand { width: 120px; padding-right: 8px; }
+            .brand img { width: 94px; }
+            .topnav-button { min-width: 66px; padding: 0 8px; }
+            .search-wrap { margin-right: 6px; }
+            .site-shell { grid-template-columns: 120px minmax(0,1fr); }
+            .sidebar { padding: 9px 5px; }
+            main { padding: 14px 10px 35px; }
+            .welcome h1 { font-size: 23px; }
+            .character-layout { grid-template-columns: 1fr; }
+            .preview-column { max-width: 360px; width: 100%; margin: auto; }
+            .wardrobe-column { padding-top: 4px; }
+            .character-page-header { align-items: flex-start; }
+            .character-shop-note { max-width: 270px; text-align: right; }
+            .detail-grid { grid-template-columns: 1fr; }
+            .game-main-content { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 520px) {
+            .search-wrap { display: none; }
+            .site-shell { display: block; }
+            .sidebar { position: sticky; z-index: 20; top: 40px; display: flex; align-items: center; border-right: 0; border-bottom: 1px solid var(--line); }
+            .user-editor { flex: 1; border-bottom: 0; padding: 0 6px 0 0; }
+            #nameStatus, .user-label { display: none; }
+            .side-nav { display: flex; margin: 0; }
+            .side-button { width: auto; padding: 0 9px; }
+            .side-icon { display: none; }
+            .welcome { min-height: 110px; padding: 7px; }
+            .profile-avatar { width: 90px; height: 95px; overflow: hidden; }
+            .welcome h1 { margin-left: 0; font-size: 23px; }
+            .welcome p { margin-left: 0; font-size: 14px; }
+            .profile-avatar { margin-right: 10px; }
+            .game-grid { grid-template-columns: repeat(2, minmax(0,1fr)); padding: 0; gap: 8px; }
+            .character-panel { padding: 10px; }
+            .avatar-stage { height: 360px; }
+            .color-grid { grid-template-columns: 1fr; }
+            .character-page-header { display: block; }
+            .character-shop-note { margin-top: 7px; max-width: none; text-align: left; }
+            .wardrobe-tabs button { min-width: 0; flex: 1; }
+            .clothing-catalog { grid-template-columns: repeat(2,minmax(0,1fr)); }
+        }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <button class="brand" id="brandButton" type="button" aria-label="Home">
+                <img src="Textures/bloxtitle.png" alt="Blox">
+            </button>
+            <nav class="topnav" aria-label="Main navigation">
+                <button class="topnav-button" id="gamesButton" type="button">Games</button>
+                <div class="upload-wrap" id="uploadWrap">
+                    <button class="topnav-button" id="uploadButton" type="button" aria-expanded="false">Upload ▾</button>
+                    <div class="upload-menu" role="menu">
+                        <label class="upload-choice" for="fileInput" role="menuitem">Upload File</label>
+                        <label class="upload-choice" for="folderInput" role="menuitem">Upload Folder</label>
+                    </div>
+                </div>
+            </nav>
+            <div class="search-wrap">
+                <input id="searchInput" type="search" placeholder="Search games" autocomplete="off">
+                <button class="search-button" id="searchButton" type="button" aria-label="Search">⌕</button>
+            </div>
+        </div>
+    </header>
+    <div class="announcement-bar alert-info" id="announcementBar" role="status"></div>
+
+    <div class="site-shell">
+        <aside class="sidebar">
+            <div class="user-editor">
+                <label class="user-label" for="usernameInput">Username</label>
+                <div class="username-row">
+                    <input id="usernameInput" maxlength="20" value="Player" aria-label="Username">
+                    <button id="saveUsername" type="button" title="Save username">✓</button>
+                </div>
+                <div id="nameStatus"></div>
+            </div>
+            <nav class="side-nav" aria-label="Account navigation">
+                <button class="side-button active" data-page="home" type="button"><span class="side-icon">⌂</span>Home</button>
+                <button class="side-button" data-page="games" type="button"><span class="side-icon">▦</span>Games</button>
+                <button class="side-button" data-page="character" type="button"><span class="side-icon">♟</span>Character</button>
+                <button class="side-button" data-page="help" type="button"><span class="side-icon">?</span>Help</button>
+            </nav>
+        </aside>
+
+        <main>
+            <section class="page active" id="homePage">
+                <div class="content-width">
+                    <div class="welcome">
+                        <div class="profile-avatar" id="homeAvatar"></div>
+                        <div>
+                            <h1>Hello, <span id="welcomeName">Player</span>!</h1>
+                            <p>Choose a local Roblox place and start playing.</p>
+                        </div>
+                    </div>
+                    <section class="recent-games-section">
+                        <div class="games-heading-row">
+                            <h2 class="section-title">Recently Played</h2>
+                            <button class="small-blue" id="recentSeeAllButton" type="button">See All</button>
+                        </div>
+                        <div class="panel game-grid games-list game-cards" id="recentGameGrid"></div>
+                    </section>
+                    <section class="panel home-games-link">
+                        <div>
+                            <h2>Games</h2>
+                            <p>Browse downloadable maps or upload one from your computer.</p>
+                        </div>
+                        <button class="small-blue" id="browseGamesButton" type="button">Browse Games</button>
+                    </section>
+                </div>
+            </section>
+
+            <section class="page" id="gamesPage">
+                <div class="games-browser">
+                    <div class="games-browser-header">
+                        <h1>Games</h1>
+                        <button class="small-blue" id="homeUploadButton" type="button">Upload Map</button>
+                    </div>
+                    <p class="catalog-status" id="catalogStatus">Loading available games…</p>
+                    <div class="panel game-grid games-list game-cards" id="gameGrid"></div>
+                </div>
+            </section>
+
+            <section class="page" id="gamePage">
+                <div class="content-width">
+                    <button class="back-link" id="backToGames" type="button">‹ Back to Games</button>
+                    <article class="game-detail game-detail-page">
+                        <div class="game-main-content">
+                            <div class="game-thumb-container">
+                                <img class="detail-image carousel-thumb" id="detailImage" src="Textures/NativeClassic/Content_Deleted.png" alt="Game thumbnail">
+                            </div>
+                            <div class="game-calls-to-action">
+                                <div class="game-title-container">
+                                <h1 class="detail-name" id="detailName">Game</h1>
+                                    <div class="detail-kind" id="detailKind">Map</div>
+                                </div>
+                                <div class="game-play-buttons">
+                                    <button class="play-button btn-primary-lg" id="playButton" type="button">Play</button>
+                                </div>
+                            </div>
+                        </div>
+                        <section class="game-about-container">
+                            <h2>Description</h2>
+                            <p class="game-description" id="detailDescription">No description was provided.</p>
+                        </section>
+                    </article>
+                </div>
+            </section>
+
+            <section class="page" id="characterPage">
+                <div class="panel character-panel">
+                    <div class="character-page-header">
+                        <h1>Avatar Customizer</h1>
+                        <p class="character-shop-note">Upload classic clothing to expand your wardrobe.<strong>Your Catalog</strong></p>
+                    </div>
+                    <div class="character-layout">
+                        <div class="preview-column">
+                            <h2 class="preview-title">Avatar</h2>
+                            <div class="avatar-stage" id="avatarStage">
+                                <div id="characterAvatar"></div>
+                            </div>
+                            <div class="preview-toolbar">
+                                <button class="mode-button" id="mode2d" type="button">2D</button>
+                                <button class="mode-button active" id="mode3d" type="button">3D</button>
+                            </div>
+                            <p class="spin-note" id="spinNote">Drag the character to spin it.</p>
+                        </div>
+                        <div class="wardrobe-column">
+                            <div class="wardrobe-tabs" role="tablist" aria-label="Character categories">
+                                <button type="button" role="tab" data-wardrobe="body" aria-selected="true">Body</button>
+                                <button type="button" role="tab" data-wardrobe="clothing" aria-selected="false">Clothing</button>
+                            </div>
+                            <div id="bodyWardrobe" class="wardrobe-panel">
+                            <h2 class="editor-subtitle">Body Colors</h2>
+                            <div class="color-grid">
+                                <label class="color-row"><span>Head</span><input id="headColor" type="color" value="#ffff82"></label>
+                                <label class="color-row"><span>Torso</span><input id="torsoColor" type="color" value="#ff8282"></label>
+                                <label class="color-row"><span>Left Arm</span><input id="leftArmColor" type="color" value="#ffff82"></label>
+                                <label class="color-row"><span>Right Arm</span><input id="rightArmColor" type="color" value="#ffff82"></label>
+                                <label class="color-row"><span>Left Leg</span><input id="leftLegColor" type="color" value="#ffff82"></label>
+                                <label class="color-row"><span>Right Leg</span><input id="rightLegColor" type="color" value="#ffff82"></label>
+                            </div>
+                            </div>
+                            <div id="clothingWardrobe" class="wardrobe-panel" hidden>
+                            <div class="wardrobe-tabs clothing-category-tabs" role="tablist" aria-label="Clothing categories">
+                                <button type="button" role="tab" data-clothing="shirt" aria-selected="true">Shirts</button>
+                                <button type="button" role="tab" data-clothing="pants" aria-selected="false">Pants</button>
+                            </div>
+                            <div id="shirtSection" class="clothing-section">
+                            <div class="asset-row">
+                                <label class="grey-button" for="shirtInput">Upload Shirts</label>
+                                <span class="asset-name" id="selectedShirt">No shirt selected</span>
+                                <button class="grey-button" id="clearShirtButton" type="button">Clear</button>
+                            </div>
+                            <div id="shirtCatalog" class="clothing-catalog"></div>
+                            </div>
+                            <div id="pantsSection" class="clothing-section" hidden>
+                            <div class="asset-row">
+                                <label class="grey-button" for="pantsInput">Upload Pants</label>
+                                <span class="asset-name" id="selectedPants">No pants selected</span>
+                                <button class="grey-button" id="clearPantsButton" type="button">Clear</button>
+                            </div>
+                            <div id="pantsCatalog" class="clothing-catalog"></div>
+                            </div>
+                            </div>
+                            <p class="template-note">Use classic 585 × 559 R6 PNG templates. Transparent pixels reveal the body color underneath.</p>
+                            <button class="save-avatar" id="saveAvatarButton" type="button">Save Character</button>
+                            <div id="avatarSaveStatus"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="page" id="helpPage">
+                <div class="panel help-panel">
+                    <h1>How to Upload Maps</h1>
+                    <div class="upload-help-step">
+                        <span class="upload-help-number">1</span>
+                        <p>Click <strong>Upload</strong> in the blue bar at the top of the page.</p>
+                    </div>
+                    <div class="upload-help-step">
+                        <span class="upload-help-number">2</span>
+                        <p>Choose <strong>Upload File</strong> for one map, or <strong>Upload Folder</strong> to add every supported map in a folder.</p>
+                    </div>
+                    <div class="upload-help-step">
+                        <span class="upload-help-number">3</span>
+                        <p>Select an <strong>RBXL</strong>, <strong>RBXLX</strong>, <strong>Lua</strong>, or <strong>Luau</strong> file from your computer.</p>
+                    </div>
+                    <div class="upload-help-step">
+                        <span class="upload-help-number">4</span>
+                        <p>Open the map's game card, then click the green <strong>Play</strong> button.</p>
+                    </div>
+                    <p class="upload-help-note">Your browser keeps uploaded files local to this page. Nothing is sent to a server.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <input class="hidden-file" type="file" id="fileInput" accept=".lua,.luau,.rbxl,.rbxlx,text/x-lua,text/plain,application/octet-stream,application/xml">
+    <input class="hidden-file" type="file" id="folderInput" webkitdirectory directory multiple>
+    <input class="hidden-file" type="file" id="shirtInput" accept="image/png,.png" multiple>
+    <input class="hidden-file" type="file" id="pantsInput" accept="image/png,.png" multiple>
+    <div class="toast" id="toast" role="status"></div>
+    <div class="game-loading-overlay" id="gameLoadingOverlay" role="dialog" aria-modal="true" aria-labelledby="gameLoadingTitle">
+        <div class="game-loading-card">
+            <img class="game-loading-hero" id="gameLoadingImage" src="Textures/NativeClassic/Content_Deleted.png" alt="">
+            <h2 class="game-loading-title" id="gameLoadingTitle">Loading game</h2>
+            <p class="game-loading-status" id="gameLoadingStatus">Preparing download…</p>
+            <div class="game-loading-track indeterminate" id="gameLoadingTrack"><div class="game-loading-fill" id="gameLoadingFill"></div></div>
+            <button class="small-blue game-loading-close" id="gameLoadingClose" type="button">Close</button>
+        </div>
+    </div>
+
+    <script src="blox-rbx-loader.js?v=20260929-gui-udim"></script>
+    <script type="module">
+        import * as THREE from "three";
+        import { getNativeR6Geometry } from "native-r6-meshes";
+
+        "use strict";
+
+        const AVATAR_STORAGE_KEY = "bloxAvatarDescription";
+        const PLAYER_NAME_STORAGE_KEY = "bloxPlayerName";
+        const RECENT_GITHUB_GAMES_STORAGE_KEY = "bloxRecentGithubGames";
+        const MAX_RECENT_GITHUB_GAMES = 6;
+        const ANNOUNCEMENT_TEXT_URL = "https://raw.githubusercontent.com/NotAtomz/BloxMaps/refs/heads/main/text.txt";
+        const CLASSIC_TEMPLATE_WIDTH = 585;
+        const CLASSIC_TEMPLATE_HEIGHT = 559;
+        const MAX_CLOTHING_FILE_BYTES = 1.5 * 1024 * 1024;
+        const SUPPORTED_MAP_PATTERN = /\.(lua|luau|rbxl|rbxlx)$/i;
+        const GAMES_MANIFEST_URL = (
+            new URLSearchParams(window.location.search).get("manifest") ||
+            document.querySelector('meta[name="blox-games-manifest"]')?.content ||
+            ""
+        ).trim();
+        const FALLBACK_GAME_IMAGE = "Textures/NativeClassic/Content_Deleted.png";
+        const DEFAULT_AVATAR_COLORS = {
+            HeadColor: "#ffff82", TorsoColor: "#ff8282",
+            LeftArmColor: "#ffff82", RightArmColor: "#ffff82",
+            LeftLegColor: "#ffff82", RightLegColor: "#ffff82"
+        };
+        const CLASSIC_R6_TEMPLATE_CROPS = Object.freeze({
+            Torso: Object.freeze({
+                right:{x:165,y:74,w:64,h:128}, front:{x:231,y:74,w:128,h:128},
+                left:{x:361,y:74,w:64,h:128}, back:{x:427,y:74,w:128,h:128},
+                top:{x:231,y:8,w:128,h:64}, bottom:{x:231,y:204,w:128,h:64}
+            }),
+            "Right Arm": Object.freeze({
+                left:{x:19,y:355,w:64,h:128}, back:{x:85,y:355,w:64,h:128},
+                right:{x:151,y:355,w:64,h:128}, front:{x:217,y:355,w:64,h:128},
+                top:{x:217,y:289,w:64,h:64}, bottom:{x:217,y:485,w:64,h:64}
+            }),
+            "Left Arm": Object.freeze({
+                front:{x:308,y:355,w:64,h:128}, left:{x:374,y:355,w:64,h:128},
+                back:{x:440,y:355,w:64,h:128}, right:{x:506,y:355,w:64,h:128},
+                top:{x:308,y:289,w:64,h:64}, bottom:{x:308,y:485,w:64,h:64}
+            }),
+            "Right Leg": Object.freeze({
+                left:{x:19,y:355,w:64,h:128}, back:{x:85,y:355,w:64,h:128},
+                right:{x:151,y:355,w:64,h:128}, front:{x:217,y:355,w:64,h:128},
+                top:{x:217,y:289,w:64,h:64}, bottom:{x:217,y:485,w:64,h:64}
+            }),
+            "Left Leg": Object.freeze({
+                front:{x:308,y:355,w:64,h:128}, left:{x:374,y:355,w:64,h:128},
+                back:{x:440,y:355,w:64,h:128}, right:{x:506,y:355,w:64,h:128},
+                top:{x:308,y:289,w:64,h:64}, bottom:{x:308,y:485,w:64,h:64}
+            })
+        });
+        // Matches the six material groups produced by native-r6-meshes.js.
+        const CLASSIC_R6_FACE_ORDER = Object.freeze(["left", "right", "top", "bottom", "front", "back"]);
+
+        const $ = id => document.getElementById(id);
+        const pages = { home: $("homePage"), games: $("gamesPage"), game: $("gamePage"), character: $("characterPage"), help: $("helpPage") };
+        const avatarColorInputs = {
+            HeadColor: $("headColor"), TorsoColor: $("torsoColor"),
+            LeftArmColor: $("leftArmColor"), RightArmColor: $("rightArmColor"),
+            LeftLegColor: $("leftLegColor"), RightLegColor: $("rightLegColor")
+        };
+
+        let selectedGame = null;
+        let games = [];
+        let selectedShirtDataUrl = "";
+        let selectedPantsDataUrl = "";
+        let shirtValidationPromise = Promise.resolve();
+        let pantsValidationPromise = Promise.resolve();
+        let avatarMode = "3d";
+        let avatarAngle = -18;
+        let dragStartX = 0;
+        let dragStartAngle = 0;
+        let toastTimer = 0;
+        let homeAvatarPreview = null;
+        let characterAvatarPreview = null;
+        const previewImageCache = new Map();
+        const clothingCatalog = { shirt: [], pants: [] };
+        // Keep the whole wardrobe in IndexedDB; only the worn outfit goes into
+        // the existing profile used by the emulator and offline launcher.
+        const wardrobeDatabase = new Promise((resolve, reject) => {
+            const request = indexedDB.open("bloxWardrobe", 1);
+            request.onupgradeneeded = () => request.result.createObjectStore("clothing", { keyPath: "id", autoIncrement: true });
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+        wardrobeDatabase.catch(() => {});
+        async function wardrobeStore(mode, action) {
+            const db = await wardrobeDatabase;
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction("clothing", mode);
+                const request = action(transaction.objectStore("clothing"));
+                transaction.oncomplete = () => resolve(request.result);
+                transaction.onabort = () => reject(transaction.error || new Error("Could not save clothing"));
+                transaction.onerror = () => reject(transaction.error);
+            });
+        }
+        function renderClothingCatalogs() {
+            for (const type of ["shirt", "pants"]) {
+                const grid = $(type + "Catalog");
+                grid.replaceChildren();
+                const selected = type === "shirt" ? selectedShirtDataUrl : selectedPantsDataUrl;
+                for (const entry of clothingCatalog[type]) {
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.className = "clothing-card";
+                    button.setAttribute("aria-pressed", String(entry.dataUrl === selected));
+                    button.title = entry.name;
+                    const image = document.createElement("img");
+                    image.src = entry.dataUrl; image.alt = ""; image.loading = "lazy";
+                    const label = document.createElement("span"); label.textContent = entry.name;
+                    button.append(image, label);
+                    button.addEventListener("click", () => {
+                        if (type === "shirt") selectedShirtDataUrl = entry.dataUrl;
+                        else selectedPantsDataUrl = entry.dataUrl;
+                        updateClothingLabels(); renderAvatars(); renderClothingCatalogs();
+                        $("avatarSaveStatus").textContent = "Unsaved changes";
+                    });
+                    grid.append(button);
+                }
+                if (!grid.children.length) grid.textContent = "Upload templates to start your collection.";
+            }
+        }
+        async function restoreWardrobe() {
+            try {
+                const entries = await wardrobeStore("readonly", store => store.getAll());
+                for (const entry of entries) {
+                    if (clothingCatalog[entry.type] && String(entry.dataUrl).startsWith("data:image/")) clothingCatalog[entry.type].push(entry);
+                }
+                for (const type of ["shirt", "pants"]) {
+                    const dataUrl = type === "shirt" ? selectedShirtDataUrl : selectedPantsDataUrl;
+                    if (dataUrl && !clothingCatalog[type].some(entry => entry.dataUrl === dataUrl)) {
+                        const entry = { type, name: "Saved " + type, dataUrl };
+                        entry.id = await wardrobeStore("readwrite", store => store.add(entry));
+                        clothingCatalog[type].push(entry);
+                    }
+                }
+            } catch (error) { showToast("Could not open your saved clothing collection: " + error.message); }
+            updateClothingLabels();
+            renderClothingCatalogs();
+        }
+
+        function safeStorageGet(storage, key) {
+            try { return storage.getItem(key); } catch { return null; }
+        }
+        function safeStorageSet(storage, key, value) {
+            try { storage.setItem(key, value); return true; } catch (error) { console.warn("[Launcher] Storage failed:", error); return false; }
+        }
+        async function loadAnnouncementBar() {
+            const bar = $("announcementBar");
+            try {
+                const response = await fetch(ANNOUNCEMENT_TEXT_URL, { cache: "no-store" });
+                if (!response.ok) throw new Error(`Announcement request returned ${response.status}`);
+                const message = (await response.text()).trim();
+                if (!message) return;
+                bar.textContent = message;
+                bar.classList.add("visible");
+            } catch (error) {
+                console.warn("[Announcement] Could not load announcement text:", error);
+                bar.textContent = "";
+                bar.classList.remove("visible");
+            }
+        }
+        function sanitizeUsername(value) {
+            const cleaned = String(value || "").trim().replace(/[^A-Za-z0-9_]/g, "").slice(0, 20);
+            return cleaned || "Player";
+        }
+        function sanitizeColor(value, fallback) {
+            const text = String(value || "").trim();
+            return /^#[0-9a-f]{6}$/i.test(text) ? text.toLowerCase() : fallback;
+        }
+        function showToast(message) {
+            const toast = $("toast");
+            toast.textContent = message;
+            toast.classList.add("show");
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
+        }
+
+        function saveUsername() {
+            const name = sanitizeUsername($("usernameInput").value);
+            $("usernameInput").value = name;
+            $("welcomeName").textContent = name;
+            safeStorageSet(localStorage, PLAYER_NAME_STORAGE_KEY, name);
+            safeStorageSet(sessionStorage, PLAYER_NAME_STORAGE_KEY, name);
+            $("nameStatus").textContent = "Saved";
+            setTimeout(() => { if ($("nameStatus").textContent === "Saved") $("nameStatus").textContent = ""; }, 1400);
+        }
+
+        function getPreviewImage(source) {
+            if (!source) return Promise.resolve(null);
+            if (previewImageCache.has(source)) return previewImageCache.get(source);
+            const pending = new Promise(resolve => {
+                const image = new Image();
+                image.onload = () => resolve(image);
+                image.onerror = () => resolve(null);
+                image.src = source;
+            });
+            previewImageCache.set(source, pending);
+            return pending;
+        }
+
+        function disposePreviewMaterial(material) {
+            const list = Array.isArray(material) ? material : [material];
+            const seen = new Set();
+            for (const item of list) {
+                if (!item || seen.has(item)) continue;
+                seen.add(item);
+                item.map?.dispose?.();
+                item.dispose?.();
+            }
+        }
+
+        class ClassicR6Preview {
+            constructor(container, compact = false) {
+                this.container = container;
+                this.compact = compact;
+                this.revision = 0;
+                this.parts = new Map();
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(compact ? 34 : 31, 1, 0.1, 50);
+                this.camera.position.set(0, 2.35, compact ? 9.4 : 9.2);
+                this.camera.lookAt(0, 2.3, 0);
+                this.renderer = new THREE.WebGLRenderer({
+                    antialias: true,
+                    alpha: true,
+                    powerPreference: "low-power",
+                    // The home portrait may be captured by the browser while
+                    // its page is idle; retain the completed preview frame.
+                    preserveDrawingBuffer: true
+                });
+                this.renderer.setClearColor(0x000000, 0);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+                this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.2;
+                container.replaceChildren(this.renderer.domElement);
+
+                this.rig = new THREE.Group();
+                this.rig.rotation.y = THREE.MathUtils.degToRad(compact ? -14 : avatarAngle);
+                this.scene.add(this.rig);
+                this.scene.add(new THREE.HemisphereLight(0xffffff, 0x76808b, 2.15));
+                const key = new THREE.DirectionalLight(0xffffff, 2.1);
+                key.position.set(4, 8, 7);
+                this.scene.add(key);
+                const fill = new THREE.DirectionalLight(0x8fc8ff, 0.8);
+                fill.position.set(-5, 3, 4);
+                this.scene.add(fill);
+
+                this.addPart("Torso", "body", [0, 2.5, 0]);
+                this.addPart("Left Arm", "LeftArm", [1.5, 2.5, 0]);
+                this.addPart("Right Arm", "RightArm", [-1.5, 2.5, 0]);
+                this.addPart("Left Leg", "LeftLeg", [0.5, 0.5, 0]);
+                this.addPart("Right Leg", "RightLeg", [-0.5, 0.5, 0]);
+                this.addHead();
+
+                this.resizeObserver = new ResizeObserver(() => this.resize());
+                this.resizeObserver.observe(container);
+                this.resize();
+            }
+
+            makeSolidMaterials(color) {
+                return CLASSIC_R6_FACE_ORDER.map(() => new THREE.MeshStandardMaterial({
+                    color,
+                    roughness: 0.36,
+                    metalness: 0
+                }));
+            }
+
+            addPart(partName, geometryName, position) {
+                const geometry = getNativeR6Geometry(THREE, geometryName);
+                const mesh = new THREE.Mesh(geometry, this.makeSolidMaterials(0xffffff));
+                mesh.name = partName;
+                mesh.position.set(...position);
+                this.parts.set(partName, mesh);
+                this.rig.add(mesh);
+            }
+
+            addHead() {
+                const head = new THREE.Mesh(
+                    getNativeR6Geometry(THREE, "Head"),
+                    new THREE.MeshStandardMaterial({ color: 0xffff82, roughness: 0.36, metalness: 0 })
+                );
+                head.name = "Head";
+                head.position.set(0, 4, 0);
+                this.parts.set("Head", head);
+                this.rig.add(head);
+
+                const faceTexture = new THREE.TextureLoader().load(
+                    "Textures/NativeClassic/face.png",
+                    () => this.render()
+                );
+                faceTexture.colorSpace = THREE.SRGBColorSpace;
+                const face = new THREE.Mesh(
+                    new THREE.PlaneGeometry(1.18, 1.18),
+                    new THREE.MeshBasicMaterial({
+                        map: faceTexture,
+                        transparent: true,
+                        alphaTest: 0.01,
+                        depthWrite: false,
+                        toneMapped: false
+                    })
+                );
+                face.position.set(0, 4, 0.603);
+                face.renderOrder = 2;
+                this.rig.add(face);
+            }
+
+            makeCompositeMaterial(baseColor, crop, images) {
+                const canvas = document.createElement("canvas");
+                canvas.width = crop.w;
+                canvas.height = crop.h;
+                const context = canvas.getContext("2d");
+                context.fillStyle = baseColor;
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                for (const image of images) {
+                    if (!image) continue;
+                    context.drawImage(image, crop.x, crop.y, crop.w, crop.h, 0, 0, canvas.width, canvas.height);
+                }
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.colorSpace = THREE.SRGBColorSpace;
+                texture.wrapS = THREE.ClampToEdgeWrapping;
+                texture.wrapT = THREE.ClampToEdgeWrapping;
+                texture.minFilter = THREE.LinearFilter;
+                texture.magFilter = THREE.LinearFilter;
+                return new THREE.MeshStandardMaterial({
+                    map: texture,
+                    color: 0xffffff,
+                    roughness: 0.36,
+                    metalness: 0
+                });
+            }
+
+            makePartMaterials(partName, baseColor, shirtImage, pantsImage) {
+                const crops = CLASSIC_R6_TEMPLATE_CROPS[partName];
+                const isTorso = partName === "Torso";
+                const isArm = partName === "Left Arm" || partName === "Right Arm";
+                const isLeg = partName === "Left Leg" || partName === "Right Leg";
+                if (!crops || (!shirtImage && !pantsImage)) return this.makeSolidMaterials(baseColor);
+
+                return CLASSIC_R6_FACE_ORDER.map(faceName => {
+                    const crop = crops[faceName];
+                    const layers = [];
+                    if (isTorso && pantsImage) layers.push(pantsImage);
+                    if ((isTorso || isArm) && shirtImage) layers.push(shirtImage);
+                    if (isLeg && pantsImage) layers.push(pantsImage);
+                    if (!crop || !layers.length) return new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.36, metalness: 0 });
+                    return this.makeCompositeMaterial(baseColor, crop, layers);
+                });
+            }
+
+            async update(profile) {
+                const revision = ++this.revision;
+                const [shirtImage, pantsImage] = await Promise.all([
+                    getPreviewImage(profile.shirtDataUrl),
+                    getPreviewImage(profile.pantsDataUrl)
+                ]);
+                if (revision !== this.revision) return;
+                const colors = profile.colors;
+                const mapping = {
+                    Torso: "TorsoColor",
+                    "Left Arm": "LeftArmColor",
+                    "Right Arm": "RightArmColor",
+                    "Left Leg": "LeftLegColor",
+                    "Right Leg": "RightLegColor"
+                };
+                for (const [partName, colorName] of Object.entries(mapping)) {
+                    const mesh = this.parts.get(partName);
+                    const old = mesh.material;
+                    mesh.material = this.makePartMaterials(partName, colors[colorName], shirtImage, pantsImage);
+                    disposePreviewMaterial(old);
+                }
+                this.parts.get("Head").material.color.set(colors.HeadColor);
+                this.render();
+            }
+
+            setAngle(degrees) {
+                this.rig.rotation.y = THREE.MathUtils.degToRad(degrees);
+                this.render();
+            }
+
+            resize() {
+                const width = Math.max(1, this.container.clientWidth);
+                const height = Math.max(1, this.container.clientHeight);
+                this.camera.aspect = width / height;
+                if (!this.compact) {
+                    const halfFov = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+                    this.camera.position.set(0, 2.1, Math.max(3.2 / halfFov, 2.6 / (halfFov * this.camera.aspect)) + 1);
+                    this.camera.lookAt(0, 2.1, 0);
+                }
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(width, height, false);
+                this.render();
+            }
+
+            render() {
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        function renderAvatars() {
+            const profile = getCurrentAvatarProfile();
+            homeAvatarPreview?.update(profile);
+            characterAvatarPreview?.update(profile);
+            homeAvatarPreview?.setAngle(-14);
+            characterAvatarPreview?.setAngle(avatarMode === "2d" ? 0 : avatarAngle);
+        }
+
+        function getCurrentAvatarProfile() {
+            const colors = {};
+            for (const [key,input] of Object.entries(avatarColorInputs)) colors[key] = sanitizeColor(input.value, DEFAULT_AVATAR_COLORS[key]);
+            return { version: 2, colors, shirtDataUrl: selectedShirtDataUrl, pantsDataUrl: selectedPantsDataUrl };
+        }
+        function restoreAvatar() {
+            let saved = null;
+            try { saved = JSON.parse(safeStorageGet(localStorage, AVATAR_STORAGE_KEY) || "null"); } catch {}
+            for (const [key,input] of Object.entries(avatarColorInputs)) input.value = sanitizeColor(saved?.colors?.[key], DEFAULT_AVATAR_COLORS[key]);
+            const shirt = String(saved?.shirtDataUrl || "");
+            const pants = String(saved?.pantsDataUrl || "");
+            selectedShirtDataUrl = shirt.startsWith("data:image/") ? shirt : "";
+            selectedPantsDataUrl = pants.startsWith("data:image/") ? pants : "";
+            updateClothingLabels();
+            renderAvatars();
+        }
+        function updateClothingLabels() {
+            $("selectedShirt").textContent = selectedShirtDataUrl ? clothingCatalog.shirt.find(item => item.dataUrl === selectedShirtDataUrl)?.name || "Saved shirt" : "No shirt selected";
+            $("selectedPants").textContent = selectedPantsDataUrl ? clothingCatalog.pants.find(item => item.dataUrl === selectedPantsDataUrl)?.name || "Saved pants" : "No pants selected";
+        }
+        function readFileAsDataUrl(file) {
+            return new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || "")); reader.onerror = () => reject(reader.error || new Error("File read failed")); reader.readAsDataURL(file); });
+        }
+        function loadImage(dataUrl) {
+            return new Promise((resolve,reject) => { const image = new Image(); image.onload = () => resolve(image); image.onerror = () => reject(new Error("Invalid image")); image.src = dataUrl; });
+        }
+        async function validateClothing(file) {
+            if (!file) return "";
+            if ((file.type && file.type !== "image/png") || !/\.png$/i.test(file.name)) throw new Error("Classic clothing must be a PNG image.");
+            if (file.size > MAX_CLOTHING_FILE_BYTES) throw new Error("The clothing PNG must be smaller than 1.5 MB.");
+            const dataUrl = await readFileAsDataUrl(file);
+            const image = await loadImage(dataUrl);
+            if (image.naturalWidth !== CLASSIC_TEMPLATE_WIDTH || image.naturalHeight !== CLASSIC_TEMPLATE_HEIGHT) throw new Error(`Expected a ${CLASSIC_TEMPLATE_WIDTH} × ${CLASSIC_TEMPLATE_HEIGHT} template; this image is ${image.naturalWidth} × ${image.naturalHeight}.`);
+            return dataUrl;
+        }
+        async function chooseClothing(input, type) {
+            const files = Array.from(input.files || []);
+            input.value = "";
+            await wardrobeReady;
+            for (const file of files) try {
+                const value = await validateClothing(file);
+                if (!clothingCatalog[type].some(entry => entry.dataUrl === value)) {
+                    const entry = { type, name: file.name, dataUrl: value };
+                    entry.id = await wardrobeStore("readwrite", store => store.add(entry));
+                    clothingCatalog[type].push(entry);
+                }
+                if (type === "shirt") selectedShirtDataUrl = value; else selectedPantsDataUrl = value;
+                $(type === "shirt" ? "selectedShirt" : "selectedPants").textContent = file.name;
+                $("avatarSaveStatus").textContent = "Unsaved changes";
+                renderAvatars();
+                renderClothingCatalogs();
+            } catch (error) {
+                input.value = "";
+                showToast(error.message || "That clothing template could not be loaded.");
+            }
+        }
+        function clearClothing(type) {
+            if (type === "shirt") { selectedShirtDataUrl = ""; $("shirtInput").value = ""; }
+            else { selectedPantsDataUrl = ""; $("pantsInput").value = ""; }
+            updateClothingLabels(); renderAvatars(); renderClothingCatalogs(); $("avatarSaveStatus").textContent = "Unsaved changes";
+        }
+
+        function showPage(name) {
+            for (const [key,page] of Object.entries(pages)) page.classList.toggle("active", key === name);
+            document.querySelectorAll(".side-button").forEach(button => button.classList.toggle("active", button.dataset.page === name));
+            $("gamesButton").classList.toggle("active", name === "games" || name === "game");
+            window.scrollTo({ top: 0, behavior: "auto" });
+        }
+        function openGame(game) {
+            selectedGame = game;
+            $("detailName").textContent = game.name;
+            $("detailDescription").textContent = game.description || "No description was provided.";
+            $("detailKind").textContent = `${gameKind(game)}${game.remote ? " · Downloadable map" : " · Local map"}`;
+            $("detailImage").src = game.imageUrl || FALLBACK_GAME_IMAGE;
+            $("detailImage").alt = `${game.name} thumbnail`;
+            $("detailImage").onerror = () => {
+                $("detailImage").onerror = null;
+                $("detailImage").src = FALLBACK_GAME_IMAGE;
+            };
+            $("playButton").disabled = false;
+            $("playButton").textContent = "Play";
+            showPage("game");
+        }
+        function gameKind(game) {
+            const fileName = game?.file?.name || game?.fileName || game?.fileUrl || "map";
+            return (String(fileName).split(/[?#]/)[0].split(".").pop() || "map").toUpperCase();
+        }
+
+        function createGameCard(game) {
+            const card = document.createElement("button");
+            card.type = "button";
+            card.className = "game-card list-item";
+            card.title = game.name;
+            const thumbContainer = document.createElement("span");
+            thumbContainer.className = "game-card-thumb-container";
+            const image = document.createElement("img");
+            image.className = "game-thumb game-card-thumb";
+            image.src = game.imageUrl || FALLBACK_GAME_IMAGE;
+            image.alt = `${game.name} thumbnail`;
+            image.onerror = () => {
+                image.onerror = null;
+                image.src = FALLBACK_GAME_IMAGE;
+            };
+            thumbContainer.appendChild(image);
+            const name = document.createElement("span");
+            name.className = "game-name";
+            name.textContent = game.name;
+            const kind = document.createElement("span");
+            kind.className = "game-kind game-card-name-secondary";
+            kind.textContent = `${gameKind(game)}${game.remote ? " · Online" : " · Local"}`;
+            card.append(thumbContainer, name, kind);
+            card.addEventListener("click", () => openGame(game));
+            return card;
+        }
+
+        function getRecentlyPlayedGames() {
+            let stored = [];
+            try {
+                stored = JSON.parse(safeStorageGet(localStorage, RECENT_GITHUB_GAMES_STORAGE_KEY) || "[]");
+            } catch {}
+            if (!Array.isArray(stored)) return [];
+
+            return stored.slice(0, MAX_RECENT_GITHUB_GAMES).map((entry,index) => {
+                const game = normalizeRemoteGame({
+                    title: entry?.name,
+                    file: entry?.fileUrl,
+                    fileName: entry?.fileName,
+                    description: entry?.description,
+                    image: entry?.imageUrl
+                }, index, window.location.href);
+                if (game) game.lastPlayed = Number(entry?.lastPlayed) || 0;
+                return game;
+            }).filter(Boolean);
+        }
+
+        function renderRecentlyPlayedGames() {
+            const grid = $("recentGameGrid");
+            const recentGames = getRecentlyPlayedGames();
+            grid.replaceChildren();
+            if (!recentGames.length) {
+                const empty = document.createElement("div");
+                empty.className = "empty-games";
+                empty.textContent = "Games launched from the online catalog will appear here.";
+                grid.appendChild(empty);
+                return;
+            }
+            for (const game of recentGames) grid.appendChild(createGameCard(game));
+        }
+
+        function rememberRecentlyPlayedGame(game) {
+            if (!game?.remote || !game.fileUrl) return;
+            const recentGames = getRecentlyPlayedGames()
+                .filter(entry => entry.fileUrl !== game.fileUrl);
+            recentGames.unshift({
+                name: game.name,
+                description: game.description || "",
+                fileUrl: game.fileUrl,
+                fileName: game.fileName,
+                imageUrl: game.imageUrl || "",
+                remote: true,
+                lastPlayed: Date.now()
+            });
+            const stored = recentGames.slice(0, MAX_RECENT_GITHUB_GAMES).map(entry => ({
+                name: entry.name,
+                description: entry.description || "",
+                fileUrl: entry.fileUrl,
+                fileName: entry.fileName,
+                imageUrl: entry.imageUrl || "",
+                lastPlayed: entry.lastPlayed || Date.now()
+            }));
+            safeStorageSet(localStorage, RECENT_GITHUB_GAMES_STORAGE_KEY, JSON.stringify(stored));
+            renderRecentlyPlayedGames();
+        }
+
+        function renderGames() {
+            const query = $("searchInput").value.trim().toLowerCase();
+            const visible = games.filter(game => !query || `${game.name} ${game.description || ""}`.toLowerCase().includes(query));
+            const grid = $("gameGrid");
+            grid.replaceChildren();
+            if (!visible.length) {
+                const empty = document.createElement("div");
+                empty.className = "empty-games";
+                empty.textContent = games.length ? "No games match that search." : "No catalog maps are available. Upload a map or configure the GitHub games manifest.";
+                grid.appendChild(empty);
+                return;
+            }
+            for (const game of visible) {
+                grid.appendChild(createGameCard(game));
+            }
+        }
+
+        function resolveManifestUrl(value, manifestUrl) {
+            try {
+                const resolved = new URL(String(value || "").trim(), manifestUrl);
+                return ["http:", "https:"].includes(resolved.protocol) ? resolved.href : "";
+            } catch {
+                return "";
+            }
+        }
+
+        function normalizeRemoteGame(entry, index, manifestUrl) {
+            if (!entry || typeof entry !== "object") return null;
+            const name = String(entry.title || entry.name || "").trim();
+            const fileUrl = resolveManifestUrl(entry.file || entry.url || entry.link, manifestUrl);
+            const imageUrl = resolveManifestUrl(entry.image || entry.imageUrl || entry.thumbnail, manifestUrl);
+            let fileName = String(entry.fileName || "").trim();
+            if (!fileName && fileUrl) {
+                try { fileName = decodeURIComponent(new URL(fileUrl).pathname.split("/").pop() || ""); } catch {}
+            }
+            if (!name || !fileUrl || !SUPPORTED_MAP_PATTERN.test(fileName)) return null;
+            return {
+                name,
+                description: String(entry.description || "").trim(),
+                fileUrl,
+                imageUrl,
+                fileName,
+                remote: true,
+                identity: `remote:${fileUrl}`,
+                manifestOrder: index
+            };
+        }
+
+        async function loadRemoteGamesManifest() {
+            const status = $("catalogStatus");
+            if (!GAMES_MANIFEST_URL) {
+                status.textContent = "GitHub catalog is not configured yet. Local uploads are still available.";
+                renderGames();
+                return;
+            }
+
+            status.textContent = "Loading available games…";
+            try {
+                const response = await fetch(GAMES_MANIFEST_URL, { cache: "no-store" });
+                if (!response.ok) throw new Error(`Manifest request returned ${response.status}`);
+                const manifest = await response.json();
+                const entries = Array.isArray(manifest) ? manifest : manifest?.games;
+                if (!Array.isArray(entries)) throw new Error("Manifest must contain a games array");
+                const remoteGames = entries.map((entry,index) => normalizeRemoteGame(entry,index,GAMES_MANIFEST_URL)).filter(Boolean);
+                games = [...remoteGames, ...games.filter(game => !game.remote)];
+                status.textContent = `${remoteGames.length} downloadable game${remoteGames.length === 1 ? "" : "s"} available.`;
+                renderGames();
+            } catch (error) {
+                console.error("[Games Catalog]", error);
+                status.textContent = "The online game catalog could not be loaded. Local uploads are still available.";
+                renderGames();
+            }
+        }
+
+        function addFiles(fileList) {
+            const accepted = Array.from(fileList || []).filter(file => SUPPORTED_MAP_PATTERN.test(file.name));
+            if (!accepted.length) { showToast("No supported .rbxl, .rbxlx, .lua, or .luau files were found."); return; }
+            const known = new Set(games.map(game => game.identity));
+            for (const file of accepted) {
+                const identity = `${file.webkitRelativePath || file.name}:${file.size}:${file.lastModified}`;
+                if (!known.has(identity)) { games.push({ file, name: file.name.replace(/\.(lua|luau|rbxl|rbxlx)$/i, ""), description: "A map uploaded from this device.", imageUrl: "", identity, remote: false }); known.add(identity); }
+            }
+            renderGames(); showPage("games");
+            showToast(`${accepted.length} game${accepted.length === 1 ? "" : "s"} added.`);
+        }
+
+        function setGameLoadingState(game, status, percent = null) {
+            $("gameLoadingOverlay").classList.add("visible");
+            $("gameLoadingImage").src = game?.imageUrl || FALLBACK_GAME_IMAGE;
+            $("gameLoadingImage").onerror = () => { $("gameLoadingImage").onerror = null; $("gameLoadingImage").src = FALLBACK_GAME_IMAGE; };
+            $("gameLoadingTitle").textContent = game?.name || "Loading game";
+            $("gameLoadingStatus").textContent = status;
+            $("gameLoadingClose").classList.remove("visible");
+            const determinate = Number.isFinite(percent);
+            $("gameLoadingTrack").classList.toggle("indeterminate", !determinate);
+            $("gameLoadingFill").style.width = determinate ? `${THREE.MathUtils.clamp(percent,0,100)}%` : "35%";
+        }
+
+        function formatDownloadBytes(bytes) {
+            if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+            if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+            return `${bytes} B`;
+        }
+
+        async function downloadRemoteGame(game) {
+            setGameLoadingState(game, "Connecting to GitHub…");
+            const response = await fetch(game.fileUrl, { cache: "no-store" });
+            if (!response.ok) throw new Error(`Map download returned ${response.status}`);
+            const total = Number(response.headers.get("content-length")) || 0;
+            const reader = response.body?.getReader?.();
+            let blob;
+
+            if (reader) {
+                const chunks = [];
+                let received = 0;
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    received += value.byteLength;
+                    if (total > 0) {
+                        setGameLoadingState(game, `Downloading ${formatDownloadBytes(received)} of ${formatDownloadBytes(total)}…`, received / total * 100);
+                    } else {
+                        setGameLoadingState(game, `Downloading ${formatDownloadBytes(received)}…`);
+                    }
+                }
+                blob = new Blob(chunks, { type: response.headers.get("content-type") || "application/octet-stream" });
+            } else {
+                blob = await response.blob();
+            }
+
+            if (!blob.size) throw new Error("The downloaded map file was empty");
+            setGameLoadingState(game, "Preparing map…", 100);
+            return new File([blob], game.fileName, { type: blob.type || "application/octet-stream", lastModified: Date.now() });
+        }
+
+        async function launchSelectedGame() {
+            if (!selectedGame || (!selectedGame.file && !selectedGame.fileUrl)) { showToast("Select a game first."); return; }
+            const button = $("playButton");
+            button.disabled = true; button.textContent = "Starting...";
+            try {
+                await Promise.all([shirtValidationPromise, pantsValidationPromise]);
+                saveUsername();
+                const file = selectedGame.file || await downloadRemoteGame(selectedGame);
+                const extension = (file.name.split(".").pop() || "").toLowerCase();
+                sessionStorage.setItem("bloxScriptName", file.name);
+                sessionStorage.removeItem("bloxMapLoaded");
+                if (extension === "rbxl" || extension === "rbxlx") {
+                    await BloxMapStorage.saveFile(file);
+                    sessionStorage.setItem("bloxMapKind", extension);
+                    sessionStorage.removeItem("bloxScriptSource");
+                } else {
+                    sessionStorage.setItem("bloxScriptSource", await file.text());
+                    sessionStorage.setItem("bloxMapKind", "script");
+                    await BloxMapStorage.clearCurrent();
+                }
+                sessionStorage.setItem(AVATAR_STORAGE_KEY, JSON.stringify(getCurrentAvatarProfile()));
+                if (selectedGame.remote) rememberRecentlyPlayedGame(selectedGame);
+                if (selectedGame.remote) setGameLoadingState(selectedGame, "Opening game…", 100);
+                window.location.href = "emulator.html";
+            } catch (error) {
+                console.error(error);
+                if (selectedGame?.remote) {
+                    $("gameLoadingStatus").textContent = `Could not load this game: ${error.message || "Download failed"}`;
+                    $("gameLoadingTrack").classList.remove("indeterminate");
+                    $("gameLoadingFill").style.width = "0%";
+                    $("gameLoadingClose").classList.add("visible");
+                } else {
+                    showToast("Failed to prepare that game file.");
+                }
+                button.disabled = false; button.textContent = "Play";
+            }
+        }
+
+        $("brandButton").addEventListener("click", () => showPage("home"));
+        $("gamesButton").addEventListener("click", () => showPage("games"));
+        $("browseGamesButton").addEventListener("click", () => showPage("games"));
+        $("recentSeeAllButton").addEventListener("click", () => showPage("games"));
+        $("backToGames").addEventListener("click", () => showPage("games"));
+        $("playButton").addEventListener("click", launchSelectedGame);
+        $("gameLoadingClose").addEventListener("click", () => $("gameLoadingOverlay").classList.remove("visible"));
+        document.querySelectorAll(".side-button").forEach(button => button.addEventListener("click", () => showPage(button.dataset.page)));
+        $("uploadButton").addEventListener("click", event => { event.stopPropagation(); const open = $("uploadWrap").classList.toggle("open"); $("uploadButton").setAttribute("aria-expanded", String(open)); });
+        document.addEventListener("click", () => { $("uploadWrap").classList.remove("open"); $("uploadButton").setAttribute("aria-expanded", "false"); });
+        $("homeUploadButton").addEventListener("click", () => $("fileInput").click());
+        $("fileInput").addEventListener("change", event => { addFiles(event.target.files); event.target.value = ""; });
+        $("folderInput").addEventListener("change", event => { addFiles(event.target.files); event.target.value = ""; });
+        $("searchInput").addEventListener("input", renderGames);
+        $("searchInput").addEventListener("keydown", event => { if (event.key === "Enter") { renderGames(); showPage("games"); } });
+        $("searchButton").addEventListener("click", () => { renderGames(); showPage("games"); });
+        $("saveUsername").addEventListener("click", saveUsername);
+        $("usernameInput").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); saveUsername(); event.target.blur(); } });
+
+        for (const input of Object.values(avatarColorInputs)) input.addEventListener("input", () => { renderAvatars(); $("avatarSaveStatus").textContent = "Unsaved changes"; });
+        $("shirtInput").addEventListener("change", () => { shirtValidationPromise = chooseClothing($("shirtInput"), "shirt"); });
+        $("pantsInput").addEventListener("change", () => { pantsValidationPromise = chooseClothing($("pantsInput"), "pants"); });
+        $("clearShirtButton").addEventListener("click", () => clearClothing("shirt"));
+        $("clearPantsButton").addEventListener("click", () => clearClothing("pants"));
+        $("saveAvatarButton").addEventListener("click", async () => {
+            await Promise.all([shirtValidationPromise, pantsValidationPromise]);
+            if (safeStorageSet(localStorage, AVATAR_STORAGE_KEY, JSON.stringify(getCurrentAvatarProfile()))) {
+                $("avatarSaveStatus").textContent = "Character saved";
+                showToast("Character appearance saved.");
+            } else showToast("The clothing images are too large for browser storage.");
+        });
+
+        function setAvatarMode(mode) {
+            avatarMode = mode;
+            $("mode2d").classList.toggle("active", mode === "2d");
+            $("mode3d").classList.toggle("active", mode === "3d");
+            $("avatarStage").classList.toggle("two-d", mode === "2d");
+            $("spinNote").textContent = mode === "3d" ? "Drag the character to spin it." : "Front view";
+            renderAvatars();
+        }
+        $("mode2d").addEventListener("click", () => setAvatarMode("2d"));
+        $("mode3d").addEventListener("click", () => setAvatarMode("3d"));
+        $("avatarStage").addEventListener("pointerdown", event => {
+            if (avatarMode !== "3d") return;
+            dragStartX = event.clientX; dragStartAngle = avatarAngle;
+            event.currentTarget.setPointerCapture(event.pointerId); event.currentTarget.classList.add("dragging");
+        });
+        $("avatarStage").addEventListener("pointermove", event => {
+            if (!event.currentTarget.hasPointerCapture(event.pointerId) || avatarMode !== "3d") return;
+            avatarAngle = dragStartAngle + (event.clientX - dragStartX) * .8;
+            characterAvatarPreview?.setAngle(avatarAngle);
+        });
+        $("avatarStage").addEventListener("pointerup", event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); event.currentTarget.classList.remove("dragging"); });
+        $("avatarStage").addEventListener("pointercancel", event => event.currentTarget.classList.remove("dragging"));
+
+        const initialName = sanitizeUsername(safeStorageGet(localStorage, PLAYER_NAME_STORAGE_KEY) || "Player");
+        $("usernameInput").value = initialName;
+        $("welcomeName").textContent = initialName;
+        safeStorageSet(sessionStorage, PLAYER_NAME_STORAGE_KEY, initialName);
+        try {
+            homeAvatarPreview = new ClassicR6Preview($("homeAvatar"), true);
+            characterAvatarPreview = new ClassicR6Preview($("characterAvatar"), false);
+        } catch (error) {
+            console.error("[Avatar Preview] WebGL initialization failed:", error);
+            $("homeAvatar").textContent = "Avatar preview unavailable";
+            $("characterAvatar").textContent = "3D avatar preview unavailable";
+        }
+        document.querySelectorAll("[data-wardrobe]").forEach(button => button.addEventListener("click", () => {
+            document.querySelectorAll("[data-wardrobe]").forEach(tab => tab.setAttribute("aria-selected", String(tab === button)));
+            $("bodyWardrobe").hidden = button.dataset.wardrobe !== "body";
+            $("clothingWardrobe").hidden = button.dataset.wardrobe !== "clothing";
+        }));
+        document.querySelectorAll("[data-clothing]").forEach(button => button.addEventListener("click", () => {
+            document.querySelectorAll("[data-clothing]").forEach(tab => tab.setAttribute("aria-selected", String(tab === button)));
+            $("shirtSection").hidden = button.dataset.clothing !== "shirt";
+            $("pantsSection").hidden = button.dataset.clothing !== "pants";
+        }));
+        restoreAvatar();
+        const wardrobeReady = restoreWardrobe();
+        renderGames();
+        renderRecentlyPlayedGames();
+        loadAnnouncementBar();
+        loadRemoteGamesManifest();
+    </script>
+</body>
+</html>
