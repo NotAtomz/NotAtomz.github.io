@@ -116,7 +116,7 @@ class RigidBodyDesc {
 }
 
 class ColliderDesc {
- constructor(shape,data={}){this.shape=shape;this.data=data;this.translation=v();this.rotation=q();this.mass=null;this.density=1;this.friction=.3;this.restitution=.5;this.restitutionEnabled=false;this.sensor=false;this.enabled=true;this.groups=0xffffffff;this.activeHooks=0;}
+ constructor(shape,data={}){this.shape=shape;this.data=data;this.translation=v();this.rotation=q();this.mass=null;this.density=1;this.friction=.3;this.restitution=.5;this.frictionWeight=1;this.elasticityWeight=1;this.restitutionEnabled=false;this.sensor=false;this.enabled=true;this.groups=0xffffffff;this.activeHooks=0;}
  static cuboid(hx,hy,hz){return new ColliderDesc('cuboid',{hx:Math.abs(hx),hy:Math.abs(hy),hz:Math.abs(hz)})}
  static ball(r){return new ColliderDesc('ball',{r:Math.abs(r)})}
  static cylinder(hh,r){return new ColliderDesc('cylinder',{hh:Math.abs(hh),r:Math.abs(r),segments:16})}
@@ -128,6 +128,8 @@ class ColliderDesc {
  setDensity(d){this.density=Math.max(0,+d||0);return this}
  setFriction(x){this.friction=Math.max(0,+x||0);return this}
  setRestitution(x){this.restitution=clamp(+x||0,0,1);return this}
+ setFrictionWeight(x){this.frictionWeight=Math.max(0,+x||0);return this}
+ setElasticityWeight(x){this.elasticityWeight=Math.max(0,+x||0);return this}
  setRestitutionEnabled(x){this.restitutionEnabled=!!x;return this}
  setSensor(x){this.sensor=!!x;return this}
  setEnabled(x){this.enabled=!!x;return this}
@@ -222,15 +224,20 @@ class RigidBody {
 function bodyTypeName(t){if(t===0||t==='dynamic'||t===RigidBodyType.Dynamic)return'dynamic';if(t===1||t==='fixed'||t===RigidBodyType.Fixed)return'fixed';return'kinematic'}
 
 function groupsCompatible(a,b){const am=(a.groups>>>16)&0xffff,af=a.groups&0xffff,bm=(b.groups>>>16)&0xffff,bf=b.groups&0xffff;return !!((am&bf)!==0&&(bm&af)!==0)}
+function weightedContactCoefficient(aValue,aWeight,bValue,bWeight){
+ const aw=Math.max(0,+aWeight||0),bw=Math.max(0,+bWeight||0),sum=aw+bw;
+ return sum>EPS?((Math.max(0,+aValue||0)*aw+Math.max(0,+bValue||0)*bw)/sum):0;
+}
 function combinedAuthoredRestitution(a,b){
- const values=[];
- if(a?.restitutionEnabled===true)values.push(clamp(a.restitution,0,1));
- if(b?.restitutionEnabled===true)values.push(clamp(b.restitution,0,1));
- return values.length?Math.max(...values):0;
+ if(a?.restitutionEnabled!==true&&b?.restitutionEnabled!==true)return 0;
+ return clamp(weightedContactCoefficient(
+   a?.restitutionEnabled===true?a.restitution:0,a?.elasticityWeight,
+   b?.restitutionEnabled===true?b.restitution:0,b?.elasticityWeight
+ ),0,1);
 }
 
 class Collider {
- constructor(world,desc,body){this.world=world;this.handle=NEXT_COL++;this.body=body;this.shape=desc.shape;this.data={...desc.data};this.localP={...desc.translation};this.localR={...desc.rotation};this.massOverride=desc.mass;this.density=desc.density;this.friction=desc.friction;this.restitution=desc.restitution;this.restitutionEnabled=desc.restitutionEnabled===true;this.sensor=desc.sensor;this.enabled=desc.enabled;this.groups=desc.groups>>>0;this.activeHooks=desc.activeHooks;this.valid=true;}
+ constructor(world,desc,body){this.world=world;this.handle=NEXT_COL++;this.body=body;this.shape=desc.shape;this.data={...desc.data};this.localP={...desc.translation};this.localR={...desc.rotation};this.massOverride=desc.mass;this.density=desc.density;this.friction=desc.friction;this.restitution=desc.restitution;this.frictionWeight=desc.frictionWeight;this.elasticityWeight=desc.elasticityWeight;this.restitutionEnabled=desc.restitutionEnabled===true;this.sensor=desc.sensor;this.enabled=desc.enabled;this.groups=desc.groups>>>0;this.activeHooks=desc.activeHooks;this.valid=true;}
  parent(){return this.body}
  isValid(){return this.valid}
  isSensor(){return this.sensor}
@@ -242,6 +249,8 @@ class Collider {
  setDensity(x){const next=Math.max(0,+x||0);if(this.density===next)return;this.density=next;this.body?._markMassDirty()}
  setFriction(x){const next=Math.max(0,+x||0);if(this.friction===next)return;this.friction=next}
  setRestitution(x){const next=clamp(+x||0,0,1);if(this.restitution===next)return;this.restitution=next}
+ setFrictionWeight(x){this.frictionWeight=Math.max(0,+x||0)}
+ setElasticityWeight(x){this.elasticityWeight=Math.max(0,+x||0)}
  setRestitutionEnabled(x){this.restitutionEnabled=!!x}
  setTranslation(p){const next=v(p?.x,p?.y,p?.z);if(this.localP.x===next.x&&this.localP.y===next.y&&this.localP.z===next.z)return;this.localP=next;this.body?._markMassDirty();if(this.body?.type==='fixed')this.world._staticDirty=true}
  setRotation(r){const next=qnorm(q(r?.x,r?.y,r?.z,r?.w));if(this.localR.x===next.x&&this.localR.y===next.y&&this.localR.z===next.z&&this.localR.w===next.w)return;this.localR=next;this.body?._markMassDirty();if(this.body?.type==='fixed')this.world._staticDirty=true}
@@ -520,7 +529,7 @@ function bodyPairKey(a,b){
 }
 
 class World {
- constructor(gravity=v(0,-196.2,0)){this.gravity=v(gravity.x,gravity.y,gravity.z);this.timestep=1/60;this.maxCcdSubsteps=1;this.bodies=new Map();this.colliders=new Map();this.joints=new Map();this.contacts=new Map();this._contactHistory=new Map();this._stepId=0;this._staticDirty=true;this._static=[];this._dynamic=[];this._staticTree=null;this._sleepLin=.15;this._sleepAng=.15;this._restingSleepLin=.75;this._restingSleepAng=.5;this._sleepTime=.4;this.xyz='v8world';this.debugStats={staticColliders:0,movingColliders:0,activeMovingColliders:0,broadphasePairs:0,narrowphasePairs:0,activeContacts:0,fixedContacts:0,sleepingBodies:0,restitutionImpacts:0,totalRestitutionImpacts:0,maxContactDepth:0,maxNormalImpulse:0};}
+ constructor(gravity=v(0,-196.2,0)){this.gravity=v(gravity.x,gravity.y,gravity.z);this.timestep=1/60;this.maxCcdSubsteps=1;this.bodies=new Map();this.colliders=new Map();this.joints=new Map();this.contacts=new Map();this._contactHistory=new Map();this._stepId=0;this._staticDirty=true;this._static=[];this._dynamic=[];this._staticTree=null;this._sleepLin=.15;this._sleepAng=.15;this._restingSleepLin=.75;this._restingSleepAng=.5;this._sleepTime=.4;this.xyz='v8world';this.debugStats={staticColliders:0,movingColliders:0,activeMovingColliders:0,broadphasePairs:0,narrowphasePairs:0,activeContacts:0,fixedContacts:0,sleepingBodies:0,restitutionImpacts:0,totalRestitutionImpacts:0,maxContactDepth:0,maxNormalImpulse:0,adaptiveSubsteps:1,adaptiveHz:60,warmStartedContacts:0};}
  createRigidBody(desc){const b=new RigidBody(this,desc);this.bodies.set(b.handle,b);this._staticDirty=true;return b}
  removeRigidBody(body){if(!body?.valid)return;for(const j of [...this.joints.values()])if(j.a===body||j.b===body)this.removeImpulseJoint(j);for(const c of [...body.colliders])this.removeCollider(c,false);body.valid=false;this.bodies.delete(body.handle);this._staticDirty=true}
  createCollider(desc,body){if(!body)throw new Error('Collider requires assembly body');const c=new Collider(this,desc,body);this.colliders.set(c.handle,c);body.colliders.push(c);body._markMassDirty();this._staticDirty=true;return c}
@@ -596,7 +605,7 @@ class World {
  contactPairsWith(c,cb){for(const rec of this.contacts.values()){if(rec.a===c)cb(rec.b);else if(rec.b===c)cb(rec.a)}}
  contactPair(a,b,cb){const k=pairKey(a,b),rec=this.contacts.get(k);if(rec)cb(new ContactManifold(rec.contact),rec.a!==a)}
  forEachContactPair(cb){for(const rec of this.contacts.values())if(rec.solverActive!==false)cb(rec.a,rec.b)}
- _jointStep(j,dt,applyMotor=true){
+ _jointStep(j,dt,applyMotor=true,correctPosition=true){
    if(!j.isValid())return;
    const a=j.a,b=j.b,d=j.data;
    if(!a||!b)return;
@@ -609,8 +618,13 @@ class World {
    // anchor velocities together with equal-and-opposite impulses. Positional
    // error becomes a bounded return velocity, so a teleported wheel eases back
    // to its axle while ordinary gravity error is rejected in the same frame.
-   const ra=qrot(a.r,d.a1||v()),rb=qrot(b.r,d.a2||v());
-   const wa=add(a.p,ra),wb=add(b.p,rb),err=sub(wb,wa);
+   // Keep both anchors in world space; corrections are mass/inertia weighted
+   // and interleaved with contacts, never a unilateral wheel teleport.
+   let wa=add(a.p,qrot(a.r,d.a1||v()));
+   let wb=add(b.p,qrot(b.r,d.a2||v()));
+   // Impulse lever arms are measured from the compound centre of mass,
+   // whereas serialized joint anchors are measured from the Part origin.
+   const ra=sub(wa,a.worldCom()),rb=sub(wb,b.worldCom()),err=sub(wb,wa);
    if(a.type==='dynamic'||b.type==='dynamic'){
       const recoveryRate=Math.max(1,Number(d.recoveryRate)||12);
       const maxRecoverySpeed=Math.max(1,Number(d.maxRecoverySpeed)||30);
@@ -632,7 +646,7 @@ class World {
          // Split correction removes only ordinary solver/gravity drift without
          // changing linear or angular velocity. Large scripted teleports stay
          // on the smooth velocity-return path above instead of snapping.
-         if(Math.abs(errorAlong)>linearSlop&&Math.abs(errorAlong)<=.5){
+         if(correctPosition&&Math.abs(errorAlong)>linearSlop&&Math.abs(errorAlong)<=.5){
             const positionImpulseMagnitude=(-errorAlong*.45)/effectiveMass;
             const positionImpulse=mul(axis,positionImpulseMagnitude);
             applyPositionImpulseAt(a,mul(positionImpulse,-1),ra);
@@ -755,6 +769,22 @@ class World {
    if(response.affectB)B._setWorldCom(add(B.worldCom(),mul(correction,ib)));
    return true;
  }
+  _warmStartContact(rec){
+    if(!rec?.solverActive||rec.warmStarted||rec.a.sensor||rec.b.sensor)return;
+    rec.warmStarted=true;
+    const impulse=Math.max(0,Number(rec.accumulatedNormalImpulses?.[0])||0);
+    if(impulse<=EPS)return;
+    const A=rec.a.body,B=rec.b.body,c=rec.contact;
+    if(!A||!B||!c||A===B)return;
+    const response=contactDominanceResponse(A,B);
+    const points=c.points?.length?c.points:[c.point];
+    const point=mul(points.reduce((sum,p)=>add(sum,p),v()),1/points.length);
+    const n=norm(c.normal),ra=sub(point,A.worldCom()),rb=sub(point,B.worldCom());
+    const normalImpulse=mul(n,impulse);
+    if(response.affectA)applyImpulseAt(A,mul(normalImpulse,-1),ra,false);
+    if(response.affectB)applyImpulseAt(B,normalImpulse,rb,false);
+    this.debugStats.warmStartedContacts=(this.debugStats.warmStartedContacts||0)+1;
+  }
  _resolve(rec,dt,iteration=0){
    const {a,b,contact:c}=rec;
    if(!rec.solverActive||!c||a.sensor||b.sensor)return;
@@ -851,7 +881,7 @@ class World {
    let tangent=sub(centerRv,mul(n,dot(centerRv,n)));
    const tangentLength=len(tangent);
    const totalNormalImpulse=rec.accumulatedNormalImpulses.reduce((sum,value)=>sum+(value||0),0);
-   if(tangentLength>EPS&&totalNormalImpulse>EPS&&positiveNormalDelta>EPS){
+   if(tangentLength>EPS&&totalNormalImpulse>EPS&&(positiveNormalDelta>EPS||(iteration===0&&rec.warmStarted))){
       tangent=mul(tangent,1/tangentLength);
       const kt=effectiveMassAlong(A,B,centerRa,centerRb,tangent,response);
       if(kt>EPS){
@@ -861,8 +891,9 @@ class World {
          // materials retain geometric mixing; an explicit <=.05 value acts as
          // a low-friction override for either touching surface.
          const frictionA=Math.max(0,a.friction),frictionB=Math.max(0,b.friction);
-         const minimumFriction=Math.min(frictionA,frictionB);
-         const mu=clamp(minimumFriction<=.05?minimumFriction:Math.sqrt(frictionA*frictionB),0,4);
+         const mu=clamp(weightedContactCoefficient(
+           frictionA,a.frictionWeight,frictionB,b.frictionWeight
+         ),0,4);
          const maxF=totalNormalImpulse*mu;
          const frictionDelta=clamp(-dot(centerRv,tangent)/kt,-maxF,maxF);
          if(Math.abs(frictionDelta)>EPS){
@@ -911,15 +942,45 @@ class World {
      upper.lv=add(upper.lv,mul(impulseAxis,-centreClosing));
    }
  }
-  step(eventQueue=null,hooks=null){
+  _stepOnce(eventQueue=null,hooks=null,advanceStep=true){
    const dt=Math.max(1e-5,+this.timestep||1/60);
-   this._stepId++;
+   if(advanceStep)this._stepId++;
     this.contacts.clear();
     this.debugStats.fixedContacts=0;
     this.debugStats.restitutionImpacts=0;
     this.debugStats.maxContactDepth=0;
     this.debugStats.maxNormalImpulse=0;
+    this.debugStats.warmStartedContacts=0;
 
+   // Wake the entire connected mechanism before integration/contact discovery.
+   // A sleeping wheel otherwise skips its floor contacts while the awake
+   // chassis pulls on it, allowing both the axle and vehicle to sink.
+   const jointNeighbors=new Map(),wakeQueue=[],wakeVisited=new Set();
+   const revoluteBodies=new Set(),drivenBodies=new Set();
+   for(const j of this.joints.values()){
+     if(!j.isValid())continue;
+     if(j.data.type==='revolute'){
+       revoluteBodies.add(j.a);revoluteBodies.add(j.b);
+       if(Math.abs(j.motorVelocity)>1e-7&&j.motorMaxForce>0){
+         drivenBodies.add(j.a);drivenBodies.add(j.b);
+         if(j.a.type==='dynamic'&&j.a.sleeping)j.a.wakeUp();
+         if(j.b.type==='dynamic'&&j.b.sleeping)j.b.wakeUp();
+       }
+     }
+     for(const [body,other] of [[j.a,j.b],[j.b,j.a]]){
+       if(!jointNeighbors.has(body))jointNeighbors.set(body,[]);
+       jointNeighbors.get(body).push(other);
+       if(body.enabled&&((body.type==='dynamic'&&!body.sleeping)||
+          (body.type!=='dynamic'&&(len2(body.lv)>EPS||len2(body.av)>EPS)))&&!wakeVisited.has(body)){
+         wakeVisited.add(body);wakeQueue.push(body);
+       }
+     }
+   }
+   for(let i=0;i<wakeQueue.length;i++)for(const other of jointNeighbors.get(wakeQueue[i])||[]){
+     if(!other.enabled||other.type!=='dynamic'||wakeVisited.has(other))continue;
+     if(other.sleeping)other.wakeUp();
+     wakeVisited.add(other);wakeQueue.push(other);
+   }
    for(const b of this.bodies.values()){
    if(!b.valid||!b.enabled||b.type!=='dynamic')continue;
      b._ensureMassProperties();
@@ -1010,12 +1071,28 @@ class World {
      const firstSeenStep=previous&&this._stepId-previous.lastSeenStep<=1
        ?(previous.firstSeenStep??previous.lastSeenStep)
        :this._stepId;
-     this._contactHistory.set(key,{
+     const currentPoints=contact.points?.length?contact.points:[contact.point];
+     const currentPoint=mul(currentPoints.reduce((sum,p)=>add(sum,p),v()),1/currentPoints.length);
+     const currentNormal=norm(contact.normal);
+     const previousNormal=previous?.normal;
+     const previousPoint=previous?.point;
+     const normalMatches=previousNormal&&dot(previousNormal,currentNormal)>.92;
+     const pointMatches=previousPoint&&len2(sub(previousPoint,currentPoint))<.25;
+     const timestepScale=previous?.dt>EPS?clamp(dt/previous.dt,.25,4):1;
+     const warmNormalImpulse=normalMatches&&pointMatches
+       ?Math.max(0,Number(previous.normalImpulse)||0)*timestepScale*.88
+       :0;
+     const historyState={
        firstSeenStep,
        lastSeenStep:this._stepId,
-       lastImpactStep:allowRestitution?this._stepId:(previous?.lastImpactStep??-Infinity)
-     });
-      const rec={a,b,contact,allowRestitution,solverActive:true,firstSeenStep,restitutionApplied:false,restitutionVelocities:[],accumulatedNormalImpulses:[]};
+       lastImpactStep:allowRestitution?this._stepId:(previous?.lastImpactStep??-Infinity),
+       normal:currentNormal,
+       point:currentPoint,
+       normalImpulse:warmNormalImpulse,
+       dt
+     };
+     this._contactHistory.set(key,historyState);
+      const rec={key,a,b,contact,allowRestitution,solverActive:true,firstSeenStep,restitutionApplied:false,restitutionVelocities:[],accumulatedNormalImpulses:[warmNormalImpulse],warmStarted:false,historyState};
      this.contacts.set(key,rec);
    };
 
@@ -1084,27 +1161,52 @@ class World {
    for(let iteration=0;iteration<2;iteration++){
      for(const rec of solverContacts)this._projectContact(rec);
    }
+   // Reapply last frame's converged normal impulse as the initial PGS guess.
+   // This is velocity-only warm starting: it supports resting stacks without
+   // teleporting them or turning penetration correction into bounce energy.
+   for(const rec of solverContacts)this._warmStartContact(rec);
    // Multiple Gauss-Seidel passes are required when one compound assembly has
    // several rail/floor contacts. A single pass makes the last collider win:
    // its off-centre impulse undoes the preceding support and alternates angular
    // velocity every frame, which looks like a welded coaster bouncing itself
    // off the track even with restitution disabled.
-   for(let iteration=0;iteration<6;iteration++){
+   const jointBodies=new Set();
+   for(const j of this.joints.values())if(j.isValid()){jointBodies.add(j.a);jointBodies.add(j.b)}
+   const jointContacts=solverContacts.filter(rec=>jointBodies.has(rec.a.body)||jointBodies.has(rec.b.body));
+   for(let iteration=0;iteration<(jointBodies.size?24:6);iteration++){
+     // Wheel support and axle constraints must converge together. A unilateral
+     // wheel snap after contact solving bypassed the floor and lost support.
+     for(const j of this.joints.values())this._jointStep(j,dt,false);
+     for(const rec of jointContacts)this._projectContact(rec);
      // Resolve from the top of a resting island toward its support so the
      // accumulated load reaches the floor in one pass instead of requiring a
      // pass per brick.
-     for(let index=solverContacts.length-1;index>=0;index--){
-       this._resolve(solverContacts[index],dt,iteration);
+     const passContacts=iteration<6?solverContacts:jointContacts;
+     for(let index=passContacts.length-1;index>=0;index--){
+       this._resolve(passContacts[index],dt,iteration);
      }
    }
    // A final bottom-up shock pass carries the floor's velocity through a
    // resting island without kicking the already-solved supports downward.
    for(const rec of solverContacts)this._resolveSupport(rec);
 
+   // Save the converged pressure-centre impulse for the next fixed step. The
+   // next contact validates both its normal and world-space contact point
+   // before using it, so a different face or a newly-created collision cannot
+   // inherit stale support force.
+   for(const rec of solverContacts){
+     if(!rec.historyState||!rec.solverActive||!rec.contact)continue;
+     const points=rec.contact.points?.length?rec.contact.points:[rec.contact.point];
+     rec.historyState.point=mul(points.reduce((sum,p)=>add(sum,p),v()),1/points.length);
+     rec.historyState.normal=norm(rec.contact.normal);
+     rec.historyState.normalImpulse=Math.max(0,rec.accumulatedNormalImpulses?.[0]||0);
+     rec.historyState.dt=dt;
+   }
+
    // Contact impulses are solved after the main joint pass and can change a
    // wheel's anchor velocity. Two inexpensive non-motor passes restore the
    // constraint before sleep/output without reapplying motor torque.
-   for(let it=0;it<2;it++)for(const j of this.joints.values())this._jointStep(j,dt,false);
+   for(let it=0;it<2;it++)for(const j of this.joints.values())this._jointStep(j,dt,false,false);
 
    this.debugStats.staticColliders=this._static.length;
    this.debugStats.movingColliders=moving.length;
@@ -1164,7 +1266,10 @@ class World {
      // preserving tiny horizontal/spin errors forever. Real impacts and fast
      // sliding remain untouched. Crucially, never apply resting damping on a
      // slope: that was deleting downhill gravity each frame and causing creep.
-     if(levelSupport&&supportAge>=8&&len2(b.lv)<16&&len2(b.av)<16){
+     // Rest stabilization is for loose resting objects, not an axle's free
+     // rotational degree of freedom. Applying it after the joint solver
+     // erased low-speed wheel motion on every step.
+     if(!revoluteBodies.has(b)&&levelSupport&&supportAge>=8&&len2(b.lv)<16&&len2(b.av)<16){
        b.lv=mul(b.lv,.65);
        const boxLikeSupport=support.collider?.shape==='cuboid'||support.collider?.shape==='convex';
        if(boxLikeSupport){
@@ -1195,7 +1300,9 @@ class World {
      const speed=len2(b.lv),spin=len2(b.av);
      const sleepLin=levelSupport?this._restingSleepLin:this._sleepLin;
      const sleepAng=levelSupport?this._restingSleepAng:this._sleepAng;
-     if(speed<sleepLin*sleepLin&&spin<sleepAng*sleepAng){
+     if(drivenBodies.has(b)){
+       b.sleepTimer=0;
+     }else if(speed<sleepLin*sleepLin&&spin<sleepAng*sleepAng){
        b.sleepTimer+=dt;
        if(b.sleepTimer>=this._sleepTime)b.sleep();
      }else{
@@ -1217,6 +1324,93 @@ class World {
        if(this._stepId-state.lastSeenStep>120)this._contactHistory.delete(key);
      }
    }
+ }
+
+ _adaptiveSubstepCount(dt){
+   const maximum=clamp(Math.trunc(Number(this.maxCcdSubsteps)||1),1,4);
+   if(maximum<=1)return 1;
+   const jointBodies=new Set();
+   for(const joint of this.joints.values()){
+     if(!joint?.valid)continue;
+     if(joint.a?.valid)jointBodies.add(joint.a);
+     if(joint.b?.valid)jointBodies.add(joint.b);
+   }
+   let requested=(this.debugStats.maxContactDepth||0)>.08?Math.min(2,maximum):1;
+   for(const body of this.bodies.values()){
+     if(!body.valid||!body.enabled||body.type!=='dynamic'||body.sleeping)continue;
+     body._ensureMassProperties?.();
+     let feature=Infinity;
+     for(const collider of body.colliders){
+       if(!collider.valid||!collider.enabled||collider.sensor)continue;
+       const data=collider.data||{};
+       let current=.5;
+       if(collider.shape==='cuboid')current=Math.min(data.hx,data.hy,data.hz);
+       else if(collider.shape==='ball')current=data.r;
+       else if(collider.shape==='cylinder')current=Math.min(data.hh,data.r);
+       else if(collider.shape==='capsule')current=data.r;
+       else{
+         const box=collider._aabb();
+         current=Math.min(box.max.x-box.min.x,box.max.y-box.min.y,box.max.z-box.min.z)*.5;
+       }
+       if(Number.isFinite(current)&&current>0)feature=Math.min(feature,current);
+     }
+     if(!Number.isFinite(feature))feature=.5;
+     feature=Math.max(.05,feature);
+     const speed=len(body.lv),spin=len(body.av);
+     const acceleration=len(add(mul(this.gravity,body._gravityScale),mul(body.force,body.invMass||0)));
+     const travel=speed*dt+.5*acceleration*dt*dt+spin*feature*dt;
+     const ratio=travel/feature;
+     if((body.ccd&&ratio>.2)||ratio>.9){
+       requested=maximum;
+       if(requested>=4)return 4;
+     }else if(ratio>.35||(jointBodies.has(body)&&(speed>12||acceleration>260))){
+       requested=Math.max(requested,Math.min(2,maximum));
+     }
+   }
+   return requested;
+ }
+
+ step(eventQueue=null,hooks=null){
+   const outerDt=Math.max(1e-5,+this.timestep||1/60);
+   const substeps=this._adaptiveSubstepCount(outerDt);
+   if(substeps<=1){
+     this._stepOnce(eventQueue,hooks,true);
+     this.debugStats.adaptiveSubsteps=1;
+     this.debugStats.adaptiveHz=Math.round(1/outerDt);
+     return;
+   }
+
+   // Forces authored for one 60 Hz game tick remain constant throughout its
+   // 120/240 Hz micro-steps. Reusing the same force with the smaller dt keeps
+   // total impulse unchanged instead of weakening BodyMovers or gravity.
+   const authoredForces=[];
+   for(const body of this.bodies.values()){
+     if(!body.valid||!body.enabled||body.type!=='dynamic')continue;
+     authoredForces.push({body,force:{...body.force},torque:{...body.torque}});
+   }
+   const aggregate={broadphasePairs:0,narrowphasePairs:0,fixedContacts:0,restitutionImpacts:0,warmStartedContacts:0,maxContactDepth:0,maxNormalImpulse:0};
+   const microDt=outerDt/substeps;
+   for(let index=0;index<substeps;index++){
+     for(const saved of authoredForces){
+       if(!saved.body.valid||!saved.body.enabled)continue;
+       saved.body.force={...saved.force};
+       saved.body.torque={...saved.torque};
+     }
+     this.timestep=microDt;
+     this._stepOnce(eventQueue,hooks,index===0);
+     aggregate.broadphasePairs+=this.debugStats.broadphasePairs||0;
+     aggregate.narrowphasePairs+=this.debugStats.narrowphasePairs||0;
+     aggregate.fixedContacts+=this.debugStats.fixedContacts||0;
+     aggregate.restitutionImpacts+=this.debugStats.restitutionImpacts||0;
+     aggregate.warmStartedContacts+=this.debugStats.warmStartedContacts||0;
+     aggregate.maxContactDepth=Math.max(aggregate.maxContactDepth,this.debugStats.maxContactDepth||0);
+     aggregate.maxNormalImpulse=Math.max(aggregate.maxNormalImpulse,this.debugStats.maxNormalImpulse||0);
+   }
+   this.timestep=outerDt;
+   Object.assign(this.debugStats,aggregate,{
+     adaptiveSubsteps:substeps,
+     adaptiveHz:Math.round(substeps/outerDt)
+   });
  }
 }
 function pairKey(a,b){const x=Math.min(a.handle,b.handle),y=Math.max(a.handle,b.handle);return x+':'+y}

@@ -109,6 +109,10 @@
         .topnav-button {
             min-width: 82px;
             padding: 0 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
             color: #fff;
             border: 0;
             border-left: 1px solid rgba(255,255,255,.08);
@@ -224,6 +228,28 @@
         }
         .side-button:hover, .side-button.active { color: var(--blox-link); background: #30343a; }
         .side-icon { width: 18px; text-align: center; font-size: 18px; color: var(--muted); }
+        .website-sprite {
+            display: inline-block;
+            background-image: url("Textures/Website/07634917e5efe992df87953ee1d991b0-games_dark.png");
+            background-repeat: no-repeat;
+        }
+        .side-icon.website-sprite {
+            width: 24px;
+            height: 24px;
+            flex: 0 0 24px;
+            background-size: 48px 816px;
+        }
+        .sprite-home { background-position: 0 -432px; }
+        .sprite-games { background-position: 0 -24px; }
+        .sprite-character { background-position: 0 -744px; }
+        .topnav-button .website-sprite {
+            width: 22px;
+            height: 22px;
+            flex: 0 0 22px;
+            background-size: 44px 748px;
+        }
+        .topnav-button .sprite-games { background-position: -22px -22px; }
+        .topnav-button .sprite-upload { background-position: -22px 0; }
 
         main { min-width: 0; padding: 12px 24px 50px; }
         .page { display: none; }
@@ -550,9 +576,9 @@
                 <img src="Textures/bloxtitle.png" alt="Blox">
             </button>
             <nav class="topnav" aria-label="Main navigation">
-                <button class="topnav-button" id="gamesButton" type="button">Games</button>
+                <button class="topnav-button" id="gamesButton" type="button"><span class="website-sprite sprite-games" aria-hidden="true"></span>Games</button>
                 <div class="upload-wrap" id="uploadWrap">
-                    <button class="topnav-button" id="uploadButton" type="button" aria-expanded="false">Upload ▾</button>
+                    <button class="topnav-button" id="uploadButton" type="button" aria-expanded="false"><span class="website-sprite sprite-upload" aria-hidden="true"></span>Upload ▾</button>
                     <div class="upload-menu" role="menu">
                         <label class="upload-choice" for="fileInput" role="menuitem">Upload File</label>
                         <label class="upload-choice" for="folderInput" role="menuitem">Upload Folder</label>
@@ -578,9 +604,9 @@
                 <div id="nameStatus"></div>
             </div>
             <nav class="side-nav" aria-label="Account navigation">
-                <button class="side-button active" data-page="home" type="button"><span class="side-icon">⌂</span>Home</button>
-                <button class="side-button" data-page="games" type="button"><span class="side-icon">▦</span>Games</button>
-                <button class="side-button" data-page="character" type="button"><span class="side-icon">♟</span>Character</button>
+                <button class="side-button active" data-page="home" type="button"><span class="side-icon website-sprite sprite-home" aria-hidden="true"></span>Home</button>
+                <button class="side-button" data-page="games" type="button"><span class="side-icon website-sprite sprite-games" aria-hidden="true"></span>Games</button>
+                <button class="side-button" data-page="character" type="button"><span class="side-icon website-sprite sprite-character" aria-hidden="true"></span>Character</button>
                 <button class="side-button" data-page="help" type="button"><span class="side-icon">?</span>Help</button>
             </nav>
         </aside>
@@ -753,7 +779,8 @@
         </div>
     </div>
 
-    <script src="blox-rbx-loader.js?v=20260929-gui-udim"></script>
+    <script src="fzstd.js?v=0.1.1"></script>
+    <script src="blox-rbx-loader.js?v=20261003-engine-2016"></script>
     <script type="module">
         import * as THREE from "three";
         import { getNativeR6Geometry } from "native-r6-meshes";

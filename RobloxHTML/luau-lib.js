@@ -559,8 +559,10 @@ class LuauState {
             ref
         );
 
+        // Maps are already iterable. Avoid materializing a second entries
+        // array for large host-created tables.
         const entries = initial instanceof Map
-            ? Array.from(initial.entries())
+            ? initial
             : Object.entries(initial);
 
         for (const [key, value] of entries) {
@@ -578,32 +580,19 @@ class LuauState {
     // This is required for classic Roblox collection APIs: Lua's # operator,
     // ipairs(), and numeric indexing only have native table semantics when the
     // value actually lives in the Luau VM.
-    createArray(items = [], extra = null) {
+    createArray(items = []) {
         this._assertAlive();
 
-        const values = Array.from(items || []);
-        const entries = new Map();
+        // Public hierarchy APIs already produce snapshots. Reuse an incoming
+        // array and populate the native table directly instead of allocating a
+        // duplicate Array plus an intermediate Map of every numeric entry.
+        const values = Array.isArray(items)
+            ? items
+            : Array.from(items || []);
+        const table = this.createTable();
 
         for (let i = 0; i < values.length; i++) {
-            entries.set(i + 1, values[i]);
-        }
-
-        const table = this.createTable(entries);
-
-        if (extra instanceof Map || (extra && typeof extra === "object")) {
-            const extraEntries = extra instanceof Map
-                ? extra
-                : new Map(Object.entries(extra));
-
-            if (extraEntries.size > 0) {
-                // Roblox collection results are ordinary numeric arrays.
-                // Compatibility conveniences such as Count/Get must remain
-                // indexable without appearing in pairs(), which only visits
-                // raw table entries. Put those conveniences behind __index.
-                const extraTable = this.createTable(extraEntries);
-                const metatable = this.createTable({ __index: extraTable });
-                this.env.setrawmetatable(table, metatable);
-            }
+            table.set(i + 1, values[i], true);
         }
 
         return table;

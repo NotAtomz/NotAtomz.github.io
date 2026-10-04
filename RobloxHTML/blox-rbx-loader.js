@@ -17,7 +17,9 @@
         "Teams", "SoundService", "ReplicatedStorage", "ReplicatedFirst",
         "ServerStorage", "ServerScriptService", "Players", "Chat", "RunService",
         "Debris", "InsertService", "CollectionService", "UserInputService",
-        "ContextActionService"
+        "ContextActionService", "PhysicsService", "DataStoreService",
+        "ContentProvider", "GuiService", "LogService", "Stats",
+        "MarketplaceService", "TeleportService", "KeyframeSequenceProvider"
     ]);
 
     const PART_CLASSES = new Set([
@@ -36,12 +38,21 @@
         "Part", "WedgePart", "CornerWedgePart", "TrussPart", "SpawnLocation", "Seat", "VehicleSeat", "Model", "Folder", "Backpack",
         "Tool", "HopperBin", "Humanoid", "HumanoidDescription", "BodyColors", "Shirt",
         "Pants", "ShirtGraphic", "Sound", "PointLight", "SpotLight", "SurfaceLight", "ForceField", "ClickDetector", "Sparkles",
-        "Message", "Hint", "Sky", "Team", "Decal", "Texture", "ParticleEmitter", "Fire", "Smoke", "ScreenGui", "SurfaceGui",
+        "Message", "Hint", "Sky", "Team", "Decal", "Texture", "ParticleEmitter", "Fire", "Smoke", "Trail", "Beam",
+        "BloomEffect", "BlurEffect", "ColorCorrectionEffect", "SunRaysEffect",
+        "SoundGroup", "ChorusSoundEffect", "CompressorSoundEffect", "DistortionSoundEffect",
+        "EchoSoundEffect", "EqualizerSoundEffect", "FlangeSoundEffect", "PitchShiftSoundEffect",
+        "ReverbSoundEffect", "TremoloSoundEffect", "Animation", "AnimationController", "Animator",
+        "KeyframeSequence", "Keyframe", "Pose", "KeyframeMarker", "ScreenGui", "SurfaceGui",
         "Frame", "TextLabel", "TextButton", "TextBox", "ImageButton", "BillboardGui", "ScrollingFrame",
-        "ImageLabel", "UIListLayout", "UIGridLayout", "UITableLayout", "UIPadding", "UIScale", "UIAspectRatioConstraint", "UISizeConstraint", "UITextSizeConstraint", "Explosion", "Terrain", "SelectionBox", "SelectionSphere", "SurfaceSelection",
+        "ImageLabel", "UIListLayout", "UIGridLayout", "UIPageLayout", "UITableLayout", "UIPadding", "UIScale", "UIAspectRatioConstraint", "UISizeConstraint", "UITextSizeConstraint", "Explosion", "Terrain", "SelectionBox", "SelectionSphere", "SurfaceSelection",
         "Configuration", "SpecialMesh", "FileMesh", "BlockMesh", "CylinderMesh", "BindableEvent",
-        "BindableFunction", "Weld", "Motor", "Motor6D", "Rotate", "RotateP", "RotateV", "VelocityMotor", "Snap",
+        "BindableFunction", "Attachment", "Weld", "Motor", "Motor6D", "Rotate", "RotateP", "RotateV", "VelocityMotor", "Snap",
         "Glue", "ManualWeld", "ManualGlue", "BodyVelocity", "BodyPosition", "BodyGyro", "BodyForce",
+        "WeldConstraint", "HingeConstraint", "RodConstraint", "RopeConstraint",
+        "SpringConstraint", "BallSocketConstraint", "PrismaticConstraint",
+        "CylindricalConstraint", "NoCollisionConstraint", "AlignPosition",
+        "AlignOrientation", "VectorForce", "LinearVelocity", "AngularVelocity",
         "BodyAngularVelocity", "BodyThrust", "RocketPropulsion", "IntValue", "NumberValue",
         "BoolValue", "StringValue", "ObjectValue", "Vector3Value", "CFrameValue", "Color3Value",
         "BrickColorValue", "Script", "LocalScript", "ModuleScript"
@@ -51,6 +62,8 @@
     // spending thousands of assignments on metadata that the classic runtime cannot render/use.
     const COMMON_PROPERTIES = new Set([
         "Name", "Archivable", "Value", "Enabled", "Disabled", "Neutral", "Duration",
+        "StreamingEnabled", "StreamingMinRadius", "StreamingTargetRadius",
+        "FallenPartsDestroyHeight",
         "Source", "RunContext", "LinkedSource",
         "TeamColor", "AutoAssignable", "AllowTeamChangeOnTouch", "Transparency", "Reflectance",
         "Anchored", "CanCollide", "CanTouch", "CanQuery", "Locked", "Shape", "FormFactor",
@@ -61,6 +74,7 @@
         "TopSurface", "BottomSurface", "LeftSurface", "RightSurface", "FrontSurface", "BackSurface",
         "Health", "MaxHealth", "WalkSpeed", "JumpPower", "Jump", "Sit", "PlatformStand", "AutoRotate",
         "SoundId", "Volume", "Looped", "PlaybackSpeed", "Pitch", "TimePosition",
+        "SoundGroup", "RollOffMode", "MinDistance", "MaxDistance", "EmitterSize",
         "Range", "Angle", "Shadows", "Heat", "SecondaryColor",
         "Texture", "TextureId", "TextureID", "MeshId", "MeshType", "Scale", "Offset", "VertexColor",
         "Face", "StudsPerTileU", "StudsPerTileV", "ZIndex",
@@ -72,7 +86,17 @@
         "DisplayOrder", "ResetOnSpawn", "IgnoreGuiInset", "AlwaysOnTop", "Adornee", "CanvasSize", "CanvasPosition", "ScrollBarThickness", "ScrollingEnabled", "ClipsDescendants", "ClipDescendants", "LayoutOrder", "Selectable",
         "AnchorPoint", "AutomaticSize", "SizeConstraint", "Rotation", "Modal", "Interactable",
         "Rate", "Lifetime", "Speed", "SpreadAngle", "Rotation", "RotSpeed", "LightEmission", "Acceleration", "Drag", "VelocityInheritance", "ZOffset",
-        "Rotation", "Ambient", "OutdoorAmbient", "Brightness", "ClockTime", "TimeOfDay", "FogStart",
+        "MinLength", "FaceCamera", "TextureLength", "TextureMode", "TextureSpeed",
+        "Width0", "Width1", "CurveSize0", "CurveSize1",
+        "Intensity", "Threshold", "Contrast", "Saturation", "TintColor",
+        "Depth", "Mix", "Attack", "GainMakeup", "Ratio", "Release", "Level",
+        "Delay", "Feedback", "WetLevel", "DryLevel", "HighGain", "LowGain",
+        "MidGain", "Octave", "DecayTime", "Density", "Diffusion", "Duty",
+        "AnimationId", "Loop", "Priority", "Time", "EasingDirection", "EasingStyle", "Weight",
+        "WaterColor", "WaterTransparency", "WaterWaveSize", "WaterWaveSpeed",
+        "Rotation", "Ambient", "OutdoorAmbient", "Brightness",
+        "EnvironmentDiffuseScale", "EnvironmentSpecularScale",
+        "ClockTime", "TimeOfDay", "FogStart",
         "FogEnd", "FogColor", "GlobalShadows", "GeographicLatitude", "SkyboxBk", "SkyboxDn", "SkyboxFt",
         "SkyboxLf", "SkyboxRt", "SkyboxUp", "CelestialBodiesShown", "StarCount", "MoonAngularSize",
         "SunAngularSize", "ShirtTemplate", "PantsTemplate", "Graphic", "HeadColor", "TorsoColor",
@@ -82,6 +106,16 @@
         "DesiredAngle", "CurrentAngle", "MaxVelocity", "BaseAngle",
         "Surface0", "Surface1", "F0", "F1", "F2", "F3", "Hole",
         "Part0", "Part1", "PrimaryPart", "Adornee",
+        "Axis", "SecondaryAxis", "Attachment0", "Attachment1",
+        "ActuatorType", "MotorMaxTorque", "TargetAngle", "LimitsEnabled",
+        "LowerAngle", "UpperAngle", "TwistLimitsEnabled", "TwistLowerAngle",
+        "TwistUpperAngle", "FreeLength", "Stiffness", "Damping", "MinLength",
+        "MaxLength", "Length", "Thickness", "Restitution", "MotorMaxForce",
+        "TargetPosition", "LowerLimit", "UpperLimit", "Responsiveness",
+        "RigidityEnabled", "ApplyAtCenterOfMass", "RelativeTo",
+        "VectorVelocity", "VelocityConstraintMode", "MaxAngularVelocity",
+        "Throttle", "ThrottleFloat", "Steer", "SteerFloat", "Torque",
+        "TurnSpeed", "HeadsUpDisplay",
         "Target", "WalkToPart", "Object", "CameraSubject",
         // Classic + newer BackpackItem/Tool serialization. These are required by
         // old rocket/sword tools and are intentionally preserved even when the
@@ -92,7 +126,9 @@
     ]);
 
     const REF_PROPERTIES = new Set([
-        "Part0", "Part1", "Hole", "PrimaryPart", "Adornee", "Target", "WalkToPart", "Object", "CameraSubject"
+        "Part0", "Part1", "Attachment0", "Attachment1", "Hole", "PrimaryPart",
+        "Adornee", "Target", "WalkToPart", "Object", "CameraSubject",
+        "SoundGroup", "CurrentPage"
     ]);
 
     // Source containers, ValueBase instances, and serialized references must
@@ -126,8 +162,8 @@
         ["Color3uint8", "Color"],
         ["color3uint8", "Color"],
         ["color", "Color"],
-        ["AssemblyLinearVelocity", "Velocity"],
-        ["AssemblyAngularVelocity", "RotVelocity"],
+        ["AssemblyLinearVelocity", "AssemblyLinearVelocity"],
+        ["AssemblyAngularVelocity", "AssemblyAngularVelocity"],
         ["TextureID", "TextureId"],
         ["part0", "Part0"],
         ["part1", "Part1"],
@@ -353,6 +389,59 @@
         return out;
     }
 
+    const ZSTD_FRAME_MAGIC = [0x28, 0xB5, 0x2F, 0xFD];
+
+    function isZstdFrame(src) {
+        return (
+            src?.length >= 4 &&
+            src[0] === ZSTD_FRAME_MAGIC[0] &&
+            src[1] === ZSTD_FRAME_MAGIC[1] &&
+            src[2] === ZSTD_FRAME_MAGIC[2] &&
+            src[3] === ZSTD_FRAME_MAGIC[3]
+        );
+    }
+
+    function zstdDecompress(src, expectedLength) {
+        const decoder = global.fzstd?.decompress;
+        if (typeof decoder !== "function") {
+            throw new Error(
+                "This RBXL uses Zstandard compression, but the local fzstd decoder was not loaded"
+            );
+        }
+
+        const input = src instanceof Uint8Array ? src : new Uint8Array(src);
+        let output;
+        try {
+            // RBXL already provides the exact uncompressed chunk length. Give
+            // fzstd one correctly-sized destination to avoid a second large
+            // allocation while loading modern places.
+            output = decoder(input, new Uint8Array(expectedLength));
+        } catch (error) {
+            throw new Error(
+                `Could not decompress Zstandard RBXL chunk: ${error?.message || error}`
+            );
+        }
+
+        const bytes = output instanceof Uint8Array
+            ? output
+            : new Uint8Array(output);
+        if (bytes.length !== expectedLength) {
+            throw new Error(
+                `Zstandard RBXL chunk produced ${bytes.length} bytes; expected ${expectedLength}`
+            );
+        }
+        return bytes;
+    }
+
+    function decompressRbxChunk(src, expectedLength) {
+        // Roblox binary chunks are self-identifying: modern Zstd frames begin
+        // with 28 B5 2F FD; every other compressed chunk retains the original
+        // raw LZ4 block format. This is additive and preserves old maps.
+        return isZstdFrame(src)
+            ? zstdDecompress(src, expectedLength)
+            : lz4Decompress(src, expectedLength);
+    }
+
     function deinterleave(bytes, count, width) {
         if (bytes.length < count*width) throw new Error("Interleaved RBXL data is truncated");
         const out=new Uint8Array(count*width);
@@ -521,7 +610,9 @@
             const storedLength=compressedLength===0?uncompressedLength:compressedLength;
             if(storedLength>r.remaining()) throw new Error("RBXL chunk extends beyond file");
             const stored=r.bytesN(storedLength);
-            const payload=compressedLength===0?stored:lz4Decompress(stored,uncompressedLength);
+            const payload=compressedLength===0
+                ? stored
+                : decompressRbxChunk(stored,uncompressedLength);
             if(signature==="END\0"){ sawEnd=true; break; }
             const cr=new Reader(payload);
             if(signature==="SSTR"){
@@ -1609,7 +1700,11 @@
     function isLoading(){ return isRbxMode() && sessionStorage.getItem("bloxMapLoaded")!=="1"; }
 
     global.BloxMapStorage=Storage;
-    global.BloxRbxMap={parseBinary,parseXml,parse,generateLuau,lz4Decompress,matrixToEulerXYZ,sanitizeLegacyXml,prepareStoredMap,isRbxMode,isLoading};
+    global.BloxRbxMap={
+        parseBinary,parseXml,parse,generateLuau,
+        lz4Decompress,zstdDecompress,decompressRbxChunk,
+        matrixToEulerXYZ,sanitizeLegacyXml,prepareStoredMap,isRbxMode,isLoading
+    };
     global.__BloxMapProgress=updateProgress;
     global.__bloxAwaitClientGesture=showClickToPlay;
     global.__bloxFinishClientLoading=hideLoading;
