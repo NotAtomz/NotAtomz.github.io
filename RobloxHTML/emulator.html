@@ -30692,6 +30692,10 @@ function syncLuaVehicleSeats(delta) {
 // Roblox network assets -------------------------------------------------------
 const ROBLOX_ASSET_DELIVERY_URL = "https://assetdelivery.roblox.com/v1/asset/?id=";
 const ROBLOX_THUMBNAIL_URL = "https://thumbnails.roblox.com/v1/assets";
+// GitHub Pages cannot set CORS headers for Roblox. Try its endpoints directly
+// first; only on a browser/CORS failure, use AllOrigins' raw CORS relay for the
+// public Roblox URL. No Roblox cookies or credentials are sent to the relay.
+const ROBLOX_CORS_RELAY_URL = "https://api.allorigins.win/raw?url=";
 const BLOX_DELETED_IMAGE_PATH = "Textures/NativeClassic/Content_Deleted.png";
 const robloxImageAssetCache = new Map();
 const robloxSoundAssetCache = new Map();
@@ -30729,6 +30733,58 @@ function warnRobloxAssetOnce(kind, id, reason) {
     console.warn(`[Asset] ${kind} ${id} is unavailable; using ${fallback}.`, reason || "");
 }
 
+function getRobloxCorsRelayUrl(url) {
+    if (!isTrustedRobloxAssetUrl(url))
+        throw new Error("Refusing to proxy a non-Roblox URL");
+    return `${ROBLOX_CORS_RELAY_URL}${encodeURIComponent(String(url))}`;
+}
+
+async function fetchRobloxAssetResponse(url, timeoutMs = 10000) {
+    if (!isTrustedRobloxAssetUrl(url))
+        throw new Error("Refusing to fetch a non-Roblox asset URL");
+
+    let directError;
+    try {
+        const directResponse = await fetch(url, {
+            signal: AbortSignal.timeout(timeoutMs)
+        });
+        if (directResponse.ok)
+            return directResponse;
+        directError = new Error(`direct request returned HTTP ${directResponse.status}`);
+    } catch (error) {
+        directError = error;
+    }
+
+    try {
+        const relayResponse = await fetch(getRobloxCorsRelayUrl(url), {
+            signal: AbortSignal.timeout(Math.max(timeoutMs, 12000))
+        });
+        if (!relayResponse.ok)
+            throw new Error(`relay returned HTTP ${relayResponse.status}`);
+        return relayResponse;
+    } catch (relayError) {
+        throw new Error(
+            `direct Roblox request failed (${directError?.message || directError}); ` +
+            `CORS relay failed (${relayError?.message || relayError})`
+        );
+    }
+}
+
+async function loadRobloxAssetImage(url) {
+    try {
+        return await loadImageUrl(url, 8000);
+    } catch (directError) {
+        try {
+            return await loadImageUrl(getRobloxCorsRelayUrl(url), 12000);
+        } catch (relayError) {
+            throw new Error(
+                `direct image failed (${directError?.message || directError}); ` +
+                `CORS relay failed (${relayError?.message || relayError})`
+            );
+        }
+    }
+}
+
 function loadImageUrl(url, timeoutMs = 8000) {
     return new Promise((resolve, reject) => {
         const image = new Image();
@@ -30754,14 +30810,15 @@ function resolveRobloxImageAsset(value) {
     if (robloxImageAssetCache.has(id)) return robloxImageAssetCache.get(id);
     const promise = (async () => {
         const delivery = `${ROBLOX_ASSET_DELIVERY_URL}${encodeURIComponent(id)}`;
-        try { return await loadImageUrl(delivery); } catch {}
+        try { return await loadRobloxAssetImage(delivery); } catch {}
         try {
-            const response = await fetch(`${ROBLOX_THUMBNAIL_URL}?assetIds=${encodeURIComponent(id)}&size=420x420&format=Png&isCircular=false`);
+            const thumbnailApi = `${ROBLOX_THUMBNAIL_URL}?assetIds=${encodeURIComponent(id)}&size=420x420&format=Png&isCircular=false`;
+            const response = await fetchRobloxAssetResponse(thumbnailApi, 8000);
             if (!response.ok) throw new Error(`thumbnail HTTP ${response.status}`);
             const data = await response.json();
             const url = String(data?.data?.[0]?.imageUrl || "");
             if (!url) throw new Error("thumbnail has no image URL");
-            return await loadImageUrl(url);
+            return await loadRobloxAssetImage(url);
         } catch (error) {
             warnRobloxAssetOnce("image", id, error);
             return BLOX_DELETED_IMAGE_PATH;
@@ -30875,7 +30932,7 @@ async function fetchRobloxMeshPayload(reference, visited = new Set(), depth = 0)
     const key = id ? `id:${id}` : `url:${url}`;
     if (visited.has(key)) throw new Error("mesh asset wrapper contains a cycle");
     visited.add(key);
-    const response = await fetch(url);
+    const response = await fetchRobloxAssetResponse(url);
     if (!response.ok) throw new Error(`mesh asset HTTP ${response.status}`);
     const bytes = new Uint8Array(await response.arrayBuffer());
     const wrapper = extractRobloxAudioWrapperReference(bytes);
@@ -30974,7 +31031,7 @@ async function fetchRobloxSoundPayload(reference, visited = new Set(), depth = 0
         throw new Error("audio asset wrapper contains a cycle");
     visited.add(visitKey);
 
-    const response = await fetch(url);
+    const response = await fetchRobloxAssetResponse(url);
     if (!response.ok) {
         let detail = "";
         try {
@@ -31084,7 +31141,8 @@ async function preloadRobloxAssetsFromGame() {
     const sounds = new Set();
     const meshes = new Set();
     const imageProperties = ["Texture", "Image", "TextureId", "TextureID", "ShirtTemplate", "PantsTemplate", "Graphic", "SkyboxBk", "SkyboxDn", "SkyboxFt", "SkyboxLf", "SkyboxRt", "SkyboxUp"];
-    for (const instance of luaInstances) {
+    for (let instanceIndex = 0; instanceIndex < luaInstances.length; instanceIndex++) {
+        const instance = luaInstances[instanceIndex];
         if (!instance || instance.__destroyed) continue;
         if (instance.ClassName === "Sound") {
             const id = parseRobloxAssetId(instance.SoundId);
@@ -31102,6 +31160,10 @@ async function preloadRobloxAssetsFromGame() {
         for (const match of source.matchAll(/\bSoundId\s*=\s*["']rbxassetid:\/\/(\d+)["']/gi)) sounds.add(match[1]);
         for (const match of source.matchAll(/\bMeshId\s*=\s*["']rbxassetid:\/\/(\d+)["']/gi)) meshes.add(match[1]);
         for (const match of source.matchAll(/\b(?:Image|Texture|TextureId|TextureID|ShirtTemplate|PantsTemplate|Graphic|SkyboxBk|SkyboxDn|SkyboxFt|SkyboxLf|SkyboxRt|SkyboxUp)\s*=\s*["']rbxassetid:\/\/(\d+)["']/gi)) images.add(match[1]);
+        // Large places can contain tens of thousands of instances. Yield during
+        // the one-time scan so asset discovery never monopolizes a browser frame.
+        if (instanceIndex > 0 && instanceIndex % 400 === 0)
+            await new Promise(resolve => setTimeout(resolve, 0));
     }
     const jobs = [
         ...[...images].map(id => () => resolveRobloxImageAsset(id)),
@@ -31109,14 +31171,12 @@ async function preloadRobloxAssetsFromGame() {
         ...[...meshes].map(id => () => resolveRobloxMeshAsset(id))
     ];
     const total = jobs.length;
-    const stage = document.getElementById("bloxRbxLoadingStage");
     let completed = 0;
     const workers = Array.from({length: Math.min(6, total)}, async () => {
         while (jobs.length) {
             const job = jobs.shift();
             try { await job(); } catch {}
             completed++;
-            if (stage) stage.textContent = `Loading assets... ${completed}/${total}`;
         }
     });
     await Promise.race([
@@ -50576,10 +50636,6 @@ async function executeLuauScript() {
         }
 
         if (rbxPayload) {
-            const assetStage = document.getElementById("bloxRbxLoadingStage");
-            if (assetStage) assetStage.textContent = "Scanning Roblox assets...";
-            const preloadedAssets = await preloadRobloxAssetsFromGame();
-            console.log(`[Asset] Preload complete: ${preloadedAssets.images} image(s), ${preloadedAssets.sounds} sound(s).`);
             // RBXL/RBXLX completion and physics-release barriers have already
             // finished above. Embedded gameplay Scripts intentionally start
             // only after the player and camera are restored.
@@ -50604,6 +50660,15 @@ async function executeLuauScript() {
             // leave the client stuck on "Starting physics...".
             await window.__bloxFinishRbxMapLoading?.();
             fireLuaSignal(gameApi.Loaded);
+
+            // Do not hold player spawn/rendering behind asset-server latency.
+            // Each visual resolves its own assets lazily; this pass only warms
+            // the cache in the background for assets scripts may use later.
+            void preloadRobloxAssetsFromGame()
+                .then(preloadedAssets => {
+                    console.log(`[Asset] Background preload complete: ${preloadedAssets.images} image(s), ${preloadedAssets.sounds} sound(s), ${preloadedAssets.meshes} mesh(es).`);
+                })
+                .catch(error => console.warn("[Asset] Background preload failed; assets will resolve on demand.", error));
 
             setTimeout(
                 () =>
