@@ -3143,7 +3143,7 @@ class BloxClassicWebGLRenderer {
                 stencil: true,
                 premultipliedAlpha: false,
                 preserveDrawingBuffer: false,
-                powerPreference: "default"
+                powerPreference: "high-performance"
             },
             {
                 alpha: false,
@@ -3151,7 +3151,8 @@ class BloxClassicWebGLRenderer {
                 depth: true,
                 stencil: true,
                 premultipliedAlpha: false,
-                preserveDrawingBuffer: false
+                preserveDrawingBuffer: false,
+                powerPreference: "high-performance"
             },
             {
                 alpha: false,
@@ -3160,9 +3161,9 @@ class BloxClassicWebGLRenderer {
                 stencil: true,
                 premultipliedAlpha: false,
                 preserveDrawingBuffer: false,
-                powerPreference: "default"
+                powerPreference: "high-performance"
             },
-            {}
+            { powerPreference: "high-performance" }
         ];
 
         this.gl =
@@ -3284,6 +3285,44 @@ class BloxClassicWebGLRenderer {
 
         const contextAttributes =
             this.gl.getContextAttributes?.();
+
+        let gpuVendor = "unavailable";
+        let gpuRenderer = "unavailable";
+        let gpuStatus = "unknown";
+        try {
+            const debugInfo = this.gl.getExtension("WEBGL_debug_renderer_info");
+            gpuVendor = String(this.gl.getParameter(
+                debugInfo?.UNMASKED_VENDOR_WEBGL || this.gl.VENDOR
+            ) || "unknown");
+            gpuRenderer = String(this.gl.getParameter(
+                debugInfo?.UNMASKED_RENDERER_WEBGL || this.gl.RENDERER
+            ) || "unknown");
+            if (/swiftshader|llvmpipe|softpipe|software rasterizer/i.test(gpuRenderer)) {
+                gpuStatus = "software";
+                console.warn(
+                    "[Graphics] WebGL is using a software renderer:",
+                    gpuRenderer,
+                    "Enable Chrome hardware acceleration and restart the browser."
+                );
+            } else if (/angle|nvidia|amd|radeon|intel|apple|adreno|mali|qualcomm/i.test(
+                `${gpuVendor} ${gpuRenderer}`
+            )) {
+                gpuStatus = "hardware-or-ANGLE";
+                console.info("[Graphics] GPU adapter:", gpuVendor, gpuRenderer);
+            } else {
+                console.info("[Graphics] WebGL adapter:", gpuVendor, gpuRenderer);
+            }
+        } catch (error) {
+            console.debug("[Graphics] GPU adapter details are not exposed by this browser.", error);
+        }
+        this.gpuInfo = {
+            status: gpuStatus,
+            vendor: gpuVendor,
+            renderer: gpuRenderer,
+            requestedPowerPreference: "high-performance",
+            contextAttributes: contextAttributes || null
+        };
+        window.__bloxGpuDiagnostics = this.gpuInfo;
 
         this.stencilAvailable =
             Boolean(
@@ -7936,6 +7975,8 @@ renderer.setSize(
 window.__bloxClassicRendererInfo = {
     core:
         "raw WebGL2",
+    gpu:
+        renderer.gpuInfo,
     threeWebGLRenderer:
         false,
     shading:
@@ -7957,6 +7998,8 @@ window.getBloxRenderStats = () => ({
 window.getBloxLightingDiagnostics = () => ({
     renderer:
         window.__bloxClassicRendererInfo,
+    gpu:
+        window.__bloxGpuDiagnostics || renderer.gpuInfo,
     stencilAvailable:
         renderer.stencilAvailable,
     stencilBits:
