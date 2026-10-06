@@ -1612,18 +1612,18 @@ window.__BloxNativeR6MeshInfo = getNativeR6MeshInfo();
 
 const BLOX_SETTINGS_STORAGE_KEY = "bloxClassicClientSettingsV2";
 const ROBLOX_DRAW_DISTANCE = Object.freeze([
-    500, 700, 900, 1200, 1600, 2250, 3200, 4500, 9000, 100000
+    1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
 ]);
 const BLOX_GRAPHICS_LEVEL_PRESETS = Object.freeze([
     null,
     ...ROBLOX_DRAW_DISTANCE.map((renderDistance,index)=>Object.freeze({
-        quality: index<3 ? "low" : "medium", renderDistance
+        quality: index<3 ? "medium" : "high", renderDistance
     }))
 ]);
 const BLOX_SETTINGS_DEFAULTS = Object.freeze({
     graphicsLevel: 6,
-    graphicsQuality: "medium",
-    renderDistance: 2250,
+    graphicsQuality: "high",
+    renderDistance: 500,
     vsync: true,
     shiftLockEnabled: true,
     mouseSensitivity: 1.0,
@@ -1757,24 +1757,26 @@ function getBloxGraphicsPixelRatio(){
 }
 function getBloxRenderDistance(){return getBloxLightingDrawDistance()}
 function getBloxVoxelShadowDistance(){
+    // Far-field coverage is intentionally bounded; nearby clips provide detail.
+    return 10000;
+}
+function getBloxMidVoxelRadius(){
     const level = clampBloxSetting(
         Math.round(Number(window.__bloxBootSettings?.graphicsLevel) || 6),
         1, 10, 6
     );
-    return level * 10000;
+    return level * 100;
 }
 function getBloxVoxelRegionalLightLimit(){
-    const level=clampBloxSetting(
-        Math.round(Number(window.__bloxBootSettings?.graphicsLevel)||6),1,10,6
-    );
-    return level * 10000;
+    // Bound the CPU flood-fill independently of the graphics-level draw cap.
+    return 256;
 }
 function getBloxLightingDrawDistance() {
     const level = clampBloxSetting(
         Math.round(Number(window.__bloxBootSettings?.graphicsLevel) || 6),
         1, 10, 6
     );
-    return level * 10000;
+    return ROBLOX_DRAW_DISTANCE[level - 1];
 }
 function getBloxVSyncEnabled(){return window.__bloxBootSettings?.vsync !== false}
 
@@ -3580,6 +3582,11 @@ class BloxClassicWebGLRenderer {
             this._collectUniforms(
                 this._programMesh,
                 [
+                    'uMidVoxelVisibility',
+                    'uMidVoxelOrigin',
+                    'uMidVoxelWorldSize',
+                    'uMidVoxelDimensions',
+                    'uMidVoxelEnabled',
                     "uModel",
                     "uViewProjection",
                     "uNormalMatrix",
@@ -3681,10 +3688,11 @@ class BloxClassicWebGLRenderer {
         this._whiteTexture =
             this._createWhiteTexture();
 
-        // Use a coarse far cache plus a smaller, finer cache around the
-        // camera. Both are voxel lighting; no projected/stencil shadow pass is
-        // needed.
+        // Three fixed-resolution clip levels prevent quality changes from
+        // stretching effects: 10k far, graphics-scaled 16-stud mid, and
+        // 4-stud near lighting.
         this._voxelLighting = this._createVoxelLightingResources(false);
+        this._midVoxelLighting = this._createVoxelLightingResources('mid');
         this._nearVoxelLighting = this._createVoxelLightingResources(true);
 
         this._blobShadow =
@@ -3801,6 +3809,11 @@ uniform sampler3D uVoxelOutdoor;
 uniform sampler3D uVoxelLocalVisibility;
 uniform vec3 uVoxelOrigin;
 uniform vec3 uVoxelWorldSize;
+uniform sampler3D uMidVoxelVisibility;
+uniform vec3 uMidVoxelOrigin;
+uniform vec3 uMidVoxelWorldSize;
+uniform vec3 uMidVoxelDimensions;
+uniform float uMidVoxelEnabled;
 uniform sampler3D uNearVoxelVisibility;
 uniform vec3 uNearVoxelOrigin;
 uniform vec3 uNearVoxelWorldSize;
@@ -3845,121 +3858,180 @@ void main() {
         vec3 V = normalize(uCameraPosition - vWorldPosition);
         vec3 L = normalize(uSunDirection);
 
-        // The volume covers the selected distance with adaptive cell sizes.
-        // A fixed four-stud bias self-shadows surfaces in the larger cells.
-        vec3 voxelCellSize = uVoxelWorldSize /
-            vec3(textureSize(uVoxelLocalVisibility, 0));
-        float voxelCell = max(voxelCellSize.x, max(voxelCellSize.y, voxelCellSize.z));
         vec3 voxelUv =
-            (vWorldPosition + N * (voxelCell + 0.05) - uVoxelOrigin) /
+            (vWorldPosition + N * 2.05 - uVoxelOrigin) /
             max(uVoxelWorldSize, vec3(0.001));
         float inVoxelVolume =
             step(0.0, voxelUv.x) * step(voxelUv.x, 1.0) *
             step(0.0, voxelUv.y) * step(voxelUv.y, 1.0) *
             step(0.0, voxelUv.z) * step(voxelUv.z, 1.0);
-        vec3 edgeDistance = min(voxelUv, vec3(1.0) - voxelUv) * uVoxelWorldSize;
-        float voxelWeight = uVoxelEnabled * inVoxelVolume *
-            smoothstep(0.0, 48.0, min(edgeDistance.x, min(edgeDistance.y, edgeDistance.z)));
-        // Large cells cannot resolve a small light's range. Keep nearby direct
-        // lights active instead of replacing them with empty coarse samples.
-        float localVoxelWeight = voxelWeight * (1.0 - smoothstep(4.0, 16.0, voxelCell));
         float outdoorVisibility = 1.0;
         vec3 propagatedLocalLight = vec3(0.0);
-        vec3 directLocalLight = vec3(0.0);
+        float localVoxelBlend = 0.0;
+        float coarseShadowConfidence = 0.0;
 
         if (uVoxelEnabled > 0.5 && inVoxelVolume > 0.5) {
-            // One trilinear lookup contains propagated local RGB plus
-            // sun/sky exposure in alpha. Lighting cost is therefore constant
-            // per pixel regardless of how many lights injected into the grid.
             vec4 voxelLight = texture(uVoxelLocalVisibility, voxelUv);
-            propagatedLocalLight = voxelLight.rgb;
-            // Voxel exposure supplies soft ambient/indirect occlusion. It must
-            // not erase direct sunlight completely; projected geometry below
-            // provides the visible cast shadow.
-            outdoorVisibility = max(voxelLight.a, 0.32);
+            // The far clipmap can span 10,000 studs with a bounded 32x16x32
+            // texture. Its cells are intentionally huge, so treating their
+            // occupancy as precise sun occlusion blacks out entire surfaces.
+            // Trust coarse shadows only while a cell is still reasonably small.
+            vec3 coarseCellSize = uVoxelWorldSize / vec3(32.0, 16.0, 32.0);
+            float coarseCellSpan = max(
+                coarseCellSize.x,
+                max(coarseCellSize.y, coarseCellSize.z)
+            );
+            coarseShadowConfidence = 1.0 - smoothstep(12.0, 48.0, coarseCellSpan);
+            propagatedLocalLight = voxelLight.rgb * coarseShadowConfidence;
+            outdoorVisibility = mix(1.0, voxelLight.a, coarseShadowConfidence);
         }
 
-        // Near detail never changes resolution when draw distance changes.
-        // Blend only at the cache boundary, not throughout the entire map.
-        vec3 nearUv = (vWorldPosition + N * 4.05 - uNearVoxelOrigin) /
+        // The mid clip adds coverage by adding fixed 16-stud cells, never by
+        // stretching a fixed texture over a larger world-space area.
+        vec3 midVoxelUv =
+            (vWorldPosition + N * 2.05 - uMidVoxelOrigin) /
+            max(uMidVoxelWorldSize, vec3(0.001));
+        vec3 midVoxelCellSize = uMidVoxelWorldSize /
+            max(uMidVoxelDimensions, vec3(1.0));
+        float midSunSampleOffset = max(
+            midVoxelCellSize.x,
+            max(midVoxelCellSize.y, midVoxelCellSize.z)
+        ) * 1.05;
+        vec3 midSunVoxelUv =
+            (vWorldPosition + N * midSunSampleOffset - uMidVoxelOrigin) /
+            max(uMidVoxelWorldSize, vec3(0.001));
+        float inMidVoxelVolume =
+            step(0.0, midVoxelUv.x) * step(midVoxelUv.x, 1.0) *
+            step(0.0, midVoxelUv.y) * step(midVoxelUv.y, 1.0) *
+            step(0.0, midVoxelUv.z) * step(midVoxelUv.z, 1.0);
+        float inMidSunVoxelVolume =
+            step(0.0, midSunVoxelUv.x) * step(midSunVoxelUv.x, 1.0) *
+            step(0.0, midSunVoxelUv.y) * step(midSunVoxelUv.y, 1.0) *
+            step(0.0, midSunVoxelUv.z) * step(midSunVoxelUv.z, 1.0);
+        float midBlend = 0.0;
+        if (uMidVoxelEnabled > 0.5 && inMidVoxelVolume > 0.5) {
+            vec4 midVoxelLight = texture(uMidVoxelVisibility, midVoxelUv);
+            float edgeDistance = min(
+                min(min(midVoxelUv.x, 1.0 - midVoxelUv.x),
+                    min(midVoxelUv.y, 1.0 - midVoxelUv.y)),
+                min(midVoxelUv.z, 1.0 - midVoxelUv.z)
+            );
+            midBlend = smoothstep(0.0, 0.035, edgeDistance);
+            propagatedLocalLight = mix(
+                propagatedLocalLight, midVoxelLight.rgb, midBlend
+            );
+            localVoxelBlend = midBlend;
+        }
+        if (uMidVoxelEnabled > 0.5 && inMidSunVoxelVolume > 0.5) {
+            vec4 midSunVoxelLight = texture(
+                uMidVoxelVisibility, midSunVoxelUv
+            );
+            float sunEdgeDistance = min(
+                min(min(midSunVoxelUv.x, 1.0 - midSunVoxelUv.x),
+                    min(midSunVoxelUv.y, 1.0 - midSunVoxelUv.y)),
+                min(midSunVoxelUv.z, 1.0 - midSunVoxelUv.z)
+            );
+            float midSunBlend = smoothstep(0.0, 0.035, sunEdgeDistance);
+            outdoorVisibility = mix(
+                outdoorVisibility, midSunVoxelLight.a, midSunBlend
+            );
+        }
+
+        // The 4-stud near clip remains fixed for crisp camera-local effects.
+        vec3 nearVoxelUv =
+            (vWorldPosition + N * 2.05 - uNearVoxelOrigin) /
             max(uNearVoxelWorldSize, vec3(0.001));
-        vec3 nearEdge = min(nearUv, vec3(1.0) - nearUv) * uNearVoxelWorldSize;
-        float nearWeight = uNearVoxelEnabled *
-            smoothstep(0.0, 24.0, min(nearEdge.x, min(nearEdge.y, nearEdge.z)));
-        if (nearWeight > 0.0) {
-            vec4 nearLight = texture(uNearVoxelVisibility, nearUv);
-            float combinedLocalWeight = mix(localVoxelWeight, 1.0, nearWeight);
-            propagatedLocalLight = (
-                propagatedLocalLight * localVoxelWeight * (1.0 - nearWeight) +
-                nearLight.rgb * nearWeight
-            ) / max(combinedLocalWeight, 0.0001);
-            localVoxelWeight = combinedLocalWeight;
-            float combinedSkyWeight = mix(voxelWeight, 1.0, nearWeight);
-            outdoorVisibility = (
-                outdoorVisibility * voxelWeight * (1.0 - nearWeight) +
-                max(nearLight.a, 0.32) * nearWeight
-            ) / max(combinedSkyWeight, 0.0001);
-            voxelWeight = combinedSkyWeight;
+        // The 2-stud offset above is useful for interpolated local-light
+        // propagation, but can still sample the receiver's own voxel. Move the
+        // sun lookup one complete near cell outward to avoid self-occlusion.
+        vec3 nearVoxelCellSize = uNearVoxelWorldSize / vec3(64.0, 32.0, 64.0);
+        float nearSunSampleOffset = max(
+            nearVoxelCellSize.x,
+            max(nearVoxelCellSize.y, nearVoxelCellSize.z)
+        ) * 1.05;
+        vec3 nearSunVoxelUv =
+            (vWorldPosition + N * nearSunSampleOffset - uNearVoxelOrigin) /
+            max(uNearVoxelWorldSize, vec3(0.001));
+        float inNearVoxelVolume =
+            step(0.0, nearVoxelUv.x) * step(nearVoxelUv.x, 1.0) *
+            step(0.0, nearVoxelUv.y) * step(nearVoxelUv.y, 1.0) *
+            step(0.0, nearVoxelUv.z) * step(nearVoxelUv.z, 1.0);
+        float inNearSunVoxelVolume =
+            step(0.0, nearSunVoxelUv.x) * step(nearSunVoxelUv.x, 1.0) *
+            step(0.0, nearSunVoxelUv.y) * step(nearSunVoxelUv.y, 1.0) *
+            step(0.0, nearSunVoxelUv.z) * step(nearSunVoxelUv.z, 1.0);
+        float nearBlend = 0.0;
+        if (uNearVoxelEnabled > 0.5 && inNearVoxelVolume > 0.5) {
+            vec4 nearVoxelLight = texture(uNearVoxelVisibility, nearVoxelUv);
+            float edgeDistance = min(
+                min(min(nearVoxelUv.x, 1.0 - nearVoxelUv.x),
+                    min(nearVoxelUv.y, 1.0 - nearVoxelUv.y)),
+                min(nearVoxelUv.z, 1.0 - nearVoxelUv.z)
+            );
+            nearBlend = smoothstep(0.0, 0.035, edgeDistance);
+            propagatedLocalLight = mix(
+                propagatedLocalLight, nearVoxelLight.rgb, nearBlend
+            );
+            localVoxelBlend = mix(localVoxelBlend, 1.0, nearBlend);
+        }
+        if (uNearVoxelEnabled > 0.5 && inNearSunVoxelVolume > 0.5) {
+            vec4 nearSunVoxelLight = texture(
+                uNearVoxelVisibility, nearSunVoxelUv
+            );
+            float sunEdgeDistance = min(
+                min(min(nearSunVoxelUv.x, 1.0 - nearSunVoxelUv.x),
+                    min(nearSunVoxelUv.y, 1.0 - nearSunVoxelUv.y)),
+                min(nearSunVoxelUv.z, 1.0 - nearSunVoxelUv.z)
+            );
+            float nearSunBlend = smoothstep(0.0, 0.035, sunEdgeDistance);
+            outdoorVisibility = mix(
+                outdoorVisibility, nearSunVoxelLight.a, nearSunBlend
+            );
         }
 
-        // Fine voxels remain lookup-only. Coarse volumes use the bounded
-        // nearest-light list for lighting details smaller than a cell.
-        if (localVoxelWeight < 0.999) {
-            int directCount = min(uLocalLightCount, MAX_DIRECT_LOCAL_LIGHTS);
-            for (int lightIndex = 0; lightIndex < MAX_DIRECT_LOCAL_LIGHTS; lightIndex++) {
-                if (lightIndex >= directCount) break;
-                vec4 positionRange = texelFetch(uLocalLightData, ivec2(0, lightIndex), 0);
-                vec4 colorBrightness = texelFetch(uLocalLightData, ivec2(1, lightIndex), 0);
-                vec4 directionOuter = texelFetch(uLocalLightData, ivec2(2, lightIndex), 0);
-                vec4 parameters = texelFetch(uLocalLightData, ivec2(3, lightIndex), 0);
-                vec3 toLight = positionRange.xyz - vWorldPosition;
-                float lightDistance = length(toLight);
-                float lightRange = max(positionRange.w, 0.001);
-                if (lightDistance >= lightRange) continue;
-                vec3 lightDirection = toLight / max(lightDistance, 0.001);
-                float attenuation = 1.0 - lightDistance / lightRange;
-                attenuation *= attenuation;
-                float cone = 1.0;
-                if (parameters.x > 0.5) {
-                    float coneDot = dot(-lightDirection, normalize(directionOuter.xyz));
-                    cone = smoothstep(
-                        directionOuter.w,
-                        max(directionOuter.w + 0.001, parameters.y),
-                        coneDot
-                    );
-                }
-                float lambert = max(dot(N, lightDirection), 0.0);
-                directLocalLight += colorBrightness.rgb *
-                    min(colorBrightness.a, 8.0) * attenuation * cone * lambert;
+        // Evaluate the nearest 16 lights at their authored ranges per fragment
+        // as a non-disappearing direct contribution. The voxel field carries
+        // propagated light from the broader set of lights in the near region.
+        vec3 directLocalLight = vec3(0.0);
+        for (int lightIndex = 0; lightIndex < MAX_DIRECT_LOCAL_LIGHTS; lightIndex++) {
+            if (lightIndex >= uLocalLightCount) break;
+            vec4 positionRange = texelFetch(uLocalLightData, ivec2(0, lightIndex), 0);
+            vec4 colorBrightness = texelFetch(uLocalLightData, ivec2(1, lightIndex), 0);
+            vec4 directionOuter = texelFetch(uLocalLightData, ivec2(2, lightIndex), 0);
+            vec4 lightParams = texelFetch(uLocalLightData, ivec2(3, lightIndex), 0);
+            float lightRange = max(positionRange.w, 0.001);
+            vec3 toLight = positionRange.xyz - vWorldPosition;
+            float lightDistance = length(toLight);
+            if (lightDistance >= lightRange) continue;
+
+            vec3 lightDirection = toLight / max(lightDistance, 0.001);
+            float cone = 1.0;
+            if (lightParams.x > 0.5) {
+                float coneCos = dot(normalize(directionOuter.xyz), -lightDirection);
+                cone = lightParams.x < 1.5
+                    ? smoothstep(directionOuter.w, lightParams.y, coneCos)
+                    : smoothstep(0.0, 0.08, coneCos);
             }
+            float diffuse = max((dot(N, lightDirection) + 0.08) / 1.08, 0.0);
+            float attenuation = 1.0 - lightDistance / lightRange;
+            directLocalLight += colorBrightness.rgb *
+                min(max(colorBrightness.a, 0.0), 1.0) * attenuation * cone * diffuse;
         }
+        // Keep the exact-range local-light pass as a floor so coarser
+        // graphics-level voxels cannot erase small nearby lights.
+        vec3 localLightForShading = max(
+            directLocalLight, propagatedLocalLight * localVoxelBlend
+        );
 
         float hemi = smoothstep(-0.72, 0.82, N.y);
-        vec3 globalLight = mix(uAmbientColor, uOutdoorAmbient, hemi);
-        // Classic voxel lighting retained broad sky bounce on faces turned
-        // away from the sun. Without it, black Ambient values make an entire
-        // underside lose its BrickColor instead of merely appearing shaded.
-        vec3 classicBounce = min(
-            vec3(0.42),
-            max(uAmbientColor, uOutdoorAmbient * 0.22) + vec3(0.20)
-        );
-        globalLight = max(globalLight, classicBounce);
+        vec3 light = mix(uAmbientColor, uOutdoorAmbient, hemi);
 
         float rawNdl = dot(N, L);
         float wrappedNdl = max((rawNdl + 0.08) / 1.08, 0.0);
-        globalLight +=
-            uSunColor * wrappedNdl * uSunStrength *
-            mix(1.0, outdoorVisibility, voxelWeight);
-
-        // Lighting.Brightness controls global sun/sky exposure only. Roblox
-        // PointLight, SpotLight, and SurfaceLight retain their own Brightness
-        // even when the global value is zero.
-        vec3 localLight = mix(
-            max(directLocalLight, vec3(0.0)),
-            max(propagatedLocalLight, vec3(0.0)),
-            localVoxelWeight
-        ) * 2.0;
-        color = base * (max(globalLight, vec3(0.0)) + localLight) + uEmissive;
+        light += uSunColor * wrappedNdl * uSunStrength *
+            mix(1.0, outdoorVisibility, uVoxelEnabled * inVoxelVolume);
+        light += localLightForShading * 2.0;
+        color = base * max(light, vec3(0.0)) + uEmissive;
 
         if (uReflectionStrength >= 0.01) {
             // reflection.png is the classic square sphere-map shipped by the
@@ -3979,6 +4051,12 @@ void main() {
         color = base + uEmissive;
     }
 
+    if (uLit > 0.5) {
+        // Leave normal Roblox-range colors untouched; compress only values
+        // above display white so strong colored lights keep their hue.
+        vec3 highlightExcess = max(color - vec3(1.0), vec3(0.0));
+        color = max(color, vec3(0.0)) / (vec3(1.0) + highlightExcess);
+    }
     color = clamp(color, 0.0, 1.0);
 
     if (uFogEnabled > 0.5) {
@@ -4234,17 +4312,26 @@ void main() {
             1,
             10
         );
-        const shadowDistance = getBloxVoxelShadowDistance();
-        // Keep texture dimensions fixed so graphics levels never create giant
-        // allocations. The coarse clip level expands its cells to cover the
-        // complete requested range; the fine clip level preserves 4-stud
-        // detail around the camera.
-        const cellSize = detail
-            ? 4
-            : Math.max(8, Math.ceil(shadowDistance / 16));
-        const width = 32;
-        const height = detail ? 32 : 16;
-        const depth = 32;
+        const mid = detail === 'mid';
+        const near = detail === true;
+        const shadowDistance = mid
+            ? getBloxMidVoxelRadius()
+            : getBloxVoxelShadowDistance();
+        // Keep cell spacing fixed within each clip level. Only the number of
+        // midrange cells grows with quality; it is capped at 125x32x125 (~500k
+        // voxels), while near remains 4-stud detail and far remains bounded.
+        const cellSize = near ? 4 : mid ? 16 : Math.max(8, Math.ceil(shadowDistance / 16));
+        const width = near
+            ? 64
+            : mid
+                ? Math.max(8, Math.ceil(shadowDistance * 2 / cellSize))
+                : 32;
+        const height = near ? 32 : mid ? 32 : 16;
+        const depth = near
+            ? 64
+            : mid
+                ? Math.max(8, Math.ceil(shadowDistance * 2 / cellSize))
+                : 32;
 
         const createTexture = (internalFormat, format, data) => {
             const texture = gl.createTexture();
@@ -4295,7 +4382,8 @@ void main() {
 
         return {
             graphicsLevel,
-            detail,
+            detail: near,
+            mid,
             shadowDistance,
             width,
             height,
@@ -4346,18 +4434,20 @@ void main() {
     }
 
     _ensureVoxelLightingResources() {
-        const level = THREE.MathUtils.clamp(
-            Math.round(Number(window.__bloxBootSettings?.graphicsLevel) || 6),
-            1,
-            10
-        );
-
-        if (this._voxelLighting?.graphicsLevel === level)
+        // Lighting volumes are fixed in world space; graphics-level changes
+        // should not destroy and rebuild them at a new scale.
+        if (
+            this._voxelLighting?.shadowDistance === getBloxVoxelShadowDistance() &&
+            this._midVoxelLighting?.shadowDistance === getBloxMidVoxelRadius() &&
+            this._nearVoxelLighting?.cellSize === 4
+        )
             return false;
 
         const previous = this._voxelLighting;
+        const previousMid = this._midVoxelLighting;
         const previousNear = this._nearVoxelLighting;
         this._voxelLighting = this._createVoxelLightingResources(false);
+        this._midVoxelLighting = this._createVoxelLightingResources('mid');
         this._nearVoxelLighting = this._createVoxelLightingResources(true);
 
         if (previous) {
@@ -4369,6 +4459,11 @@ void main() {
             if (previousNear.outdoorTexture)
                 this.gl.deleteTexture(previousNear.outdoorTexture);
             this.gl.deleteTexture(previousNear.localTexture);
+        }
+        if (previousMid) {
+            if (previousMid.outdoorTexture)
+                this.gl.deleteTexture(previousMid.outdoorTexture);
+            this.gl.deleteTexture(previousMid.localTexture);
         }
 
         this.info.render.voxelDirty = true;
@@ -4426,12 +4521,17 @@ void main() {
 
     _updateVoxelLighting(casters, lighting, camera) {
         this._ensureVoxelLightingResources();
-        // Time-slice clip levels so a camera move or light change does not
-        // rebuild both grids in the same frame. First use initializes both;
-        // subsequent frames alternate coarse and fine updates.
+        // Time-slice the three clip levels so a camera move or light change
+        // does not rebuild all grids in the same frame. Initialize each once,
+        // then rotate updates across far, mid, and near.
         const tick = (this._voxelUpdateTick = ((this._voxelUpdateTick || 0) + 1));
-        let volume = (tick & 1) === 0 ? this._voxelLighting : this._nearVoxelLighting;
+        let volume = tick % 3 === 0
+            ? this._voxelLighting
+            : tick % 3 === 1
+                ? this._midVoxelLighting
+                : this._nearVoxelLighting;
         if (!this._voxelLighting.initialized) volume = this._voxelLighting;
+        else if (!this._midVoxelLighting.initialized) volume = this._midVoxelLighting;
         else if (!this._nearVoxelLighting.initialized) volume = this._nearVoxelLighting;
         this._updateVoxelLightingVolume(casters, lighting, camera, volume);
         return this._voxelLighting.initialized;
@@ -4892,6 +4992,14 @@ void main() {
         gl.activeTexture(gl.TEXTURE3);
         gl.bindTexture(gl.TEXTURE_3D, volume.localTexture);
         gl.uniform1i(this._meshUniforms.uVoxelLocalVisibility, 3);
+        const mid = this._midVoxelLighting;
+        gl.uniform1f(this._meshUniforms.uMidVoxelEnabled, mid?.initialized ? 1 : 0);
+        gl.uniform3f(this._meshUniforms.uMidVoxelOrigin, mid.origin.x, mid.origin.y, mid.origin.z);
+        gl.uniform3f(this._meshUniforms.uMidVoxelWorldSize, mid.worldSize.x, mid.worldSize.y, mid.worldSize.z);
+        gl.uniform3f(this._meshUniforms.uMidVoxelDimensions, mid.width, mid.height, mid.depth);
+        gl.activeTexture(gl.TEXTURE6);
+        gl.bindTexture(gl.TEXTURE_3D, mid.localTexture);
+        gl.uniform1i(this._meshUniforms.uMidVoxelVisibility, 6);
         const near = this._nearVoxelLighting;
         gl.uniform1f(this._meshUniforms.uNearVoxelEnabled, near?.initialized ? 1 : 0);
         gl.uniform3f(this._meshUniforms.uNearVoxelOrigin, near.origin.x, near.origin.y, near.origin.z);
@@ -7461,8 +7569,8 @@ void main() {
         this.info.render.localLights =
             lighting.localLightCount;
 
-        // Local lights now inject into the propagated 3D voxel texture. There
-        // is no per-frame 500-light GPU upload and no per-fragment light loop.
+        // All submitted local lights feed the voxel cache; the nearest 16 also
+        // provide the shader fallback beyond the fine voxel footprint.
 
         // GitHub/ANGLE-safe mode: the mesh program intentionally avoids shadow-map
         // sampling because that was one of the GPU-driver crash paths.
@@ -9367,6 +9475,83 @@ function createClassicCornerWedgeGeometry(w, h, d) {
     return geometry;
 }
 
+function createClassicTrussGeometry(w, h, d) {
+    const width = Math.max(0.05, Number(w) || 1);
+    const height = Math.max(0.05, Number(h) || 1);
+    const depth = Math.max(0.05, Number(d) || 1);
+    const hx = width / 2, hy = height / 2, hz = depth / 2;
+    const member = Math.max(0.02, Math.min(0.16, Math.min(width, depth) * 0.1));
+    const railX = Math.max(0, hx - member / 2), railZ = Math.max(0, hz - member / 2);
+    const positions = [];
+
+    // Each strut is appended as a flat-shaded prism so the whole lattice remains
+    // one mesh and one draw call. This is visual-only; collision stays box-based.
+    const addBeam = (ax, ay, az, bx, by, bz) => {
+        const dx = bx - ax, dy = by - ay, dz = bz - az;
+        const length = Math.hypot(dx, dy, dz);
+        if (length < 0.0001) return;
+        const ux = dx / length, uy = dy / length, uz = dz / length;
+        let rx = 0, ry = 1, rz = 0;
+        if (Math.abs(uy) > 0.9) { rx = 1; ry = 0; }
+        let vx = uy * rz - uz * ry, vy = uz * rx - ux * rz, vz = ux * ry - uy * rx;
+        const vLength = Math.hypot(vx, vy, vz) || 1;
+        vx /= vLength; vy /= vLength; vz /= vLength;
+        const wx = uy * vz - uz * vy, wy = uz * vx - ux * vz, wz = ux * vy - uy * vx;
+        const half = member / 2, corners = [];
+        for (const [cx, cy, cz] of [[ax, ay, az], [bx, by, bz]]) {
+            corners.push(
+                [cx-vx*half-wx*half,cy-vy*half-wy*half,cz-vz*half-wz*half],
+                [cx+vx*half-wx*half,cy+vy*half-wy*half,cz+vz*half-wz*half],
+                [cx-vx*half+wx*half,cy-vy*half+wy*half,cz-vz*half+wz*half],
+                [cx+vx*half+wx*half,cy+vy*half+wy*half,cz+vz*half+wz*half]
+            );
+        }
+        const faces = [[0,2,3,1],[4,5,7,6],[0,1,5,4],[2,6,7,3],[0,4,6,2],[1,3,7,5]];
+        for (const [a, b, c, e] of faces) {
+            for (const index of [a, b, c, a, c, e]) positions.push(...corners[index]);
+        }
+    };
+
+    // Four continuous corner chords form the frame.
+    for (const x of [-railX, railX]) for (const z of [-railZ, railZ]) addBeam(x, -hy, z, x, hy, z);
+
+    // Repeat fixed-footprint, roughly cube-height bays upward. X/Z dimensions
+    // stay tied to the part's Size and never grow to compensate for its height;
+    // only a final partial bay is shortened when the height is not an exact fit.
+    // Exceptionally tall imports enlarge the vertical pitch to cap the mesh at
+    // 64 bays; the horizontal footprint is still never scaled.
+    const cellHeight = Math.max(width, depth, height / 64);
+    const sections = THREE.MathUtils.clamp(Math.ceil(height / cellHeight), 1, 64);
+    for (let section = 0; section <= sections; section++) {
+        const y = Math.min(hy, -hy + section * cellHeight);
+        for (const z of [-railZ, railZ]) addBeam(-railX, y, z, railX, y, z);
+        for (const x of [-railX, railX]) addBeam(x, y, -railZ, x, y, railZ);
+    }
+    // Alternating diagonal braces create the classic ladder-like truss lattice.
+    for (let section = 0; section < sections; section++) {
+        const y0 = Math.min(hy, -hy + section * cellHeight);
+        const y1 = Math.min(hy, y0 + cellHeight);
+        for (const z of [-railZ, railZ]) {
+            if (section % 2 === 0) addBeam(-railX, y0, z, railX, y1, z);
+            else addBeam(railX, y0, z, -railX, y1, z);
+        }
+        for (const x of [-railX, railX]) {
+            if (section % 2 === 0) addBeam(x, y0, -railZ, x, y1, railZ);
+            else addBeam(x, y0, railZ, x, y1, -railZ);
+        }
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    geometry.clearGroups();
+    geometry.addGroup(0, positions.length / 3, 0);
+    geometry.userData.__bloxClassicTruss = true;
+    return geometry;
+}
+
 function createClassicPartGeometryUncached(shape, w, h, d) {
     const normalized =
         normalizeClassicPartShape(
@@ -9461,19 +9646,7 @@ function createClassicPartGeometryUncached(shape, w, h, d) {
         );
     }
 
-    if (normalized === "Truss") {
-        const geometry =
-            new THREE.BoxGeometry(
-                w,
-                h,
-                d,
-                1,
-                Math.max(1, Math.min(16, Math.round((Number(h) || 1) / 2))),
-                1
-            );
-        geometry.userData.__bloxClassicTruss = true;
-        return geometry;
-    }
+    if (normalized === "Truss") return createClassicTrussGeometry(w, h, d);
 
     // Keep just enough intermediate vertices for the broad retro Gouraud
     // highlight. The previous 1.5-stud / 128-axis cap could turn one 200^3
@@ -13780,6 +13953,10 @@ const CLASS_PARENTS = {
     Animator: ["Instance"],
     Animation: ["Instance"],
     AnimationController: ["Instance"],
+    Accoutrement: ["Instance"],
+    Accessory: ["Accoutrement", "Instance"],
+    Hat: ["Accoutrement", "Instance"],
+    AccessoryDescription: ["Instance"],
     KeyframeSequence: ["Instance"],
     Keyframe: ["Instance"],
     Pose: ["Instance"],
@@ -13952,6 +14129,23 @@ defineBlox2016Class("Beam","Instance",{
     CurveSize0:0,CurveSize1:0,FaceCamera:false,Texture:"",TextureLength:1,TextureSpeed:0
 });
 defineBlox2016Class("SoundGroup","Instance",{Volume:1});
+defineBlox2016Class("Accoutrement","Instance",{AttachmentPoint:null,AssetId:0});
+defineBlox2016Class("Accessory","Accoutrement",{AttachmentPoint:null,AssetId:0,AccessoryType:"Unknown"});
+defineBlox2016Class("Hat","Accoutrement",{AttachmentPoint:null,AssetId:0});
+defineBlox2016Class("AccessoryDescription","Instance",{
+    AssetId:0,AccessoryType:"Hat",Instance:null,IsLayered:false,Order:1,
+    Position:null,Rotation:null,Scale:null,Puffiness:1
+});
+defineBlox2016Class("HumanoidDescription","Instance",{
+    Shirt:"",Pants:"",ShirtGraphic:"",GraphicTShirt:0,Face:0,
+    HatAccessory:"",HairAccessory:"",FaceAccessory:"",NeckAccessory:"",
+    ShoulderAccessory:"",ShouldersAccessory:"",FrontAccessory:"",BackAccessory:"",WaistAccessory:"",AccessoryBlob:"",
+    Head:0,Torso:0,LeftArm:0,RightArm:0,LeftLeg:0,RightLeg:0,
+    BodyTypeScale:0,DepthScale:1,HeadScale:1,HeightScale:1,ProportionScale:0,WidthScale:1,
+    ClimbAnimation:0,FallAnimation:0,IdleAnimation:0,JumpAnimation:0,RunAnimation:0,
+    SwimAnimation:0,WalkAnimation:0,MoodAnimation:0,StaticFacialAnimation:true,UseAvatarSettings:false,
+    HeadColor:null,TorsoColor:null,LeftArmColor:null,RightArmColor:null,LeftLegColor:null,RightLegColor:null
+});
 defineBlox2016Class("KeyframeSequence","Instance",{Loop:false,Priority:"Core"});
 defineBlox2016Class("Keyframe","Instance",{Time:0});
 defineBlox2016Class("Pose","Instance",{
@@ -19852,7 +20046,7 @@ function createLuaValue(className) {
 // Emulation. Classic BodyColors/Shirt/Pants/ShirtGraphic are also supported as
 // Character children for old-style scripts.
 function createLuaHumanoidDescription() {
-    return finalizeLuaInstance(
+    const description = finalizeLuaInstance(
         Mutable({
             Name:
                 "HumanoidDescription",
@@ -19875,6 +20069,48 @@ function createLuaHumanoidDescription() {
             ShirtGraphic:
                 "",
 
+            GraphicTShirt:0,
+            Face:0,
+
+            // Legacy accessory asset lists plus the newer typed accessory
+            // description collection. The renderer uses locally available Hat/
+            // Accessory instances; AssetId metadata is still preserved.
+            HatAccessory:"",
+            HairAccessory:"",
+            FaceAccessory:"",
+            NeckAccessory:"",
+            ShoulderAccessory:"",
+            ShouldersAccessory:"",
+            FrontAccessory:"",
+            BackAccessory:"",
+            WaistAccessory:"",
+            AccessoryBlob:"",
+            Accessories:[],
+
+            Head:0,
+            Torso:0,
+            LeftArm:0,
+            RightArm:0,
+            LeftLeg:0,
+            RightLeg:0,
+
+            BodyTypeScale:0,
+            DepthScale:1,
+            HeadScale:1,
+            HeightScale:1,
+            ProportionScale:0,
+            WidthScale:1,
+            ClimbAnimation:0,
+            FallAnimation:0,
+            IdleAnimation:0,
+            JumpAnimation:0,
+            RunAnimation:0,
+            SwimAnimation:0,
+            WalkAnimation:0,
+            MoodAnimation:0,
+            StaticFacialAnimation:true,
+            UseAvatarSettings:false,
+
             // Color3 values preserve the exact color selected on index.html.
             // null means "leave that body part's current color alone".
             HeadColor:
@@ -19896,6 +20132,271 @@ function createLuaHumanoidDescription() {
                 null
         })
     );
+
+    const accessoryList = () => {
+        const fromProperty = luaListValues(description.Accessories);
+        const fromChildren = getLuaChildren(description).filter(child =>
+            child?.ClassName === "AccessoryDescription"
+        );
+        return [...new Set([...fromProperty, ...fromChildren])];
+    };
+    description.GetAccessories = (...args) => {
+        const includeRigid = args.find(value => typeof value === "boolean") !== false;
+        const entries = getHumanoidDescriptionAccessoryEntries(description)
+            .map(normalizeHumanoidAccessoryInfo)
+            .filter(Boolean)
+            .filter(info => includeRigid || info.IsLayered || Number.isFinite(info.Order));
+        return makeLuaCollection(entries);
+    };
+    description.getAccessories = description.GetAccessories;
+    description.AddAccessory = (...args) => {
+        const item = args.find(value =>
+            value && value !== description && typeof value === "object" &&
+            (value.ClassName === "AccessoryDescription" ||
+                value.ClassName === "Accessory" || value.ClassName === "Hat" ||
+                Number.isFinite(Number(getLuaAccessoryInfoField(value,"AssetId"))))
+        );
+        if (!item) return false;
+        const current = accessoryList();
+        if (!current.includes(item)) current.push(item);
+        description.Accessories = current;
+        if (item.ClassName === "AccessoryDescription" && item.Parent !== description)
+            item.Parent = description;
+        return true;
+    };
+    description.addAccessory = description.AddAccessory;
+    description.SetAccessories = (...args) => {
+        const values = args.filter(value => value !== description);
+        const source = values.find(value => value && typeof value === "object" &&
+            !value.ClassName && typeof value !== "boolean");
+        const next = luaListValues(source).filter(Boolean).map(value =>
+            value?.ClassName === "AccessoryDescription"
+                ? value
+                : normalizeHumanoidAccessoryInfo(value)
+        ).filter(Boolean);
+        for (const child of getLuaChildren(description)) {
+            if (child?.ClassName === "AccessoryDescription" && !next.includes(child))
+                child.Parent = null;
+        }
+        const includeRigid = args.find(value => typeof value === "boolean") !== false;
+        const normalized = next.map(normalizeHumanoidAccessoryInfo).filter(Boolean);
+        description.Accessories = next;
+        description.AccessoryBlob = JSON.stringify(normalized.filter(info => info.IsLayered).map(info => ({
+            AssetId:info.AssetId,
+            AccessoryType:info.AccessoryType,
+            IsLayered:true,
+            Order:info.Order,
+            Puffiness:info.Puffiness
+        })));
+        if (includeRigid) {
+            const rigidProperties = {
+                Hat:"HatAccessory", Hair:"HairAccessory", Face:"FaceAccessory",
+                Neck:"NeckAccessory", Shoulder:"ShouldersAccessory",
+                Front:"FrontAccessory", Back:"BackAccessory", Waist:"WaistAccessory"
+            };
+            for (const [accessoryType, propertyName] of Object.entries(rigidProperties)) {
+                description[propertyName] = normalized
+                    .filter(info => !info.IsLayered && !Number.isFinite(info.Order) &&
+                        String(info.AccessoryType?.Name || info.AccessoryType) === accessoryType)
+                    .map(info => Math.trunc(Number(info.AssetId) || 0))
+                    .filter(assetId => assetId > 0)
+                    .join(",");
+            }
+            // Preserve the older singular spelling used by some 2015 scripts.
+            description.ShoulderAccessory = description.ShouldersAccessory;
+        }
+        for (const item of next) {
+            if (item?.ClassName === "AccessoryDescription" && item.Parent !== description)
+                item.Parent = description;
+        }
+        return true;
+    };
+    description.setAccessories = description.SetAccessories;
+    return description;
+}
+
+function createLuaAccessoryDescription() {
+    const description = finalizeLuaInstance(Mutable({
+        Name:"AccessoryDescription",
+        ClassName:"AccessoryDescription",
+        Parent:null,
+        Archivable:true,
+        AssetId:0,
+        AccessoryType:"Hat",
+        Instance:null,
+        IsLayered:false,
+        Order:1,
+        Position:createVector3(0,0,0),
+        Rotation:createVector3(0,0,0),
+        Scale:createVector3(1,1,1),
+        Puffiness:1
+    }));
+    description.GetAppliedInstance = (...args) => description.Instance || null;
+    description.getAppliedInstance = description.GetAppliedInstance;
+    return description;
+}
+
+function getLuaAccessoryInfoField(entry, key) {
+    if (!entry) return undefined;
+    if (entry instanceof Map) return entry.get(key);
+    if (entry.map instanceof Map) return entry.map.get(key);
+    if (typeof entry.get === "function") {
+        try { return entry.get(key); } catch {}
+    }
+    return entry[key];
+}
+
+function normalizeHumanoidAccessoryInfo(entry) {
+    if (!entry || typeof entry !== "object") return null;
+    if (isA(entry, "Accoutrement")) {
+        return {
+            AssetId:Number(entry.AssetId) || 0,
+            AccessoryType:entry.AccessoryType || "Unknown",
+            IsLayered:false,
+            Order:undefined,
+            Instance:entry
+        };
+    }
+    const assetId = Math.max(0, Math.trunc(Number(getLuaAccessoryInfoField(entry,"AssetId")) || 0));
+    const type = getLuaAccessoryInfoField(entry,"AccessoryType");
+    const instance = getLuaAccessoryInfoField(entry,"Instance") || null;
+    const rawOrder = getLuaAccessoryInfoField(entry,"Order");
+    const hasOrder = rawOrder !== undefined && rawOrder !== null && rawOrder !== "";
+    const isLayered = Boolean(getLuaAccessoryInfoField(entry,"IsLayered")) ||
+        (entry.ClassName !== "AccessoryDescription" && hasOrder);
+    return {
+        AssetId:assetId,
+        AccessoryType:type?.Name || type || "Hat",
+        IsLayered:isLayered,
+        Order:entry.ClassName === "AccessoryDescription" &&
+            !isLayered
+                ? undefined
+                : hasOrder && Number.isFinite(Number(rawOrder)) ? Number(rawOrder) : undefined,
+        Puffiness:Number(getLuaAccessoryInfoField(entry,"Puffiness")) || 1,
+        Instance:instance,
+        Position:getLuaAccessoryInfoField(entry,"Position") || null,
+        Rotation:getLuaAccessoryInfoField(entry,"Rotation") || null,
+        Scale:getLuaAccessoryInfoField(entry,"Scale") || null
+    };
+}
+
+function getHumanoidDescriptionAccessoryEntries(description) {
+    const values = luaListValues(description?.Accessories);
+    const children = getLuaChildren(description).filter(child =>
+        child?.ClassName === "AccessoryDescription"
+    );
+    const entries = [...values, ...children];
+    const layeredBlob = String(description?.AccessoryBlob || "").trim();
+    if (layeredBlob) {
+        try {
+            const parsed = JSON.parse(layeredBlob);
+            if (Array.isArray(parsed)) entries.push(...parsed);
+        } catch {}
+    }
+    const rigidFields = [
+        ["HatAccessory","Hat"], ["HairAccessory","Hair"],
+        ["FaceAccessory","Face"], ["NeckAccessory","Neck"],
+        ["ShoulderAccessory","Shoulder"], ["ShouldersAccessory","Shoulder"],
+        ["FrontAccessory","Front"], ["BackAccessory","Back"],
+        ["WaistAccessory","Waist"]
+    ];
+    for (const [property,type] of rigidFields) {
+        const raw = String(description?.[property] || "").trim();
+        if (!raw) continue;
+        for (const id of raw.split(/[;,\s]+/)) {
+            const assetId = Math.max(0, Math.trunc(Number(id) || 0));
+            if (assetId > 0) entries.push({AssetId:assetId,AccessoryType:type,IsLayered:false});
+        }
+    }
+    const unique = new Map();
+    for (const entry of entries) {
+        const info = normalizeHumanoidAccessoryInfo(entry);
+        if (!info) continue;
+        const key = info.Instance || (info.AssetId + ":" + info.AccessoryType + ":" + info.Order);
+        if (!unique.has(key)) unique.set(key, entry);
+    }
+    return [...unique.values()];
+}
+
+function findLoadedAccessoryForDescription(accessoryDescription) {
+    if (!accessoryDescription) return null;
+    if (isA(accessoryDescription, "Accoutrement")) return accessoryDescription;
+    const directInstance = getLuaAccessoryInfoField(accessoryDescription,"Instance");
+    if (isA(directInstance,"Accoutrement")) return directInstance;
+    const assetId = Math.trunc(Number(getLuaAccessoryInfoField(accessoryDescription,"AssetId")) || 0);
+    if (assetId <= 0) return null;
+    for (const candidate of luaInstances) {
+        if (!candidate || candidate.__destroyed || !isA(candidate, "Accoutrement")) continue;
+        if (Math.trunc(Number(candidate.AssetId) || 0) === assetId) return candidate;
+    }
+    return null;
+}
+
+function attachLuaAccessoryToHumanoid(humanoid, accessory) {
+    if (!humanoid || !accessory || !isA(accessory, "Accoutrement")) return false;
+    const character = humanoid.Parent;
+    const head = character?.FindFirstChild?.("Head") || null;
+    const handle = accessory.FindFirstChild?.("Handle", true) || null;
+    if (!character || !head || !handle || !isA(handle, "BasePart")) return false;
+
+    if (accessory.Parent !== character) accessory.Parent = character;
+    const headAttachments = getLuaDescendants(head).filter(node => node?.ClassName === "Attachment");
+    const handleAttachments = getLuaDescendants(handle).filter(node => node?.ClassName === "Attachment");
+    let targetFrame = null;
+    for (const handleAttachment of handleAttachments) {
+        const headAttachment = headAttachments.find(node => node.Name === handleAttachment.Name);
+        if (!headAttachment) continue;
+        targetFrame = mulFrame(
+            mulFrame(cfFrame(head.CFrame), cfFrame(headAttachment.CFrame)),
+            invFrame(cfFrame(handleAttachment.CFrame))
+        );
+        break;
+    }
+    if (!targetFrame && accessory.AttachmentPoint)
+        targetFrame = mulFrame(cfFrame(head.CFrame), cfFrame(accessory.AttachmentPoint));
+    if (!targetFrame) {
+        targetFrame = mulFrame(
+            cfFrame(head.CFrame),
+            cfFrame(createCFrame(0, (Number(head.Size?.Y) || 1) * 0.5 + (Number(handle.Size?.Y) || 0) * 0.5, 0))
+        );
+    }
+    handle.CFrame = frameToCFrame(targetFrame);
+    handle.CanCollide = false;
+    handle.Massless = true;
+
+    const accessoryParts = new Set(getLuaDescendants(accessory).filter(node => isA(node, "BasePart")));
+    // Cloned hats can retain a weld to their source NPC's Head. Remove only
+    // cross-boundary joints; internal Handle-to-mesh welds remain intact.
+    for (const joint of [...luaJoints]) {
+        const part0Inside = accessoryParts.has(joint.Part0);
+        const part1Inside = accessoryParts.has(joint.Part1);
+        if (part0Inside !== part1Inside) {
+            joint.Part0 = null;
+            joint.Part1 = null;
+            joint.Parent = null;
+        }
+    }
+
+    const weld = createRobloxLinuxJoint("WeldConstraint");
+    weld.Part0 = head;
+    weld.Part1 = handle;
+    weld.Parent = handle;
+    return true;
+}
+
+function applyHumanoidDescriptionAccessories(humanoid, description) {
+    const previous = humanoid.__descriptionAccessoryInstances || new Set();
+    for (const accessory of previous) {
+        if (accessory && !accessory.__destroyed) accessory.Destroy?.();
+    }
+    const applied = new Set();
+    for (const entry of getHumanoidDescriptionAccessoryEntries(description)) {
+        const source = findLoadedAccessoryForDescription(entry);
+        if (!source || source.__destroyed) continue;
+        const clone = source.Clone?.();
+        if (clone && attachLuaAccessoryToHumanoid(humanoid, clone)) applied.add(clone);
+    }
+    humanoid.__descriptionAccessoryInstances = applied;
 }
 
 function createLuaBodyColors() {
@@ -20256,6 +20757,8 @@ function createLuaHumanoid() {
                 );
             }
 
+            applyHumanoidDescriptionAccessories(humanoid, description);
+
             return true;
         };
 
@@ -20406,6 +20909,26 @@ function createLuaHumanoid() {
         const state=getStringArg(args,"");
         return stateEnabled.get(state)!==false;
     };
+    humanoid.AddAccessory = (...args) => {
+        const accessory = args.find(value =>
+            value && value !== humanoid && isA(value, "Accoutrement")
+        );
+        return attachLuaAccessoryToHumanoid(humanoid, accessory);
+    };
+    humanoid.addAccessory = humanoid.AddAccessory;
+    humanoid.GetAccessories = (...args) => makeLuaCollection(
+        getLuaChildren(humanoid.Parent).filter(child => isA(child,"Accessory"))
+    );
+    humanoid.getAccessories = humanoid.GetAccessories;
+    humanoid.RemoveAccessories = (...args) => {
+        const character = humanoid.Parent;
+        if (!character) return;
+        for (const accessory of getLuaChildren(character)) {
+            if (isA(accessory, "Accoutrement")) accessory.Destroy?.();
+        }
+        humanoid.__descriptionAccessoryInstances?.clear?.();
+    };
+    humanoid.removeAccessories = humanoid.RemoveAccessories;
     humanoid.EquipTool=(...args)=>{
         const tool=args.find(value=>value?.ClassName==="Tool");
         return tool?equipClassicBackpackItem(tool):false;
@@ -29263,6 +29786,11 @@ function cloneLuaInstance(source, shallow = false) {
             "SkyboxBk","SkyboxDn","SkyboxFt","SkyboxLf","SkyboxRt","SkyboxUp",
             "CelestialBodiesShown","StarCount","SunAngularSize","MoonAngularSize"
         ]) c[propertyName]=source[propertyName];
+    } else if (source.ClassName === "AccessoryDescription") {
+        for (const propertyName of [
+            "AssetId","AccessoryType","Instance","IsLayered","Order",
+            "Puffiness","Position","Rotation","Scale"
+        ]) c[propertyName] = source[propertyName];
     } else if (
         source.ClassName ===
         "Team"
@@ -29288,6 +29816,13 @@ function cloneLuaInstance(source, shallow = false) {
                 "Shirt",
                 "Pants",
                 "ShirtGraphic",
+                "GraphicTShirt","Face","Head","Torso","LeftArm","RightArm","LeftLeg","RightLeg",
+                "HatAccessory","HairAccessory","FaceAccessory","NeckAccessory",
+                "ShoulderAccessory","ShouldersAccessory","FrontAccessory","BackAccessory","WaistAccessory",
+                "AccessoryBlob","Accessories","BodyTypeScale","DepthScale","HeadScale",
+                "HeightScale","ProportionScale","WidthScale","ClimbAnimation","FallAnimation",
+                "IdleAnimation","JumpAnimation","RunAnimation","SwimAnimation","WalkAnimation","MoodAnimation",
+                "StaticFacialAnimation","UseAvatarSettings",
                 "HeadColor",
                 "TorsoColor",
                 "LeftArmColor",
@@ -29296,8 +29831,9 @@ function cloneLuaInstance(source, shallow = false) {
                 "RightLegColor"
             ]
         ) {
-            c[propertyName] =
-                source[propertyName];
+            c[propertyName] = propertyName === "Accessories" && Array.isArray(source[propertyName])
+                ? source[propertyName].slice()
+                : source[propertyName];
         }
     } else if (
         source.ClassName ===
@@ -29566,6 +30102,17 @@ function relinkClonedSubtreeReferences(cloneRoot) {
 
         if (clone.ClassName === "ObjectValue") {
             clone.Value = remap(source.Value);
+        }
+
+        if (clone.ClassName === "AccessoryDescription")
+            clone.Instance = remap(source.Instance);
+
+        if (clone.ClassName === "HumanoidDescription" && Array.isArray(clone.Accessories)) {
+            clone.Accessories = clone.Accessories.map(entry => {
+                if (entry?.ClassName === "AccessoryDescription") return remap(entry);
+                if (!entry || typeof entry !== "object") return entry;
+                return {...entry, Instance:remap(entry.Instance)};
+            });
         }
 
         if (luaConstraints.has(clone)) {
@@ -42057,6 +42604,8 @@ const InstanceApi = Mutable({
         ) {
             instance =
                 createLuaHumanoidDescription();
+        } else if (className === "AccessoryDescription") {
+            instance = createLuaAccessoryDescription();
         } else if (
             className ===
             "BodyColors"
@@ -46716,6 +47265,13 @@ const EnumApi = Mutable({
     PathStatus: Mutable({Success:"Success",ClosestNoPath:"ClosestNoPath",ClosestOutOfRange:"ClosestOutOfRange",FailStartNotEmpty:"FailStartNotEmpty",FailFinishNotEmpty:"FailFinishNotEmpty",NoPath:"NoPath"}),
     PathWaypointAction: Mutable({Walk:"Walk",Jump:"Jump",Custom:"Custom"}),
     PlaybackState: Mutable({Begin:"Begin",Delayed:"Delayed",Playing:"Playing",Paused:"Paused",Completed:"Completed",Cancelled:"Cancelled"}),
+    AccessoryType: Mutable({
+        Unknown:"Unknown",Hat:"Hat",Hair:"Hair",Face:"Face",Neck:"Neck",
+        Shoulder:"Shoulder",Front:"Front",Back:"Back",Waist:"Waist",
+        TShirt:"TShirt",Shirt:"Shirt",Sweater:"Sweater",Pants:"Pants",
+        Shorts:"Shorts",LeftShoe:"LeftShoe",RightShoe:"RightShoe",
+        DressSkirt:"DressSkirt",Jacket:"Jacket",Eyebrow:"Eyebrow",Eyelash:"Eyelash"
+    }),
     AnimationPriority: Mutable({Core:"Core",Idle:"Idle",Movement:"Movement",Action:"Action"}),
     RenderPriority: Mutable({First:0,Input:100,Camera:200,Character:300,Last:2000}),
     RollOffMode: Mutable({Inverse:"Inverse",Linear:"Linear",LinearSquare:"LinearSquare",InverseTapered:"InverseTapered"}),
