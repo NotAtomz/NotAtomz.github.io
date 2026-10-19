@@ -413,6 +413,20 @@
             font-size: 21px;
             cursor: pointer;
         }
+
+        .download-button {
+            width: 100%;
+            height: 52px;
+            border: 1px solid #002690;
+            border-radius: 4px;
+            color: #fff;
+            background: linear-gradient(#083bc9,#0003ad);
+            box-shadow: inset 0 1px rgba(255,255,255,.35);
+            font-size: 21px;
+            cursor: pointer;
+        }
+        .download-button:hover { background: linear-gradient(#1361d6,#002bba); }
+
         .play-button:hover { background: linear-gradient(#13d66f,#00ba58); }
         .play-button:disabled { opacity: .6; cursor: wait; }
         .back-link { margin-bottom: 12px; border: 0; color: var(--blox-link); background: none; cursor: pointer; }
@@ -567,6 +581,11 @@
             .wardrobe-tabs button { min-width: 0; flex: 1; }
             .clothing-catalog { grid-template-columns: repeat(2,minmax(0,1fr)); }
         }
+        .banner-img {
+            width: 100%;
+            height: 125px;
+            object-fit: cover;
+        }
     </style>
 </head>
 <body>
@@ -608,6 +627,7 @@
                 <button class="side-button" data-page="games" type="button"><span class="side-icon website-sprite sprite-games" aria-hidden="true"></span>Games</button>
                 <button class="side-button" data-page="character" type="button"><span class="side-icon website-sprite sprite-character" aria-hidden="true"></span>Character</button>
                 <button class="side-button" data-page="help" type="button"><span class="side-icon">?</span>Help</button>
+                <button class="side-button" data-page="download" type="button"><span class="side-icon">↓</span>Download</button>
             </nav>
         </aside>
 
@@ -761,6 +781,27 @@
                     <p class="upload-help-note">Your browser keeps uploaded files local to this page. Nothing is sent to a server.</p>
                 </div>
             </section>
+            
+            <section class="page" id="downloadPage">
+                <div class="panel help-panel">
+                    <img class="banner-img" src="Textures/Website/banner.jpeg" alt="">
+                    <h1>Offline Download</h1>
+                    <p>
+                        This page is to download the latest open source single offline blox emulation html file, with this you will be able to play directly from the downloaded file without the website!
+                    </p>
+                    <p>
+                        Click the download button below to get started. (107.6 MB)
+                    </p>
+                    <button
+                        class="download-button btn-primary-lg"
+                        id="downloadButton"
+                        type="button">
+                        Download
+                    </button>
+                </div>
+            </section>
+
+
         </main>
     </div>
 
@@ -778,6 +819,15 @@
             <button class="small-blue game-loading-close" id="gameLoadingClose" type="button">Close</button>
         </div>
     </div>
+    <script>
+        document.getElementById("downloadButton").addEventListener("click", function () {
+            window.open(
+                "https://mega.nz/file/n0RE3IxY#3UmqcKyBtmjvhUgsuY3rfv6RO-avx24J_O2VZlcMUTc",
+                "_blank",
+                "noopener,noreferrer"
+            );
+        });
+    </script>
 
     <script src="fzstd.js?v=0.1.1"></script>
     <script src="blox-rbx-loader.js?v=20261003-engine-2016"></script>
@@ -838,7 +888,7 @@
         const CLASSIC_R6_FACE_ORDER = Object.freeze(["left", "right", "top", "bottom", "front", "back"]);
 
         const $ = id => document.getElementById(id);
-        const pages = { home: $("homePage"), games: $("gamesPage"), game: $("gamePage"), character: $("characterPage"), help: $("helpPage") };
+        const pages = { home: $("homePage"), games: $("gamesPage"), game: $("gamePage"), character: $("characterPage"), help: $("helpPage"), download: $("downloadPage") };
         const avatarColorInputs = {
             HeadColor: $("headColor"), TorsoColor: $("torsoColor"),
             LeftArmColor: $("leftArmColor"), RightArmColor: $("rightArmColor"),
