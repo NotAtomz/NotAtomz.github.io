@@ -36,7 +36,7 @@ The runtime uses managed Luau coroutines rather than invoking every place script
 
 ## Intentional exclusions and limits
 
-- Single player only: no RemoteEvent/RemoteFunction networking, replication server, matchmaking, or Roblox server connection.
+- Catalog games with a valid multiplayer `gameid` can connect to Photon for server browsing, room membership, basic roster/chat events, and simple remote R6 avatars. Full Instance replication, authoritative remote Player objects, and RemoteEvent/RemoteFunction routing are still pending; uploaded maps remain local. See [MULTIPLAYER.md](MULTIPLAYER.md).
 - Roblox CoreScripts and imported `CoreGui`/`Chat` Bubble Chat code do not run. Blox uses its own classic local UI.
 - External Roblox asset IDs may be unavailable offline; bundled classic sounds/textures have local resolution paths.
 - Modern engine systems, complex terrain/CSG fidelity, modern constraints, and every contemporary service are outside the 2007–2009 target.

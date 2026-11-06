@@ -1,0 +1,47 @@
+{
+	"name": "@photonengine/realtime-core",
+	"version": "6.0.1",
+	"description": "Photon Realtime Core for the web: a TypeScript/JavaScript client over the native RealtimeCore library compiled to WebAssembly.",
+	"keywords": [
+		"photon",
+		"photon-engine",
+		"realtime",
+		"multiplayer",
+		"matchmaking",
+		"networking",
+		"gamedev",
+		"websocket",
+		"webassembly",
+		"wasm"
+	],
+	"homepage": "https://doc.photonengine.com/realtime-core/v6/bindings/javascript-typescript-api",
+	"bugs": "https://dashboard.photonengine.com/support/create",
+	"license": "SEE LICENSE IN LICENSE.txt",
+	"type": "module",
+	"sideEffects": false,
+	"engines": {
+		"node": ">=22"
+	},
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./integration": {
+			"types": "./dist/integration.d.ts",
+			"default": "./dist/integration.js"
+		},
+		"./realtimecore.wasm": "./dist/native/realtimecore.wasm",
+		"./package.json": "./package.json"
+	},
+	"peerDependencies": {
+		"ws": ">=8"
+	},
+	"peerDependenciesMeta": {
+		"ws": {
+			"optional": true
+		}
+	}
+}

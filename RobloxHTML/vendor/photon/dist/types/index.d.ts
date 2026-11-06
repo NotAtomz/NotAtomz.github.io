@@ -1,0 +1,16 @@
+export type { ClientOptions } from './ClientOptions.js';
+export type { AuthenticationValues } from './AuthenticationValues.js';
+export type { ConnectOptions } from './ConnectOptions.js';
+export type { CreateRoomOptions } from './CreateRoomOptions.js';
+export type { JoinRoomOptions } from './JoinRoomOptions.js';
+export type { MatchmakingOptions } from './MatchmakingOptions.js';
+export type { EventOptions } from './EventOptions.js';
+export type { DirectMessageOptions } from './DirectMessageOptions.js';
+export type { Player } from './Player.js';
+export type { RoomListing } from './RoomListing.js';
+export type { FriendInfo } from './FriendInfo.js';
+export type { LobbyStats } from './LobbyStats.js';
+export type { RegionInfo } from './RegionInfo.js';
+export type { NetworkStats } from './NetworkStats.js';
+export type { TrafficStats } from './TrafficStats.js';
+export type { TrafficStatsGameLevel } from './TrafficStatsGameLevel.js';

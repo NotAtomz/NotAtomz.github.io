@@ -1,6 +1,6 @@
 # Blox Emulation
 
-Blox Emulation is a single-player, browser-based recreation of the 2007–2009 Roblox client style. It loads `.lua`, `.luau`, `.rbxl`, and `.rbxlx` files into a local classic world with an R6 character, retro rendering, physics, tools, humanoids, joints, GUI objects, sounds, and place scripts.
+Blox Emulation is a browser-based recreation of the 2007–2009 Roblox client style. It loads `.lua`, `.luau`, `.rbxl`, and `.rbxlx` files into a classic world with an R6 character, retro rendering, physics, tools, humanoids, joints, GUI objects, sounds, and place scripts. Uploaded maps run locally; eligible catalog games can opt into the early Photon multiplayer layer described in [MULTIPLAYER.md](MULTIPLAYER.md).
 
 It is an emulator, not a Roblox client. It does not connect to Roblox multiplayer servers.
 
@@ -13,7 +13,7 @@ and AnimationTrack state, MeshPart/UnionOperation preservation, Terrain fill
 methods, Attachments, WeldConstraint, common constraint classes, and GUI layout
 objects/input events.
 
-This layer is intentionally additive and single-player. WeldConstraint uses the
+This layer is intentionally additive. WeldConstraint uses the
 native rigid-assembly solver; common force/velocity/align constraints have local
 physics behavior. Mesh/CSG data and the remaining constraint classes retain
 their class identity and script-facing properties but may use a box visual or a
@@ -71,6 +71,8 @@ await executeLuau(`
 The engine includes a static AABB tree and sweep broadphase, sleeping-body filtering, lazy compound mass calculation, indexed Instance parent/name lookups, bounded classic part tessellation, far-surface LOD, render-state caching, and Luau bridge reference caching. These target the common failure cases in multi-thousand-part classic places rather than changing their gameplay behavior.
 
 See [RBXL_RBXLX_SUPPORT.md](RBXL_RBXLX_SUPPORT.md) for the place/script compatibility details.
+
+See [MULTIPLAYER.md](MULTIPLAYER.md) for Photon setup, current multiplayer capabilities, and known limitations. Local uploads and catalog maps without a valid `gameid` remain single-player.
 
 ## Workspace exporter
 

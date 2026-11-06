@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="blox-photon-app-id" content="">
 <link rel="icon" type="image/png" href="Textures/Website/O.png">
 <link rel="preload" as="image" href="Textures/UI/ArrowCursor.png">
 <title>Blox Emulation - Emulator</title>
@@ -2736,7 +2737,9 @@ bloxGameMenu?.addEventListener("click", event => {
             break;
 
         case "leave":
-            window.location.href = "index.html";
+            void Promise.resolve(window.__bloxMpLeave?.()).finally(() => {
+                window.location.href = "index.html";
+            });
             break;
 
         // Report Abuse intentionally remains a visible no-op.
@@ -18824,9 +18827,10 @@ function renderClassicLeaderboard() {
     // renderer on the canonical host object instead of GetPlayers' transient
     // luau-web wrappers, otherwise leaderstats child indexes and Team identity
     // are lost while crossing back into JavaScript.
-    const players = localPlayerApi && !localPlayerApi.__destroyed
-        ? [localPlayerApi]
-        : [];
+    const players = [
+        ...(localPlayerApi && !localPlayerApi.__destroyed ? [localPlayerApi] : []),
+        ...(Array.isArray(window.__bloxMpRemotePlayers) ? window.__bloxMpRemotePlayers : [])
+    ];
     const keys =
         getClassicLeaderboardKeys();
     classicLeaderboardBody.textContent =
@@ -19280,6 +19284,8 @@ function submitClassicChatInput() {
             type,
             null
         );
+        try { window.__bloxMpSendChat?.(text); }
+        catch (error) { console.warn("[Blox Multiplayer] Chat send failed:", error); }
     }
 
     closeClassicChatInput();
@@ -40915,19 +40921,43 @@ function createLuaRemoteEvent() {
     }));
     instance.OnServerEvent = createLuaSignal("RemoteEvent.OnServerEvent", instance);
     instance.OnClientEvent = createLuaSignal("RemoteEvent.OnClientEvent", instance);
+    const sendRpc = (mode, values, targetPlayers) => {
+        const runtime = window.BloxMultiplayer;
+        if (!runtime || typeof window.__bloxMpSendRpc !== "function") return false;
+        const path = [];
+        for (let node = instance; node && node !== gameApi; node = node.Parent) path.unshift(`${node.ClassName}:${node.Name}`);
+        const seen = new WeakSet();
+        const safe = (value, depth = 0) => {
+            if (depth > 8) return null;
+            if (value == null || ["string", "boolean"].includes(typeof value)) return value;
+            if (typeof value === "number") return Number.isFinite(value) ? value : null;
+            if (typeof value === "object") { if (seen.has(value)) return null; seen.add(value); }
+            if (Array.isArray(value)) return value.slice(0, 100).map(item => safe(item, depth + 1));
+            if (typeof value === "object" && Number.isFinite(Number(value.X ?? value.x)) && Number.isFinite(Number(value.Y ?? value.y)) && Number.isFinite(Number(value.Z ?? value.z))) return { __type: "Vector3", v: [Number(value.X ?? value.x), Number(value.Y ?? value.y), Number(value.Z ?? value.z)] };
+            if (typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) return Object.fromEntries(Object.entries(value).slice(0, 100).map(([key, item]) => [String(key).slice(0, 100), safe(item, depth + 1)]));
+            return null;
+        };
+        return window.__bloxMpSendRpc({ mode, path, args: safe(values) }, targetPlayers);
+    };
     instance.FireServer = (...args) => {
         const values = args[0] === instance ? args.slice(1) : args;
+        if (window.BloxMultiplayer && Number(window.BloxMultiplayer.authority) !== Number(window.BloxMultiplayer.client.localPlayer.number)) return sendRpc("server", values);
         fireLuaSignal(instance.OnServerEvent, localPlayerApi, ...values);
     };
     instance.FireClient = (...args) => {
         const values = args[0] === instance ? args.slice(1) : args;
         const recipient = values.shift();
-        if (recipient !== localPlayerApi) return;
-        fireLuaSignal(instance.OnClientEvent, ...values);
+        const isAuthority = !window.BloxMultiplayer || Number(window.BloxMultiplayer.authority) === Number(window.BloxMultiplayer.client.localPlayer.number);
+        if (!isAuthority) return;
+        if (recipient === localPlayerApi) fireLuaSignal(instance.OnClientEvent, ...values);
+        else if (window.BloxMultiplayer) sendRpc("client", values, [Number(recipient?.UserId)]);
     };
     instance.FireAllClients = (...args) => {
         const values = args[0] === instance ? args.slice(1) : args;
+        const isAuthority = !window.BloxMultiplayer || Number(window.BloxMultiplayer.authority) === Number(window.BloxMultiplayer.client.localPlayer.number);
+        if (!isAuthority) return;
         fireLuaSignal(instance.OnClientEvent, ...values);
+        if (window.BloxMultiplayer) sendRpc("client", values);
     };
     return instance;
 }
@@ -49528,6 +49558,7 @@ function scheduleEmbeddedMapScriptsAfterLoad(options = {}) {
         ...getEmbeddedMapScripts("LocalScript")
     ].filter(instance =>
         isEmbeddedMapScriptEnabled(instance) &&
+        (!window.BloxMultiplayer || (instance.ClassName === "LocalScript" || window.BloxMultiplayer.authority === window.BloxMultiplayer.client.localPlayer.number)) &&
         !isEmbeddedScriptTemplate(instance) &&
         isEmbeddedScriptRuntimeContextValid(instance) &&
         !launchedEmbeddedScriptInstances.has(instance)
@@ -51211,6 +51242,17 @@ async function executeLuauScript() {
 
             restoreLocalPlayerCameraAfterRbxLoad();
 
+            // Multiplayer is opted in only by the launcher for manifest catalog games.
+            // Local uploads never set bloxGameId and take the existing path unchanged.
+            if (sessionStorage.getItem("bloxGameId")) {
+                try {
+                    const { connectEmulatorMultiplayer } = await import("./blox-mp-sync.js?v=20261106-mp6");
+                    await connectEmulatorMultiplayer();
+                } catch (error) {
+                    console.error("[Blox Multiplayer] Could not join the room:", error);
+                }
+            }
+
             // Gameplay is now genuinely loaded. Remove the loading UI BEFORE
             // starting legacy place Scripts so a waiting/slow Script can never
             // leave the client stuck on "Starting physics...".
@@ -51279,6 +51321,13 @@ window.executeLuau = async function(source, chunkName = "DevConsole") {
         String(source),
         String(chunkName)
     );
+};
+
+window.__bloxMpAuthorityStarted = async ({ handover = false } = {}) => {
+    if (handover) {
+        scheduleEmbeddedMapScriptsAfterLoad({ lateDiscovery: true, modulesReady: true });
+    }
+    window.__bloxMpResetWorldSync?.();
 };
 function syncLuaValueObjects() {
     for (
@@ -53032,6 +53081,11 @@ function makeCharacterPartInstance(
 
     instance.BreakJoints =
         (...args) => {
+            // Multiplayer proxy parts mirror another player's body. Their
+            // joint lifecycle must never touch this browser's local Humanoid.
+            if (instance.__bloxMpRemoteActor === true)
+                return 0;
+
             // In a classic R6, losing the Head/Torso connection kills the Humanoid.
             // Character Part:BreakJoints() therefore enters the same no-joints death
             // lifecycle used by Health <= 0.
@@ -65713,6 +65767,11 @@ function animate(
             0.05
         );
 
+    // Remote snapshots arrive at network cadence; render their buffered poses
+    // every frame so movement and joint motion do not step at packet frequency.
+    updateBloxRemoteActors(frameTimeMs);
+    updateBloxRemoteWorldPoses(frameTimeMs);
+
     const rbxPhysicsImportPaused =
         isRbxMapPreSpawnLoading() &&
         window.__bloxRbxPhysicsReleased !== true;
@@ -66147,6 +66206,17 @@ window.__bloxClassic2008 = {
     chat: message => dispatchClassicPlayerChat(localPlayerApi, message, "All", null)
 };
 
+window.__bloxMpAppendChat = (name, message, playerNumber) => {
+    const character = bloxRemoteActors.get(Number(playerNumber))?.character || null;
+    dispatchClassicPlayerChat(
+        { Name: String(name || `Player ${playerNumber || ""}`), Character: character },
+        String(message || "").slice(0, 240),
+        "All",
+        null
+    );
+};
+window.__bloxMpRosterChanged = () => renderClassicLeaderboard();
+
 window.getBloxCharacterPartVisualDiagnostics = () => {
     if (
         !currentCharacterModel ||
@@ -66315,6 +66385,561 @@ window.getBloxBasePartVisualDiagnostics = name => {
             )
     };
 };
+
+// Replicated Workspace scope: Models, Folders and BaseParts. Every client
+// already loads the game's static asset; authority snapshots reconcile that
+// baseline and add/remove script-created objects for late joiners.
+const bloxRemoteActors = new Map();
+const bloxMpAppliedWorldObjects = new Map();
+let bloxMpAuthorityWorldSignatures = new Map();
+function bloxMpWorldSegment(instance, ordinal) {
+    return `${instance.ClassName}:${encodeURIComponent(String(instance.Name || ""))}:${ordinal}`;
+}
+function bloxMpSupportedWorldObject(instance) {
+    return instance?.ClassName === "Model" || instance?.ClassName === "Folder" || instance?.ClassName === "ForceField" || instance?.ClassName === "RemoteEvent" || isA(instance, "ValueBase") || instance?.ClassName === "Team" || isA(instance, "BasePart") || ["PointLight", "SpotLight", "SurfaceLight"].includes(instance?.ClassName);
+}
+function bloxMpWalkWorld() {
+    const entries = [], objects = new Map(), excluded = new Set([currentCharacterModel]);
+    for (const actor of bloxRemoteActors.values()) excluded.add(actor.character);
+    const visit = (parent, parentId) => {
+        const ordinals = new Map();
+        for (const child of getLuaChildren(parent)) {
+            if (!child || child.__destroyed || excluded.has(child) || !bloxMpSupportedWorldObject(child)) continue;
+            const key = `${child.ClassName}\u0000${String(child.Name || "")}`;
+            const ordinal = ordinals.get(key) || 0; ordinals.set(key, ordinal + 1);
+            const segment = bloxMpWorldSegment(child, ordinal);
+            const id = parentId ? `${parentId}/${segment}` : segment;
+            child.__bloxMpWorldId = id;
+            const entry = { id, parentId, className: child.ClassName, name: String(child.Name || "").slice(0, 128) };
+            if (isA(child, "BasePart")) {
+                const vec = value => [Number(value?.X ?? value?.x) || 0, Number(value?.Y ?? value?.y) || 0, Number(value?.Z ?? value?.z) || 0];
+                const color = child.Color;
+                Object.assign(entry, { size: vec(child.Size), position: vec(child.Position), orientation: vec(child.Orientation), color: [Number(color?.R) || 0, Number(color?.G) || 0, Number(color?.B) || 0], anchored: child.Anchored !== false, canCollide: child.CanCollide !== false, canTouch: child.CanTouch !== false, transparency: Number(child.Transparency) || 0, reflectance: Number(child.Reflectance) || 0, material: String(child.Material || "Plastic"), shape: String(child.Shape || "Block"), topSurface: String(child.TopSurface || "Smooth"), bottomSurface: String(child.BottomSurface || "Smooth") });
+            } else if (["PointLight", "SpotLight", "SurfaceLight"].includes(child.ClassName)) {
+                const color = child.Color;
+                Object.assign(entry, { enabled: child.Enabled !== false, brightness: Number(child.Brightness) || 0, range: Number(child.Range) || 0, color: [Number(color?.R) || 0, Number(color?.G) || 0, Number(color?.B) || 0], shadows: child.Shadows !== false, angle: Number(child.Angle) || 90, face: String(child.Face || "Front") });
+            } else if (isA(child, "ValueBase")) {
+                const value = child.Value;
+                if (["StringValue", "BoolValue", "IntValue", "NumberValue"].includes(child.ClassName)) entry.value = value;
+                else if (child.ClassName === "ObjectValue") entry.valueRef = value?.__bloxMpWorldId || null;
+                else if (child.ClassName === "Vector3Value") entry.value = [value.X, value.Y, value.Z];
+                else if (child.ClassName === "Color3Value") entry.value = [value.R, value.G, value.B];
+                else if (child.ClassName === "BrickColorValue") entry.value = { name: value.Name };
+            } else if (child.ClassName === "Team") {
+                entry.teamColor = child.TeamColor?.Name || "Medium stone grey";
+                entry.autoAssignable = child.AutoAssignable !== false; entry.score = Number(child.Score) || 0;
+            }
+            entries.push(entry); objects.set(id, child);
+            if (child.ClassName === "Model" || child.ClassName === "Folder" || isA(child, "BasePart")) visit(child, id);
+        }
+    };
+    visit(workspaceApi, "");
+    visit(TeamsApi, "TeamsRoot");
+    visit(ReplicatedStorageApi, "ReplicatedStorageRoot");
+    return { entries, objects };
+}
+function bloxMpIndexWorld() {
+    const index = new Map(), excluded = new Set([currentCharacterModel]);
+    for (const actor of bloxRemoteActors.values()) excluded.add(actor.character);
+    const visit = (parent, parentId) => {
+        const ordinals = new Map();
+        for (const child of getLuaChildren(parent)) {
+            if (!child || child.__destroyed || excluded.has(child) || child.__bloxMpRemoteActor || !bloxMpSupportedWorldObject(child)) continue;
+            const key = `${child.ClassName}\u0000${String(child.Name || "")}`;
+            const ordinal = ordinals.get(key) || 0; ordinals.set(key, ordinal + 1);
+            const id = parentId ? `${parentId}/${bloxMpWorldSegment(child, ordinal)}` : bloxMpWorldSegment(child, ordinal);
+            child.__bloxMpWorldId = id; index.set(id, child);
+            if (child.ClassName === "Model" || child.ClassName === "Folder" || isA(child, "BasePart")) visit(child, id);
+        }
+    };
+    visit(workspaceApi, "");
+    index.set("TeamsRoot", TeamsApi);
+    index.set("ReplicatedStorageRoot", ReplicatedStorageApi);
+    visit(TeamsApi, "TeamsRoot");
+    visit(ReplicatedStorageApi, "ReplicatedStorageRoot");
+    return index;
+}
+function bloxMpApplyWorldEntries(entries, snapshot = false) {
+    if (!Array.isArray(entries) || entries.length > 50000) throw new Error("Workspace sync contains too many objects");
+    const instances = bloxMpIndexWorld(), wanted = new Set();
+    for (const entry of entries) {
+        if (!entry || typeof entry.id !== "string" || entry.id.length > 2048 || !["Model", "Folder", "ForceField", "RemoteEvent", "Team", "PointLight", "SpotLight", "SurfaceLight", "StringValue", "BoolValue", "IntValue", "NumberValue", "ObjectValue", "Vector3Value", "Color3Value", "BrickColorValue"].includes(entry.className) && !isA({ ClassName: entry.className }, "BasePart")) continue;
+        wanted.add(entry.id);
+        let instance = instances.get(entry.id);
+        if (!instance) {
+            instance = InstanceApi.new(entry.className);
+            instance.Name = entry.name || entry.className;
+            instance.__bloxMpRemoteCreated = true;
+            instances.set(entry.id, instance);
+        }
+        instance.Name = String(entry.name || entry.className).slice(0, 128); instance.__bloxMpWorldId = entry.id;
+        if (isA(instance, "BasePart")) {
+            if (Array.isArray(entry.size)) instance.Size = createVector3(...entry.size);
+            if (Array.isArray(entry.position)) instance.Position = createVector3(...entry.position);
+            if (Array.isArray(entry.orientation)) instance.Orientation = createVector3(...entry.orientation);
+            if (Array.isArray(entry.color)) instance.Color = createColor3(...entry.color);
+            for (const [key, value] of [["Anchored", entry.anchored], ["CanCollide", entry.canCollide], ["CanTouch", entry.canTouch], ["Transparency", entry.transparency], ["Reflectance", entry.reflectance], ["Material", entry.material], ["Shape", entry.shape], ["TopSurface", entry.topSurface], ["BottomSurface", entry.bottomSurface]]) if (value !== undefined) instance[key] = value;
+        } else if (["PointLight", "SpotLight", "SurfaceLight"].includes(instance.ClassName)) {
+            for (const [key, value] of [["Enabled", entry.enabled], ["Brightness", entry.brightness], ["Range", entry.range], ["Shadows", entry.shadows], ["Angle", entry.angle], ["Face", entry.face]]) if (value !== undefined) instance[key] = value;
+            if (Array.isArray(entry.color)) instance.Color = createColor3(...entry.color);
+        } else if (isA(instance, "ValueBase")) {
+            if (["StringValue", "BoolValue", "IntValue", "NumberValue"].includes(instance.ClassName) && entry.value !== undefined) instance.Value = entry.value;
+            else if (instance.ClassName === "ObjectValue") instance.__bloxMpPendingValueRef = entry.valueRef || null;
+            else if (instance.ClassName === "Vector3Value" && Array.isArray(entry.value)) instance.Value = createVector3(...entry.value);
+            else if (instance.ClassName === "Color3Value" && Array.isArray(entry.value)) instance.Value = createColor3(...entry.value);
+            else if (instance.ClassName === "BrickColorValue" && entry.value?.name) instance.Value = BrickColorApi.new(entry.value.name);
+        } else if (instance.ClassName === "Team") {
+            if (entry.teamColor) instance.TeamColor = BrickColorApi.new(entry.teamColor);
+            if (entry.autoAssignable !== undefined) instance.AutoAssignable = entry.autoAssignable;
+            if (entry.score !== undefined) instance.Score = entry.score;
+        }
+    }
+    for (const entry of entries) {
+        const instance = instances.get(entry.id), parent = entry.parentId ? instances.get(entry.parentId) || (entry.parentId === "TeamsRoot" ? TeamsApi : entry.parentId === "ReplicatedStorageRoot" ? ReplicatedStorageApi : null) : workspaceApi;
+        if (instance && parent && instance.Parent !== parent) instance.Parent = parent;
+    }
+    for (const entry of entries) if (entry.className === "ObjectValue") {
+        const instance = instances.get(entry.id); if (instance) instance.Value = entry.valueRef ? instances.get(entry.valueRef) || null : null;
+    }
+    if (snapshot) {
+        for (const [id, instance] of bloxMpAppliedWorldObjects) if (!wanted.has(id) && instance && !instance.__destroyed) destroyLuaInstance(instance);
+        bloxMpAppliedWorldObjects.clear();
+        for (const id of bloxMpWorldPoseTracks.keys()) if (!wanted.has(id)) bloxMpWorldPoseTracks.delete(id);
+    }
+    for (const id of wanted) bloxMpAppliedWorldObjects.set(id, instances.get(id));
+}
+window.__bloxMpBuildSnapshot = () => ({ schema: 1, objects: bloxMpWalkWorld().entries, lighting: bloxMpReadLighting() });
+window.__bloxMpApplySnapshot = async snapshot => {
+    if (!snapshot || snapshot.schema !== 1) throw new Error("Unsupported Workspace snapshot schema");
+    bloxMpApplyWorldEntries(snapshot.objects, true);
+    if (snapshot.lighting) window.__bloxMpApplyLighting?.(snapshot.lighting);
+};
+window.__bloxMpApplyWorldOps = payload => {
+    if (!Array.isArray(payload?.ops)) return;
+    for (const op of payload.ops) if (op?.op === "lighting") window.__bloxMpApplyLighting?.(op.value);
+    else if (op?.op === "delete" && typeof op.id === "string") {
+        const instance = bloxMpAppliedWorldObjects.get(op.id);
+        if (instance && !instance.__destroyed) destroyLuaInstance(instance);
+        bloxMpAppliedWorldObjects.delete(op.id);
+        bloxMpWorldPoseTracks.delete(op.id);
+    }
+    bloxMpApplyWorldEntries(payload.ops.filter(op => op?.op === "upsert").map(op => op.entry));
+};
+function bloxMpReadLighting() {
+    const color = value => [Number(value?.R) || 0, Number(value?.G) || 0, Number(value?.B) || 0];
+    return { Ambient: color(LightingApi.Ambient), OutdoorAmbient: color(LightingApi.OutdoorAmbient), ColorShift_Bottom: color(LightingApi.ColorShift_Bottom), ColorShift_Top: color(LightingApi.ColorShift_Top), ShadowColor: color(LightingApi.ShadowColor), FogColor: color(LightingApi.FogColor), Brightness: Number(LightingApi.Brightness), EnvironmentDiffuseScale: Number(LightingApi.EnvironmentDiffuseScale), EnvironmentSpecularScale: Number(LightingApi.EnvironmentSpecularScale), GeographicLatitude: Number(LightingApi.GeographicLatitude), GlobalShadows: LightingApi.GlobalShadows !== false, TimeOfDay: String(LightingApi.TimeOfDay), ClockTime: Number(LightingApi.ClockTime), FogStart: Number(LightingApi.FogStart), FogEnd: Number(LightingApi.FogEnd) };
+}
+window.__bloxMpApplyLighting = state => {
+    if (!state || typeof state !== "object") return;
+    for (const key of ["Ambient", "OutdoorAmbient", "ColorShift_Bottom", "ColorShift_Top", "ShadowColor", "FogColor"]) if (Array.isArray(state[key])) LightingApi[key] = createColor3(...state[key].map(Number));
+    for (const key of ["Brightness", "EnvironmentDiffuseScale", "EnvironmentSpecularScale", "GeographicLatitude", "ClockTime", "FogStart", "FogEnd"]) if (Number.isFinite(Number(state[key]))) LightingApi[key] = Number(state[key]);
+    for (const key of ["GlobalShadows"]) if (typeof state[key] === "boolean") LightingApi[key] = state[key];
+    if (typeof state.TimeOfDay === "string") LightingApi.TimeOfDay = state.TimeOfDay;
+};
+window.__bloxMpHandleRpc = (packet, senderNumber) => {
+    if (!packet || !Array.isArray(packet.path) || packet.path.length > 32 || !Array.isArray(packet.args)) return;
+    const instances = [...luaInstances];
+    const find = () => instances.find(instance => {
+        if (instance?.ClassName !== "RemoteEvent") return false;
+        const path = []; for (let node = instance; node && node !== gameApi; node = node.Parent) path.unshift(`${node.ClassName}:${node.Name}`);
+        return JSON.stringify(path) === JSON.stringify(packet.path);
+    });
+    const remote = find(); if (!remote) return;
+    const decode = value => value && value.__type === "Vector3" && Array.isArray(value.v) ? createVector3(...value.v) : Array.isArray(value) ? value.map(decode) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, decode(item)])) : value;
+    const args = packet.args.map(decode);
+    if (packet.mode === "server" && Number(window.BloxMultiplayer?.authority) === Number(window.__bloxMpLocalPlayerNumber)) {
+        const actor = bloxRemoteActors.get(Number(senderNumber));
+        const player = { ClassName: "Player", Name: window.BloxMultiplayer?.client.room?.getPlayer(senderNumber)?.name || `Player ${senderNumber}`, UserId: Number(senderNumber), Character: actor?.character || null };
+        fireLuaSignal(remote.OnServerEvent, player, ...args);
+    } else if (packet.mode === "client" && Number(window.BloxMultiplayer?.authority) === Number(senderNumber)) fireLuaSignal(remote.OnClientEvent, ...args);
+};
+const bloxMpWorldPoseTracks = new Map();
+window.__bloxMpApplyWorldPoses = payload => {
+    const now = performance.now();
+    for (const pose of payload?.poses || []) {
+        if (typeof pose?.id !== "string" || !Array.isArray(pose.position) || !Array.isArray(pose.orientation)) continue;
+        const track = bloxMpWorldPoseTracks.get(pose.id) || { samples: [] };
+        track.samples.push({ time: now, position: pose.position.map(Number), orientation: pose.orientation.map(Number) });
+        if (track.samples.length > 4) track.samples.shift();
+        track.instance = bloxMpAppliedWorldObjects.get(pose.id) || bloxMpIndexWorld().get(pose.id) || null;
+        bloxMpWorldPoseTracks.set(pose.id, track);
+    }
+};
+function updateBloxRemoteWorldPoses(frameTimeMs = performance.now()) {
+    const renderTime = frameTimeMs - 100;
+    for (const [id, track] of bloxMpWorldPoseTracks) {
+        const samples = track.samples;
+        while (samples.length > 2 && samples[1].time <= renderTime) samples.shift();
+        const first = samples[0], second = samples[1];
+        if (!first || !track.instance || track.instance.__destroyed) continue;
+        const sampleSpan = second ? Math.max(1, second.time - first.time) : 1;
+        const t = second ? Math.max(0, Math.min(1 + 100 / sampleSpan, (renderTime - first.time) / sampleSpan)) : 1;
+        const position = first.position.map((value, i) => value + ((second?.position[i] ?? value) - value) * t);
+        const orientation = first.orientation.map((value, i) => {
+            const target = second?.orientation[i] ?? value;
+            const difference = ((target - value + 540) % 360) - 180;
+            return value + difference * t;
+        });
+        const last = track.lastRendered;
+        const changed = !last || position.some((value, i) => Math.abs(value - last.position[i]) > 0.0001) || orientation.some((value, i) => Math.abs(value - last.orientation[i]) > 0.001);
+        if (changed) {
+            track.instance.Position = createVector3(...position);
+            track.instance.Orientation = createVector3(...orientation);
+            track.lastRendered = { position, orientation };
+        }
+    }
+}
+window.__bloxMpCollectWorldOps = () => {
+    const entries = bloxMpWalkWorld().entries, next = new Map(entries.map(entry => [entry.id, JSON.stringify(entry)])), ops = [], poses = [];
+    for (const entry of entries) {
+        const previousText = bloxMpAuthorityWorldSignatures.get(entry.id), currentText = next.get(entry.id);
+        if (previousText === currentText) continue;
+        let previous = null;
+        try { previous = previousText ? JSON.parse(previousText) : null; } catch {}
+        if (previous && Object.hasOwn(entry, "position") && Object.hasOwn(previous, "position")) {
+            const { position: _oldPosition, orientation: _oldOrientation, ...oldProperties } = previous;
+            const { position: _position, orientation: _orientation, ...newProperties } = entry;
+            if (JSON.stringify(oldProperties) === JSON.stringify(newProperties)) {
+                poses.push({ id: entry.id, position: entry.position, orientation: entry.orientation });
+                continue;
+            }
+        }
+        ops.push({ op: "upsert", entry });
+    }
+    for (const id of bloxMpAuthorityWorldSignatures.keys()) if (!next.has(id)) ops.push({ op: "delete", id });
+    const lighting = bloxMpReadLighting(), lightingText = JSON.stringify(lighting);
+    if (bloxMpAuthorityWorldSignatures.get("__lighting") !== lightingText && bloxMpAuthorityWorldSignatures.has("__lighting")) ops.push({ op: "lighting", value: lighting });
+    next.set("__lighting", lightingText);
+    bloxMpAuthorityWorldSignatures = next;
+    return { ops, poses };
+};
+window.__bloxMpResetWorldSync = () => {
+    bloxMpAuthorityWorldSignatures = new Map(bloxMpWalkWorld().entries.map(entry => [entry.id, JSON.stringify(entry)]));
+    bloxMpAuthorityWorldSignatures.set("__lighting", JSON.stringify(bloxMpReadLighting()));
+};
+
+function bloxFiniteNumber(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(-100000, Math.min(100000, number)) : fallback;
+}
+
+function bloxRemoteColor(colors, key, fallback) {
+    const value = colors?.[key];
+    return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+}
+
+function createBloxRemoteActor(player) {
+    if (!player || !Number.isInteger(player.number) || bloxRemoteActors.has(player.number)) return;
+    const localNumber = Number(window.__bloxMpLocalPlayerNumber ?? window.BloxMultiplayer?.client.localPlayer.number);
+    if (Number.isFinite(localNumber) && player.number === localNumber) return;
+    let profile = {};
+    try { profile = JSON.parse(String(player.customProperties?.avatar || "{}")); } catch {}
+    const name = String(player.name || `Player ${player.number}`).slice(0, 32);
+    const character = createLuaModel();
+    character.Name = name;
+    character.Parent = workspaceApi;
+
+    // STATE.p is the local HumanoidRootPart/foot-floor position. Keep the
+    // remote visual group at that same origin; R6 torso/head/limbs are placed
+    // above it exactly like the engine's local player rig.
+    const visual = new THREE.Group();
+    visual.name = `RemoteCharacter-${player.number}`;
+    // A roster/join notification can precede the first STATE packet. Never
+    // render an unpositioned replica at the world origin during that gap.
+    visual.visible = false;
+    // Network position is the HumanoidRootPart center. The local visual rig is
+    // rooted at the feet with a small visual offset, so reproduce that offset.
+    visual.position.y = PLAYER_VISUAL_Y_OFFSET - getPlayerRootGroundDistance();
+    scene.add(visual);
+    const parts = {};
+    const pivots = {};
+    const makeBodyPart = (partName, size, mesh, hidden = false) => {
+        mesh.name = partName;
+        mesh.castShadow = !hidden;
+        mesh.receiveShadow = !hidden;
+        if (hidden) mesh.visible = false;
+        const proxy = makeCharacterPartInstance(partName, mesh, { x: size[0], y: size[1], z: size[2] }, 0xffffff, character);
+        proxy.__bloxMpRemoteActor = true;
+        proxy.CanCollide = false;
+        proxy.CanTouch = false;
+        proxy.Transparency = hidden ? 1 : 0;
+        parts[partName] = proxy;
+        return proxy;
+    };
+    const makeMesh = (partName, size, color) => makeCharacterBlock(
+        partName,
+        size[0], size[1], size[2],
+        Number.parseInt(String(color).replace("#", ""), 16)
+    );
+
+    const rootMesh = makeMesh("HumanoidRootPart", [2, 2, 1], "#ffffff");
+    visual.add(rootMesh);
+    const root = makeBodyPart("HumanoidRootPart", [2, 2, 1], rootMesh, true);
+
+    const torsoMesh = makeMesh("body", [2, 2, 1], bloxRemoteColor(profile.colors, "TorsoColor", "#ff8282"));
+    torsoMesh.position.set(0, 2.5, 0);
+    visual.add(torsoMesh);
+    const torso = makeBodyPart("Torso", [2, 2, 1], torsoMesh);
+
+    const headRoot = new THREE.Group();
+    headRoot.name = "head";
+    headRoot.position.set(0, 4, 0);
+    visual.add(headRoot);
+    const headHex = Number.parseInt(bloxRemoteColor(profile.colors, "HeadColor", "#ffff82").slice(1), 16);
+    const headMesh = makeCharacterBlock("Head", 1.2, 1.2, 1.2, headHex);
+    headMesh.position.set(0, 0, 0);
+    headRoot.add(headMesh);
+    const faceTexture = makeFaceTextureWithSkinBackground("Textures/NativeClassic/face.png", headHex);
+    const facePlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.18, 1.18),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, map: faceTexture, transparent: true, alphaTest: 0.01, depthWrite: false, toneMapped: false })
+    );
+    facePlane.name = "face";
+    facePlane.position.set(0, 0, 0.603);
+    facePlane.renderOrder = 2;
+    headRoot.add(facePlane);
+    makeBodyPart("Head", [1.2, 1.2, 1.2], headMesh);
+
+    const limb = (partName, size, pivotName, pivotPosition, meshPosition, colorKey, fallback) => {
+        const pivot = new THREE.Group();
+        pivot.name = pivotName;
+        pivot.position.set(...pivotPosition);
+        const mesh = makeMesh(partName, size, bloxRemoteColor(profile.colors, colorKey, fallback));
+        mesh.position.set(...meshPosition);
+        pivot.add(mesh);
+        visual.add(pivot);
+        pivots[pivotName] = pivot;
+        makeBodyPart(partName, size, mesh);
+    };
+    limb("LeftArm", [1, 2, 1], "LeftArmMotor", [1.5, 3.5 - ARM_PIVOT_DROP, 0], [0, -1 + ARM_PIVOT_DROP, 0], "LeftArmColor", "#ffff82");
+    limb("RightArm", [1, 2, 1], "RightArmMotor", [-1.5, 3.5 - ARM_PIVOT_DROP, 0], [0, -1 + ARM_PIVOT_DROP, 0], "RightArmColor", "#ffff82");
+    limb("Left Leg", [1, 2, 1], "LeftLegMotor", [0.5, 1.5, 0], [0, -1, 0], "LeftLegColor", "#ffff82");
+    limb("Right Leg", [1, 2, 1], "RightLegMotor", [-0.5, 1.5, 0], [0, -1, 0], "RightLegColor", "#ffff82");
+
+    const humanoid = createLuaHumanoid();
+    humanoid.Name = "Humanoid";
+    humanoid.Parent = character;
+    humanoid.RootPart = root;
+    character.PrimaryPart = root;
+    const description = createLuaHumanoidDescription();
+    description.Parent = humanoid;
+    humanoid.Description = description;
+    refreshChildAliases(humanoid);
+    refreshChildAliases(character);
+
+    const ragdollParts = [torsoMesh, headRoot, ...Object.values(pivots)];
+    const rigRestPose = ragdollParts.map(object => ({ object, position: object.position.clone(), quaternion: object.quaternion.clone(), scale: object.scale.clone() }));
+    const actor = { character, visual, humanoid, description, parts, pivots, ragdollParts, rigRestPose, headMesh, faceTexture, position: new THREE.Vector3(), yaw: 0, samples: [], targetAngles: [0, 0, 0, 0], ragdoll: null, lifeGeneration: null };
+    bloxRemoteActors.set(player.number, actor);
+    window.__bloxMpApplyActorProfile?.(player.number, profile);
+}
+
+window.__bloxMpPlayerJoined = player => createBloxRemoteActor(player);
+window.__bloxMpPlayerUpdated = player => {
+    if (!player) return;
+    if (!bloxRemoteActors.has(player.number)) createBloxRemoteActor(player);
+    window.__bloxMpApplyActorProfile?.(player.number, JSON.parse(String(player.customProperties?.avatar || "{}")));
+};
+window.__bloxMpPlayerLeft = playerNumber => {
+    const actor = bloxRemoteActors.get(Number(playerNumber));
+    if (!actor) return;
+    destroyLuaInstance(actor.character);
+    for (const part of Object.values(actor.parts)) {
+        const index = characterVisualBindings.findIndex(binding => binding.instance === part);
+        if (index >= 0) characterVisualBindings.splice(index, 1);
+    }
+    scene.remove(actor.visual);
+    actor.visual.traverse(object => {
+        object.geometry?.dispose?.();
+        if (Array.isArray(object.material)) object.material.forEach(material => material.dispose?.());
+        else object.material?.dispose?.();
+    });
+    uploadedAvatarAssets.delete(`blox-mp://${Number(playerNumber)}/shirt`);
+    uploadedAvatarAssets.delete(`blox-mp://${Number(playerNumber)}/pants`);
+    bloxRemoteActors.delete(Number(playerNumber));
+};
+window.__bloxMpReceive = (type, state, senderNumber) => {
+    if (type === "world_ops") {
+        if (Number(senderNumber) === Number(window.BloxMultiplayer?.authority)) window.__bloxMpApplyWorldOps?.(state);
+        return;
+    }
+    if (type !== "state" || Number(senderNumber) === Number(window.__bloxMpLocalPlayerNumber ?? window.BloxMultiplayer?.client.localPlayer.number)) return;
+    const player = window.BloxMultiplayer?.client.room?.getPlayer(senderNumber);
+    if (player) createBloxRemoteActor(player);
+    const actor = bloxRemoteActors.get(senderNumber);
+    if (!actor || !Array.isArray(state.p) || state.p.length < 4) return;
+    const lifeGeneration = Number.isFinite(Number(state.l)) ? Number(state.l) : 0;
+    if (actor.lifeGeneration !== null && actor.lifeGeneration !== lifeGeneration) {
+        actor.samples.length = 0;
+        actor.humanoid.__dead = false;
+        if (actor.ragdoll) {
+            for (const pose of actor.rigRestPose) {
+                actor.visual.add(pose.object);
+                pose.object.position.copy(pose.position);
+                pose.object.quaternion.copy(pose.quaternion);
+                pose.object.scale.copy(pose.scale);
+            }
+            actor.ragdoll = null;
+        }
+    }
+    actor.lifeGeneration = lifeGeneration;
+    const x = bloxFiniteNumber(state.p[0]), y = bloxFiniteNumber(state.p[1]), z = bloxFiniteNumber(state.p[2]);
+    const yaw = bloxFiniteNumber(state.p[3]);
+    const sample = { time: performance.now(), position: new THREE.Vector3(x, y, z), yaw,
+        angles: Array.isArray(state.a) && state.a.length === 4 ? state.a.map(value => bloxFiniteNumber(value)) : actor.targetAngles };
+    actor.samples.push(sample);
+    if (actor.samples.length > 6) actor.samples.shift();
+    if (actor.samples.length === 1) {
+        actor.visual.position.set(x, y + PLAYER_VISUAL_Y_OFFSET - getPlayerRootGroundDistance(), z);
+        actor.visual.rotation.y = yaw;
+        actor.visual.visible = true;
+    }
+    if (state.r && typeof state.r === "object") window.__bloxMpUpdateRemoteProfile?.(senderNumber, state.r);
+    actor.targetAngles = sample.angles;
+};
+function updateBloxRemoteActors(frameTimeMs = performance.now()) {
+    const renderTime = frameTimeMs - 100;
+    for (const actor of bloxRemoteActors.values()) {
+        if (actor.ragdoll) for (const piece of actor.ragdoll) {
+            piece.velocity.y -= 18 * Math.min(0.05, (frameTimeMs - (piece.lastTime || frameTimeMs)) / 1000);
+            const dt = Math.min(0.05, (frameTimeMs - (piece.lastTime || frameTimeMs)) / 1000); piece.lastTime = frameTimeMs;
+            piece.object.position.addScaledVector(piece.velocity, dt);
+            piece.object.rotation.x += piece.spin.x * dt; piece.object.rotation.y += piece.spin.y * dt; piece.object.rotation.z += piece.spin.z * dt;
+        }
+        if (actor.humanoid.Health > 0 && actor.ragdoll) {
+            for (const object of actor.ragdollParts) actor.visual.attach(object);
+            actor.ragdoll = null;
+        }
+        const samples = actor.samples;
+        if (!samples?.length) continue;
+        while (samples.length > 2 && samples[1].time <= renderTime) samples.shift();
+        const first = samples[0], second = samples[1];
+        const sampleSpan = second ? Math.max(1, second.time - first.time) : 1;
+        let alpha = second ? Math.max(0, Math.min(1 + 120 / sampleSpan, (renderTime - first.time) / sampleSpan)) : 1;
+        if (!second && frameTimeMs - first.time < 100) alpha = 0;
+        const x = second ? first.position.x + (second.position.x - first.position.x) * alpha : first.position.x;
+        const y = second ? first.position.y + (second.position.y - first.position.y) * alpha : first.position.y;
+        const z = second ? first.position.z + (second.position.z - first.position.z) * alpha : first.position.z;
+        const yawDelta = second ? Math.atan2(Math.sin(second.yaw - first.yaw), Math.cos(second.yaw - first.yaw)) : 0;
+        const yaw = first.yaw + yawDelta * alpha;
+        actor.visual.position.set(x, y + PLAYER_VISUAL_Y_OFFSET - getPlayerRootGroundDistance(), z);
+        actor.visual.rotation.y = yaw;
+        const angles = second ? first.angles.map((value, index) => value + (second.angles[index] - value) * alpha) : first.angles;
+        ["LeftArmMotor", "RightArmMotor", "LeftLegMotor", "RightLegMotor"].forEach((key, index) => {
+            if (actor.pivots[key]) actor.pivots[key].rotation.x = angles[index] || 0;
+        });
+    }
+}
+window.__bloxMpGetLocalState = () => {
+    if (currentCharacterModel && currentCharacterModel !== bloxMpObservedCharacter) {
+        bloxMpObservedCharacter = currentCharacterModel;
+        bloxMpLifeGeneration++;
+    }
+    const root = currentHumanoidRootPart;
+    const position = root?.Position || root?.position;
+    if (!position) return null;
+    const x = Number(position.X ?? position.x), y = Number(position.Y ?? position.y), z = Number(position.Z ?? position.z);
+    if (![x, y, z].every(Number.isFinite)) return null;
+    const look = root?.CFrame?.LookVector || root?.CFrame?.lookVector || root?.lookVector;
+    const yaw = look ? Math.atan2(-Number(look.X ?? look.x), -Number(look.Z ?? look.z)) : 0;
+    const moving = Number(currentPlayerHumanoid?.MoveDirection?.Magnitude ?? currentPlayerHumanoid?.MoveDirection?.magnitude ?? 0) > 0.05;
+    const leftArm = player?.getObjectByName("LeftArmMotor");
+    const rightArm = player?.getObjectByName("RightArmMotor");
+    const leftLeg = player?.getObjectByName("LeftLegMotor");
+    const rightLeg = player?.getObjectByName("RightLegMotor");
+    return {
+        p: [Number(x.toFixed(3)), Number(y.toFixed(3)), Number(z.toFixed(3)), Number((Number.isFinite(yaw) ? yaw : 0).toFixed(3))],
+        m: moving ? 1 : 0,
+        a: [leftArm, rightArm, leftLeg, rightLeg].map(pivot => Number((pivot?.rotation?.x || 0).toFixed(3))),
+        l: bloxMpLifeGeneration,
+        r: window.__bloxMpGetPlayerProfile?.() || {}
+    };
+};
+window.__bloxMpGetPlayerProfile = () => {
+    const player = localPlayerApi;
+    const team = player?.Team;
+    const color = player?.TeamColor?.Color;
+    const statsFolder = getLuaChildren(player).find(child => child?.Name === "leaderstats");
+    const stats = {};
+    for (const stat of getLuaChildren(statsFolder)) {
+        if (stat?.Name && typeof stat.Value !== "undefined" && ["string", "number", "boolean"].includes(typeof stat.Value)) stats[String(stat.Name).slice(0, 32)] = stat.Value;
+    }
+    return {
+        name: String(player?.Name || "Player").slice(0, 32),
+        colors: localAvatarProfile.colors || {},
+        team: team?.Name ? String(team.Name).slice(0, 32) : "",
+        teamName: player?.TeamColor?.Name || "",
+        teamColor: color && Number.isFinite(color.R) ? { R: color.R, G: color.G, B: color.B } : null,
+        neutral: player?.Neutral !== false,
+        health: Number(currentPlayerHumanoid?.Health) || 0,
+        maxHealth: Number(currentPlayerHumanoid?.MaxHealth) || 100,
+        forceField: getLuaChildren(currentCharacterModel).some(child => child?.ClassName === "ForceField" && !child.__destroyed),
+        stats
+    };
+};
+window.__bloxMpGetWearables = () => ({ shirtDataUrl: localAvatarProfile.shirtDataUrl || "", pantsDataUrl: localAvatarProfile.pantsDataUrl || "" });
+window.__bloxMpUpdateRemoteProfile = (playerNumber, profile) => {
+    const index = window.__bloxMpRemotePlayers?.findIndex(player => player.UserId === playerNumber) ?? -1;
+    if (index < 0) return;
+    const current = window.__bloxMpRemotePlayers[index];
+    const nextColor = profile.teamColor && typeof profile.teamColor === "object" ? profile.teamColor : current.TeamColor.Color;
+    window.__bloxMpRemotePlayers[index] = {
+        ...current,
+        ...(Object.hasOwn(profile, "team") ? { Team: profile.team ? { Name: String(profile.team) } : null } : {}),
+        TeamColor: { Color: nextColor, Name: String(profile.teamName || current.TeamColor.Name) },
+        ...(Object.hasOwn(profile, "neutral") ? { Neutral: profile.neutral !== false } : {}),
+        ...(profile.stats && typeof profile.stats === "object" ? profile.stats : {})
+    };
+    window.__bloxMpApplyActorProfile?.(playerNumber, profile);
+    window.__bloxMpRosterChanged?.();
+};
+window.__bloxMpApplyActorProfile = (playerNumber, profile = {}) => {
+    const actor = bloxRemoteActors.get(Number(playerNumber));
+    if (!actor || !profile || typeof profile !== "object") return;
+    const colors = profile.colors || {};
+    for (const key of ["HeadColor", "TorsoColor", "LeftArmColor", "RightArmColor", "LeftLegColor", "RightLegColor"]) {
+        const hex = bloxRemoteColor(colors, key, "");
+        if (hex) {
+            actor.description[key] = color3FromHexString(hex);
+            if (key === "HeadColor") {
+                const colorHex = Number.parseInt(hex.slice(1), 16);
+                for (const material of (Array.isArray(actor.headMesh.material) ? actor.headMesh.material : [actor.headMesh.material])) material?.color?.setHex?.(colorHex);
+                actor.faceTexture?.userData?.setSkinColor?.(colorHex);
+            }
+        }
+    }
+    const shirtKey = `blox-mp://${Number(playerNumber)}/shirt`;
+    const pantsKey = `blox-mp://${Number(playerNumber)}/pants`;
+    if (Object.hasOwn(profile, "shirtDataUrl")) {
+        if (typeof profile.shirtDataUrl === "string" && profile.shirtDataUrl.startsWith("data:image/")) {
+            uploadedAvatarAssets.set(shirtKey, profile.shirtDataUrl);
+            actor.description.Shirt = shirtKey;
+        } else actor.description.Shirt = "";
+    }
+    if (Object.hasOwn(profile, "pantsDataUrl")) {
+        if (typeof profile.pantsDataUrl === "string" && profile.pantsDataUrl.startsWith("data:image/")) {
+            uploadedAvatarAssets.set(pantsKey, profile.pantsDataUrl);
+            actor.description.Pants = pantsKey;
+        } else actor.description.Pants = "";
+    }
+    actor.character.Name = String(profile.name || actor.character.Name).slice(0, 32);
+    if (Number.isFinite(Number(profile.maxHealth)) && Number(profile.maxHealth) > 0) actor.humanoid.MaxHealth = Number(profile.maxHealth);
+    if (Number.isFinite(Number(profile.health))) actor.humanoid.Health = Math.max(0, Math.min(actor.humanoid.MaxHealth, Number(profile.health)));
+    if (profile.forceField) {
+        if (!getLuaChildren(actor.character).some(child => child?.ClassName === "ForceField" && !child.__destroyed)) {
+            const shield = InstanceApi.new("ForceField"); shield.Parent = actor.character;
+        }
+    } else for (const shield of getLuaChildren(actor.character).filter(child => child?.ClassName === "ForceField")) destroyLuaInstance(shield);
+    if (actor.humanoid.Health <= 0 && !actor.ragdoll) {
+        actor.ragdoll = actor.ragdollParts.map(object => {
+            actor.visual.updateMatrixWorld(true); scene.attach(object);
+            return { object, velocity: new THREE.Vector3((Math.random() - 0.5) * 3, 2 + Math.random() * 3, (Math.random() - 0.5) * 3), spin: new THREE.Vector3(Math.random() * 5, Math.random() * 5, Math.random() * 5), lastTime: performance.now() };
+        });
+    }
+    refreshChildAliases(actor.character);
+};
+let bloxMpObservedCharacter = null;
+let bloxMpLifeGeneration = 0;
 
 // Start map/Luau initialization before entering the first render frame.
 // executeLuauScript() yields asynchronously, so normal frame ordering is preserved,

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Replace this value with your raw.githubusercontent.com games.json URL. -->
     <meta name="blox-games-manifest" content="https://raw.githubusercontent.com/NotAtomz/BloxMaps/refs/heads/main/games.json">
+    <meta name="blox-photon-app-id" content="">
     <link rel="icon" type="image/png" href="Textures/Website/O.png">
     <title>Blox</title>
     <script type="importmap">
@@ -393,6 +394,17 @@
             font-weight: 400;
         }
         .game-kind { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+        .mp-card-tag { display: inline-block; margin: 5px 0 0; padding: 2px 6px; border-radius: 3px; color: #d8f5ff; background: #075a82; font-size: 11px; font-weight: 600; text-transform: none; }
+        .mp-server-browser { margin-top: 14px; padding: 16px; background: var(--panel); border: 1px solid var(--line); }
+        .mp-server-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        .mp-region-label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+        .mp-region-select { min-height: 34px; padding: 4px 8px; color: var(--text); background: var(--panel-deep); border: 1px solid var(--line); }
+        .mp-server-status { min-height: 20px; margin: 12px 0 6px; color: var(--muted); }
+        .mp-error { color: #ffb8b8; }
+        .mp-server-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+        .mp-server-details { overflow-wrap: anywhere; }
+        .mp-empty { color: var(--muted); }
+        .mp-queue-button, .mp-cancel-queue { margin: 8px 8px 0 0; }
         .empty-games { grid-column: 1 / -1; padding: 25px; color: var(--muted); text-align: center; }
 
         .game-detail { max-width: 970px; margin: 12px auto; padding: 0; background: transparent; border: 0; box-shadow: none; }
@@ -691,6 +703,7 @@
                             <h2>Description</h2>
                             <p class="game-description" id="detailDescription">No description was provided.</p>
                         </section>
+                        <section id="mpServers" aria-label="Multiplayer servers"></section>
                     </article>
                 </div>
             </section>
@@ -1310,6 +1323,9 @@
         }
         function openGame(game) {
             selectedGame = game;
+            sessionStorage.removeItem("bloxPendingJoinGameId");
+            sessionStorage.removeItem("bloxJoinRoom");
+            sessionStorage.removeItem("bloxRegion");
             $("detailName").textContent = game.name;
             $("detailDescription").textContent = game.description || "No description was provided.";
             $("detailKind").textContent = `${gameKind(game)}${game.remote ? " · Downloadable map" : " · Local map"}`;
@@ -1321,6 +1337,16 @@
             };
             $("playButton").disabled = false;
             $("playButton").textContent = "Play";
+            if ($("playButton").__bloxMpPlayHandler) {
+                $("playButton").removeEventListener("click", $("playButton").__bloxMpPlayHandler);
+                $("playButton").__bloxMpPlayHandler = null;
+            }
+            $("mpServers").replaceChildren();
+            if (game.remote && game.gameId) {
+                import("./blox-mp-ui.js?v=20261106-mp6").then(({ mountServerBrowser }) => {
+                    if (selectedGame === game) mountServerBrowser(game);
+                }).catch(error => console.error("[Blox Multiplayer] Could not load server browser:", error));
+            }
             showPage("game");
         }
         function gameKind(game) {
@@ -1351,6 +1377,12 @@
             kind.className = "game-kind game-card-name-secondary";
             kind.textContent = `${gameKind(game)}${game.remote ? " · Online" : " · Local"}`;
             card.append(thumbContainer, name, kind);
+            if (game.remote && game.gameId) {
+                const tag = document.createElement("span");
+                tag.className = "mp-card-tag";
+                tag.textContent = "Multiplayer";
+                card.appendChild(tag);
+            }
             card.addEventListener("click", () => openGame(game));
             return card;
         }
@@ -1368,7 +1400,8 @@
                     file: entry?.fileUrl,
                     fileName: entry?.fileName,
                     description: entry?.description,
-                    image: entry?.imageUrl
+                    image: entry?.imageUrl,
+                    gameid: entry?.gameId
                 }, index, window.location.href);
                 if (game) game.lastPlayed = Number(entry?.lastPlayed) || 0;
                 return game;
@@ -1398,6 +1431,7 @@
                 description: game.description || "",
                 fileUrl: game.fileUrl,
                 fileName: game.fileName,
+                gameId: game.gameId || "",
                 imageUrl: game.imageUrl || "",
                 remote: true,
                 lastPlayed: Date.now()
@@ -1407,6 +1441,7 @@
                 description: entry.description || "",
                 fileUrl: entry.fileUrl,
                 fileName: entry.fileName,
+                gameId: entry.gameId || "",
                 imageUrl: entry.imageUrl || "",
                 lastPlayed: entry.lastPlayed || Date.now()
             }));
@@ -1450,12 +1485,17 @@
                 try { fileName = decodeURIComponent(new URL(fileUrl).pathname.split("/").pop() || ""); } catch {}
             }
             if (!name || !fileUrl || !SUPPORTED_MAP_PATTERN.test(fileName)) return null;
+            const rawGameId = entry.gameid ?? entry.gameId;
+            const gameIdValue = String(rawGameId ?? "").trim();
+            const gameId = /^[A-Za-z0-9_-]{1,32}$/.test(gameIdValue) ? gameIdValue : "";
+            if (!gameId) console.warn(`[Blox Multiplayer] Catalog game '${name}' has no valid gameid; it will run single-player.`);
             return {
                 name,
                 description: String(entry.description || "").trim(),
                 fileUrl,
                 imageUrl,
                 fileName,
+                gameId,
                 remote: true,
                 identity: `remote:${fileUrl}`,
                 manifestOrder: index
@@ -1558,6 +1598,25 @@
                 await Promise.all([shirtValidationPromise, pantsValidationPromise]);
                 saveUsername();
                 const file = selectedGame.file || await downloadRemoteGame(selectedGame);
+                const forceOffline = sessionStorage.getItem("bloxForceOffline") === "1";
+                const pendingJoin = sessionStorage.getItem("bloxPendingJoinGameId") === selectedGame.gameId;
+                if (selectedGame.remote && selectedGame.gameId && !forceOffline) {
+                    sessionStorage.setItem("bloxGameId", selectedGame.gameId);
+                    const appIdOverride = document.querySelector('meta[name="blox-photon-app-id"]')?.content?.trim();
+                    if (appIdOverride) sessionStorage.setItem("bloxPhotonAppId", appIdOverride);
+                    else sessionStorage.removeItem("bloxPhotonAppId");
+                    if (!pendingJoin) {
+                        sessionStorage.removeItem("bloxJoinRoom");
+                        sessionStorage.removeItem("bloxRegion");
+                    }
+                } else {
+                    sessionStorage.removeItem("bloxGameId");
+                    sessionStorage.removeItem("bloxPhotonAppId");
+                    sessionStorage.removeItem("bloxJoinRoom");
+                    sessionStorage.removeItem("bloxRegion");
+                }
+                sessionStorage.removeItem("bloxPendingJoinGameId");
+                sessionStorage.removeItem("bloxForceOffline");
                 const extension = (file.name.split(".").pop() || "").toLowerCase();
                 sessionStorage.setItem("bloxScriptName", file.name);
                 sessionStorage.removeItem("bloxMapLoaded");
