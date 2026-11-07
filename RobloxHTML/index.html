@@ -1343,7 +1343,7 @@
             }
             $("mpServers").replaceChildren();
             if (game.remote && game.gameId) {
-                import("./blox-mp-ui.js?v=20261106-mp6").then(({ mountServerBrowser }) => {
+                import("./blox-mp-ui.js?v=20261106-mp7").then(({ mountServerBrowser }) => {
                     if (selectedGame === game) mountServerBrowser(game);
                 }).catch(error => console.error("[Blox Multiplayer] Could not load server browser:", error));
             }

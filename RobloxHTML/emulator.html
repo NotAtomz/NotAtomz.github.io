@@ -32774,6 +32774,7 @@ function createLuaSound() {
 
     sound.Play =
         (...args) => {
+            sound.__bloxMpPlaySequence = (Number(sound.__bloxMpPlaySequence) + 1) >>> 0;
             sound.Playing =
                 true;
 
@@ -32781,6 +32782,7 @@ function createLuaSound() {
                 sound,
                 true
             );
+            window.__bloxMpPublishSound?.(sound);
         };
 
     sound.play =
@@ -32816,6 +32818,7 @@ function createLuaSound() {
                     sound.Stopped
                 );
             }
+            window.__bloxMpPublishSound?.(sound);
         };
 
     sound.stop =
@@ -32825,11 +32828,14 @@ function createLuaSound() {
         (...args) => {
             audio.pause();
 
+            sound.TimePosition = Number(audio.currentTime) || 0;
+
             sound.Playing =
                 false;
 
             sound.__lastSound.Playing =
                 false;
+            window.__bloxMpPublishSound?.(sound);
         };
 
     sound.pause =
@@ -32837,6 +32843,7 @@ function createLuaSound() {
 
     sound.Resume =
         (...args) => {
+            sound.__bloxMpPlaySequence = (Number(sound.__bloxMpPlaySequence) + 1) >>> 0;
             sound.Playing =
                 true;
 
@@ -32844,6 +32851,7 @@ function createLuaSound() {
                 sound,
                 true
             );
+            window.__bloxMpPublishSound?.(sound);
         };
 
     sound.resume =
@@ -51246,7 +51254,7 @@ async function executeLuauScript() {
             // Local uploads never set bloxGameId and take the existing path unchanged.
             if (sessionStorage.getItem("bloxGameId")) {
                 try {
-                    const { connectEmulatorMultiplayer } = await import("./blox-mp-sync.js?v=20261106-mp6");
+                    const { connectEmulatorMultiplayer } = await import("./blox-mp-sync.js?v=20261106-mp7");
                     await connectEmulatorMultiplayer();
                 } catch (error) {
                     console.error("[Blox Multiplayer] Could not join the room:", error);
@@ -66396,7 +66404,7 @@ function bloxMpWorldSegment(instance, ordinal) {
     return `${instance.ClassName}:${encodeURIComponent(String(instance.Name || ""))}:${ordinal}`;
 }
 function bloxMpSupportedWorldObject(instance) {
-    return instance?.ClassName === "Model" || instance?.ClassName === "Folder" || instance?.ClassName === "ForceField" || instance?.ClassName === "RemoteEvent" || isA(instance, "ValueBase") || instance?.ClassName === "Team" || isA(instance, "BasePart") || ["PointLight", "SpotLight", "SurfaceLight"].includes(instance?.ClassName);
+    return instance?.ClassName === "Model" || instance?.ClassName === "Folder" || instance?.ClassName === "ForceField" || instance?.ClassName === "RemoteEvent" || instance?.ClassName === "Sound" || isA(instance, "ValueBase") || instance?.ClassName === "Team" || isA(instance, "BasePart") || ["PointLight", "SpotLight", "SurfaceLight"].includes(instance?.ClassName);
 }
 function bloxMpWalkWorld() {
     const entries = [], objects = new Map(), excluded = new Set([currentCharacterModel]);
@@ -66418,6 +66426,8 @@ function bloxMpWalkWorld() {
             } else if (["PointLight", "SpotLight", "SurfaceLight"].includes(child.ClassName)) {
                 const color = child.Color;
                 Object.assign(entry, { enabled: child.Enabled !== false, brightness: Number(child.Brightness) || 0, range: Number(child.Range) || 0, color: [Number(color?.R) || 0, Number(color?.G) || 0, Number(color?.B) || 0], shadows: child.Shadows !== false, angle: Number(child.Angle) || 90, face: String(child.Face || "Front") });
+            } else if (child.ClassName === "Sound") {
+                Object.assign(entry, { soundId: String(child.SoundId || ""), volume: Number(child.Volume) || 0, playbackSpeed: Number(child.PlaybackSpeed) || 1, looped: child.Looped === true, playing: child.Playing === true, timePosition: Math.max(0, Number(child.TimePosition) || 0), minDistance: Number(child.MinDistance) || 0, maxDistance: Number(child.MaxDistance) || 0, emitterSize: Number(child.EmitterSize) || 0, rollOffMode: String(child.RollOffMode || "Inverse"), playSequence: Number(child.__bloxMpPlaySequence) || 0 });
             } else if (isA(child, "ValueBase")) {
                 const value = child.Value;
                 if (["StringValue", "BoolValue", "IntValue", "NumberValue"].includes(child.ClassName)) entry.value = value;
@@ -66463,7 +66473,7 @@ function bloxMpApplyWorldEntries(entries, snapshot = false) {
     if (!Array.isArray(entries) || entries.length > 50000) throw new Error("Workspace sync contains too many objects");
     const instances = bloxMpIndexWorld(), wanted = new Set();
     for (const entry of entries) {
-        if (!entry || typeof entry.id !== "string" || entry.id.length > 2048 || !["Model", "Folder", "ForceField", "RemoteEvent", "Team", "PointLight", "SpotLight", "SurfaceLight", "StringValue", "BoolValue", "IntValue", "NumberValue", "ObjectValue", "Vector3Value", "Color3Value", "BrickColorValue"].includes(entry.className) && !isA({ ClassName: entry.className }, "BasePart")) continue;
+        if (!entry || typeof entry.id !== "string" || entry.id.length > 2048 || !["Model", "Folder", "ForceField", "RemoteEvent", "Sound", "Team", "PointLight", "SpotLight", "SurfaceLight", "StringValue", "BoolValue", "IntValue", "NumberValue", "ObjectValue", "Vector3Value", "Color3Value", "BrickColorValue"].includes(entry.className) && !isA({ ClassName: entry.className }, "BasePart")) continue;
         wanted.add(entry.id);
         let instance = instances.get(entry.id);
         if (!instance) {
@@ -66482,6 +66492,18 @@ function bloxMpApplyWorldEntries(entries, snapshot = false) {
         } else if (["PointLight", "SpotLight", "SurfaceLight"].includes(instance.ClassName)) {
             for (const [key, value] of [["Enabled", entry.enabled], ["Brightness", entry.brightness], ["Range", entry.range], ["Shadows", entry.shadows], ["Angle", entry.angle], ["Face", entry.face]]) if (value !== undefined) instance[key] = value;
             if (Array.isArray(entry.color)) instance.Color = createColor3(...entry.color);
+        } else if (instance.ClassName === "Sound") {
+            for (const [key, value] of [["SoundId", entry.soundId], ["Volume", entry.volume], ["PlaybackSpeed", entry.playbackSpeed], ["Looped", entry.looped], ["MinDistance", entry.minDistance], ["MaxDistance", entry.maxDistance], ["EmitterSize", entry.emitterSize], ["RollOffMode", entry.rollOffMode]]) if (value !== undefined) instance[key] = value;
+            const sequence = Number(entry.playSequence) || 0;
+            if (entry.playing && sequence !== Number(instance.__bloxMpAppliedPlaySequence ?? -1)) {
+                instance.Playing = false; syncLuaSound(instance);
+                instance.TimePosition = Math.max(0, Number(entry.timePosition) || 0);
+                instance.Playing = true; syncLuaSound(instance, true);
+                instance.__bloxMpAppliedPlaySequence = sequence;
+            } else if (!entry.playing && instance.Playing) {
+                instance.Playing = false; syncLuaSound(instance);
+                instance.__bloxMpAppliedPlaySequence = sequence;
+            }
         } else if (isA(instance, "ValueBase")) {
             if (["StringValue", "BoolValue", "IntValue", "NumberValue"].includes(instance.ClassName) && entry.value !== undefined) instance.Value = entry.value;
             else if (instance.ClassName === "ObjectValue") instance.__bloxMpPendingValueRef = entry.valueRef || null;
@@ -66537,6 +66559,12 @@ window.__bloxMpApplyLighting = state => {
     if (typeof state.TimeOfDay === "string") LightingApi.TimeOfDay = state.TimeOfDay;
 };
 window.__bloxMpHandleRpc = (packet, senderNumber) => {
+    if (packet?.mode === "player_sound" && packet.sound && Number(senderNumber) !== Number(window.__bloxMpLocalPlayerNumber)) {
+        const player = window.BloxMultiplayer?.client.room?.getPlayer(senderNumber);
+        if (player && !bloxRemoteActors.has(Number(senderNumber))) createBloxRemoteActor(player);
+        window.__bloxMpApplyActorProfile?.(Number(senderNumber), { sounds: [packet.sound], soundsComplete: false });
+        return;
+    }
     if (!packet || !Array.isArray(packet.path) || packet.path.length > 32 || !Array.isArray(packet.args)) return;
     const instances = [...luaInstances];
     const find = () => instances.find(instance => {
@@ -66864,6 +66892,21 @@ window.__bloxMpGetPlayerProfile = () => {
     for (const stat of getLuaChildren(statsFolder)) {
         if (stat?.Name && typeof stat.Value !== "undefined" && ["string", "number", "boolean"].includes(typeof stat.Value)) stats[String(stat.Name).slice(0, 32)] = stat.Value;
     }
+    const sounds = [];
+    const collectSounds = (parent, path = "", depth = 0) => {
+        if (!parent || depth > 7 || sounds.length >= 8) return;
+        const ordinals = new Map();
+        for (const child of getLuaChildren(parent)) {
+            if (!child || child.__destroyed) continue;
+            const label = `${child.ClassName}:${String(child.Name || "").slice(0, 48)}`;
+            const ordinal = ordinals.get(label) || 0; ordinals.set(label, ordinal + 1);
+            const key = `${path}/${label}:${ordinal}`;
+            if (child.ClassName === "Sound" && child.Playing) sounds.push({ key, soundId: String(child.SoundId || "").slice(0, 256), volume: Number(child.Volume) || 0, playbackSpeed: Number(child.PlaybackSpeed) || 1, looped: child.Looped === true, playing: true, timePosition: Math.max(0, Number(child.TimePosition) || 0), minDistance: Number(child.MinDistance) || 0, maxDistance: Number(child.MaxDistance) || 0, emitterSize: Number(child.EmitterSize) || 0, playSequence: Number(child.__bloxMpPlaySequence) || 0 });
+            if (child.ClassName !== "Sound") collectSounds(child, key, depth + 1);
+            if (sounds.length >= 8) break;
+        }
+    };
+    collectSounds(currentCharacterModel);
     return {
         name: String(player?.Name || "Player").slice(0, 32),
         colors: localAvatarProfile.colors || {},
@@ -66874,10 +66917,26 @@ window.__bloxMpGetPlayerProfile = () => {
         health: Number(currentPlayerHumanoid?.Health) || 0,
         maxHealth: Number(currentPlayerHumanoid?.MaxHealth) || 100,
         forceField: getLuaChildren(currentCharacterModel).some(child => child?.ClassName === "ForceField" && !child.__destroyed),
+        sounds,
+        soundsComplete: true,
         stats
     };
 };
 window.__bloxMpGetWearables = () => ({ shirtDataUrl: localAvatarProfile.shirtDataUrl || "", pantsDataUrl: localAvatarProfile.pantsDataUrl || "" });
+window.__bloxMpPublishSound = sound => {
+    if (!window.__bloxMpSendRpc || !sound || !currentCharacterModel) return;
+    const chain = [];
+    for (let node = sound; node && node !== currentCharacterModel; node = node.Parent) chain.unshift(node);
+    if (chain[0]?.Parent !== currentCharacterModel) return;
+    let parent = currentCharacterModel, key = "";
+    for (const node of chain) {
+        const siblings = getLuaChildren(parent).filter(child => child?.ClassName === node.ClassName && child?.Name === node.Name);
+        key += `/${node.ClassName}:${String(node.Name || "").slice(0, 48)}:${Math.max(0, siblings.indexOf(node))}`;
+        parent = node;
+    }
+    const descriptor = { key, soundId: String(sound.SoundId || "").slice(0, 256), volume: Number(sound.Volume) || 0, playbackSpeed: Number(sound.PlaybackSpeed) || 1, looped: sound.Looped === true, playing: sound.Playing === true, timePosition: Math.max(0, Number(sound.TimePosition) || 0), minDistance: Number(sound.MinDistance) || 0, maxDistance: Number(sound.MaxDistance) || 0, emitterSize: Number(sound.EmitterSize) || 0, playSequence: Number(sound.__bloxMpPlaySequence) || 0 };
+    window.__bloxMpSendRpc({ mode: "player_sound", sound: descriptor });
+};
 window.__bloxMpUpdateRemoteProfile = (playerNumber, profile) => {
     const index = window.__bloxMpRemotePlayers?.findIndex(player => player.UserId === playerNumber) ?? -1;
     if (index < 0) return;
@@ -66930,6 +66989,35 @@ window.__bloxMpApplyActorProfile = (playerNumber, profile = {}) => {
             const shield = InstanceApi.new("ForceField"); shield.Parent = actor.character;
         }
     } else for (const shield of getLuaChildren(actor.character).filter(child => child?.ClassName === "ForceField")) destroyLuaInstance(shield);
+    actor.remoteSounds ||= new Map();
+    const activeSoundKeys = new Set();
+    for (const descriptor of Array.isArray(profile.sounds) ? profile.sounds.slice(0, 8) : []) {
+        if (!descriptor || typeof descriptor.key !== "string" || descriptor.key.length > 600) continue;
+        activeSoundKeys.add(descriptor.key);
+        let remoteSound = actor.remoteSounds.get(descriptor.key);
+        if (!remoteSound || remoteSound.__destroyed) {
+            remoteSound = InstanceApi.new("Sound"); remoteSound.Name = `RemoteSound-${activeSoundKeys.size}`; remoteSound.Parent = actor.parts.HumanoidRootPart;
+            actor.remoteSounds.set(descriptor.key, remoteSound);
+        }
+        remoteSound.SoundId = String(descriptor.soundId || "").slice(0, 256);
+        remoteSound.Volume = Math.max(0, Math.min(10, Number(descriptor.volume) || 0));
+        remoteSound.PlaybackSpeed = Math.max(0.05, Math.min(4, Number(descriptor.playbackSpeed) || 1));
+        remoteSound.Looped = descriptor.looped === true;
+        remoteSound.MinDistance = Math.max(0, Number(descriptor.minDistance) || 0);
+        remoteSound.MaxDistance = Math.max(0, Number(descriptor.maxDistance) || 0);
+        remoteSound.EmitterSize = Math.max(0, Number(descriptor.emitterSize) || 0);
+        const sequence = Number(descriptor.playSequence) || 0;
+        if (descriptor.playing && (remoteSound.__bloxMpAppliedPlaySequence !== sequence || !remoteSound.Playing)) {
+            remoteSound.Playing = false; syncLuaSound(remoteSound);
+            remoteSound.TimePosition = Math.max(0, Number(descriptor.timePosition) || 0);
+            remoteSound.Playing = true; syncLuaSound(remoteSound, true);
+            remoteSound.__bloxMpAppliedPlaySequence = sequence;
+        } else if (!descriptor.playing && remoteSound.Playing) {
+            remoteSound.Playing = false; remoteSound.TimePosition = Math.max(0, Number(descriptor.timePosition) || 0); syncLuaSound(remoteSound);
+            remoteSound.__bloxMpAppliedPlaySequence = sequence;
+        }
+    }
+    for (const [key, remoteSound] of actor.remoteSounds) if (!activeSoundKeys.has(key) && remoteSound.Playing) { remoteSound.Playing = false; syncLuaSound(remoteSound); }
     if (actor.humanoid.Health <= 0 && !actor.ragdoll) {
         actor.ragdoll = actor.ragdollParts.map(object => {
             actor.visual.updateMatrixWorld(true); scene.attach(object);

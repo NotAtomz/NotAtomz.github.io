@@ -6,7 +6,7 @@ const PHOTON_APP_ID = (
     sessionStorage.getItem("bloxPhotonAppId") ||
     "d0123ab4-116f-4fdc-89ea-21538e0b205d"
 ).trim();
-export const PHOTON_APP_VERSION = "blox-mp-6";
+export const PHOTON_APP_VERSION = "blox-mp-7";
 export const MAX_PLAYERS = 10;
 export const ROOM_BUILD = PHOTON_APP_VERSION;
 export const ROOM_LOBBY_TYPE = "sqlLobby";

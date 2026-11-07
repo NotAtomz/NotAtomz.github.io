@@ -1,4 +1,4 @@
-import { EVENTS, MAX_PLAYERS, createGameSession, matchmakeGame, joinGameRoom, withTimeout } from "./blox-mp-net.js?v=20261106-mp6";
+import { EVENTS, MAX_PLAYERS, createGameSession, matchmakeGame, joinGameRoom, withTimeout } from "./blox-mp-net.js?v=20261106-mp7";
 
 const MAX_EVENT_BYTES = 45000;
 const SNAPSHOT_CHUNK_BYTES = 8000;
